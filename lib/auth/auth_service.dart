@@ -24,4 +24,10 @@ class AuthService {
   }
 
   Stream<User?> get authStateChanges => _auth.authStateChanges();
+
+  Future<String?> getIdToken() async {
+    final user = _auth.currentUser;
+    if (user == null) return null;
+    return await user.getIdToken();
+  }
 }

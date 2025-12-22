@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/services.dart';
+
 import 'auth_service.dart';
 import 'register_page.dart';
 
@@ -49,11 +52,36 @@ class _LoginPageState extends State<LoginPage> {
                       });
 
                       try {
-                        await authService.signIn(
+                        // 1️⃣ Sign in
+                        final user = await authService.signIn(
                           emailController.text.trim(),
                           passwordController.text.trim(),
                         );
-                        // AuthGate handles redirect
+
+                        if (user == null) {
+                          throw Exception("Login failed");
+                        }
+
+                        // 2️⃣ Get a FRESH Firebase ID token
+                        final token = await FirebaseAuth.instance
+                            .currentUser!
+                            .getIdToken(true);
+
+                        if (token == null) {
+                        throw Exception("Failed to retrieve Firebase ID token");
+                        }
+
+                        // 3️⃣ Copy token DIRECTLY to clipboard (NO wrapping)
+                        await Clipboard.setData(
+                          ClipboardData(text: token),
+                        );
+
+                        // 4️⃣ Confirmation (do NOT print token)
+                        debugPrint('Firebase ID token copied to clipboard');
+
+                        // OPTIONAL: Navigate to next screen here
+                        // Navigator.pushReplacement(...);
+
                       } catch (e) {
                         setState(() {
                           error = e.toString();
@@ -64,8 +92,9 @@ class _LoginPageState extends State<LoginPage> {
                         });
                       }
                     },
-              child:
-                  loading ? const CircularProgressIndicator() : const Text('Login'),
+              child: loading
+                  ? const CircularProgressIndicator()
+                  : const Text('Login'),
             ),
 
             TextButton(
