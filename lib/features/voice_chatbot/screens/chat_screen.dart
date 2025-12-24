@@ -10,7 +10,7 @@ import '../widgets/chat_message.dart';
 import 'history_screen.dart';
 import 'emotions_screen.dart';
 import 'session_screen.dart'; // must contain SessionsScreen
-//import 'all_emotions_screen.dart';
+import 'all_emotion_screen.dart';
 //import 'package:mobile_caregiving_and_monitoring_system/features/voice_chatbot/screens/all_emotions_screen.dart';
 
 class ChatScreen extends StatefulWidget {
@@ -187,6 +187,20 @@ class _ChatScreenState extends State<ChatScreen> {
             );
           },
         ),
+
+
+IconButton(
+  tooltip: "All Emotions (Weekly)",
+  icon: const Icon(Icons.calendar_month),
+  onPressed: () {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AllEmotionsScreen(baseUrl: _baseUrl, days: 7),
+      ),
+    );
+  },
+),
 
         // ✅ Weekly Emotions (FIXED: inside actions)
     //    IconButton(
