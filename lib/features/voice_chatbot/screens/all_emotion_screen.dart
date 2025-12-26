@@ -7,6 +7,7 @@ class AllEmotionsScreen extends StatefulWidget {
   final String baseUrl;
   final int days;
   const AllEmotionsScreen({
+    
     super.key,
     required this.baseUrl,
     this.days = 7,
