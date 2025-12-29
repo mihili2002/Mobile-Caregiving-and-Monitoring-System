@@ -66,7 +66,7 @@ class _ElderMedicationsPageState extends State<ElderMedicationsPage> {
                     return Card(
                       child: ListTile(
                         leading: const Icon(Icons.medication, color: Colors.blue),
-                        title: Text(med.drugName), // Fixed: uses drugName
+                        title: Text(med.name), 
                         subtitle: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -74,7 +74,7 @@ class _ElderMedicationsPageState extends State<ElderMedicationsPage> {
                             Text('Dosage: ${med.dosage ?? "Not specified"}'), 
                             // FIX: Handling nullable frequency
                             Text('Frequency: ${_formatFrequency(med.frequency)}'), 
-                            Text('Times: ${med.times?.join(", ") ?? "Not scheduled"}'), 
+                            // Text('Times: ${med.times?.join(", ") ?? "Not scheduled"}'), 
                             const SizedBox(height: 4),
                             Text(
                               'Valid: ${med.startDate ?? "N/A"} to ${med.endDate ?? "N/A"}',
@@ -90,9 +90,8 @@ class _ElderMedicationsPageState extends State<ElderMedicationsPage> {
     );
   }
 
-  String _formatFrequency(List<String>? frequency) {
+  String _formatFrequency(String? frequency) {
     if (frequency == null || frequency.isEmpty) return "Not specified";
-    if (frequency.contains('Daily')) return 'Daily';
-    return frequency.join(', ');
+    return frequency;
   }
 }
