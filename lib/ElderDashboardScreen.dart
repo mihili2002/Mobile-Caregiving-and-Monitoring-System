@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import '../../PatientHealthDetailsScreen.dart';
-import '../../features/voice_chatbot/screens/chat_screen.dart';
-import 'daily_routine_page.dart';
-import '../../ElderProfilePage.dart';
-import '../../models/user_model.dart';
-import 'widgets/quick_stats_widget.dart'; // Assuming this exists or will be useful
+import 'PatientHealthDetailsScreen.dart';
+import 'features/voice_chatbot/screens/chat_screen.dart';
+import 'pages/elder/daily_routine_page.dart';
+import 'ElderProfilePage.dart';
+import 'models/user_model.dart';
+import 'pages/elder/widgets/quick_stats_widget.dart'; // Assuming this exists or will be useful
 // Import other widgets if needed, user had many widgets created in lib/pages/elder/widgets based on summary
 
 class ElderDashboard extends StatelessWidget {

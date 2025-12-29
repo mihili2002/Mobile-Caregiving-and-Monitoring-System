@@ -6,7 +6,7 @@ import '../services/user_service.dart';
 import '../models/user_model.dart';
 import '../auth/login_page.dart';
 import '../pages/admin/admin_dashboard.dart';
-import '../pages/elder/elder_dashboard.dart';
+import '../ElderDashboardScreen.dart';
 import '../pages/caregiver/caregiver_dashboard.dart';
 import '../pages/therapist/therapist_dashboard.dart';
 import '../pages/home_dashboard.dart';
