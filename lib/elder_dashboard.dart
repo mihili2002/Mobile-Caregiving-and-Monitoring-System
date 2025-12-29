@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
-import 'PatientHealthDetailsScreen.dart';
+import '../../PatientHealthDetailsScreen.dart';
+import '../../features/voice_chatbot/screens/chat_screen.dart';
+import 'daily_routine_page.dart';
+import '../../ElderProfilePage.dart';
+import '../../models/user_model.dart';
+import 'widgets/quick_stats_widget.dart'; // Assuming this exists or will be useful
+// Import other widgets if needed, user had many widgets created in lib/pages/elder/widgets based on summary
 
-// ✅ Voice chatbot screen
-import 'features/voice_chatbot/screens/chat_screen.dart';
-
-class ElderDashboardScreen extends StatelessWidget {
-  const ElderDashboardScreen({Key? key}) : super(key: key);
+class ElderDashboard extends StatelessWidget {
+  final AppUser user;
+  const ElderDashboard({Key? key, required this.user}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -80,9 +84,9 @@ class ElderDashboardScreen extends StatelessWidget {
                     ),
                     IconButton(
                       onPressed: () {
-                        // Optional: Profile/settings later
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Settings coming soon')),
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const ElderProfilePage()),
                         );
                       },
                       icon: Icon(Icons.settings, color: brownDark.withOpacity(0.85)),
@@ -92,7 +96,7 @@ class ElderDashboardScreen extends StatelessWidget {
 
                 const SizedBox(height: 16),
 
-                // Welcome header card (same card style as login/register)
+                // Welcome header card
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
@@ -122,9 +126,9 @@ class ElderDashboardScreen extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text(
-                              'Welcome 👋',
-                              style: TextStyle(
+                            Text(
+                              'Welcome ${user.name ?? 'Back'} 👋',
+                              style: const TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.w800,
                                 color: brownDark,
@@ -173,8 +177,14 @@ class ElderDashboardScreen extends StatelessWidget {
                         icon: Icons.schedule,
                         gradient: const [Color(0xFF4E342E), Color(0xFF8D6E63)],
                         onTap: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Daily Routine coming soon')),
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => DailyRoutinePage(
+                                elderId: user.uid,
+                                elderName: user.name,
+                              ),
+                            ),
                           );
                         },
                       ),

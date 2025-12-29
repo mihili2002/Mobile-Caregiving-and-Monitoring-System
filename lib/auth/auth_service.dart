@@ -1,7 +1,11 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import '../models/user_model.dart';
+import '../services/user_service.dart';
 
 class AuthService {
-  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseAuth _authc = FirebaseAuth.instance;
+
+  User? get currentUser => _auth.currentUser;
 
   Future<User?> signIn(String email, String password) async {
     final result = await _auth.signInWithEmailAndPassword(
@@ -29,5 +33,11 @@ class AuthService {
     final user = _auth.currentUser;
     if (user == null) return null;
     return await user.getIdToken();
+  }
+
+  Future<AppUser?> getCurrentAppUser() async {
+    final user = _auth.currentUser;
+    if (user == null) return null;
+    return await UserService().getUser(user.uid);
   }
 }

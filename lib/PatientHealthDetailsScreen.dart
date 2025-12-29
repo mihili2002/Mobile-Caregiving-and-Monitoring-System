@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'ElderDashboardScreen.dart';
+import 'widgets/role_based_wrapper.dart';
 
 enum Gender { male, female }
 
@@ -108,6 +109,7 @@ class _PatientHealthDetailsScreenState extends State<PatientHealthDetailsScreen>
 
     try {
       final doc = {
+        'uid': FirebaseAuth.instance.currentUser?.uid,
         'age': int.tryParse(_ageController.text.trim()),
         'gender': _gender == Gender.male ? 'Male' : 'Female',
         'height': double.tryParse(_heightController.text.trim()),
@@ -132,14 +134,20 @@ class _PatientHealthDetailsScreenState extends State<PatientHealthDetailsScreen>
         'createdAt': Timestamp.now(),
       };
 
-      // Save to Firestore
-      await FirebaseFirestore.instance.collection('elder_health_profiles').add(doc);
+      // Save to Firestore (Update existing or create new)
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid != null) {
+        await FirebaseFirestore.instance
+            .collection('elder_health_profiles')
+            .doc(uid)
+            .set(doc, SetOptions(merge: true));
+      }
 
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Details saved successfully')));
 
       // Navigate to ElderDashboardScreen and replace current screen
       if (!mounted) return;
-      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const ElderDashboardScreen()));
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const RoleBasedWrapper()));
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error saving details: $e')));
     } finally {

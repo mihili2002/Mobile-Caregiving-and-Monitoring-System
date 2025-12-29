@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../main.dart';
-import '../ElderDashboardScreen.dart';
+import '../widgets/role_based_wrapper.dart';
 import 'login_page.dart';
 
 class AuthGate extends StatelessWidget {
@@ -19,8 +19,8 @@ class AuthGate extends StatelessWidget {
         }
 
         if (snapshot.hasData) {
-          // ✅ Show the elder dashboard instead of the Flutter demo home
-          return const ElderDashboardScreen();
+          // ✅ Show role based wrapper
+          return const RoleBasedWrapper();
         }
 
         // ✅ Show login page when logged out
