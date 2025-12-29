@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
 import 'auth_service.dart';
+import '../services/user_service.dart';
+import '../models/user_model.dart';
+import '../widgets/session_wrapper.dart';
+import '../widgets/auth_wrapper.dart';
+import '../pages/elder/onboarding_flow.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -34,20 +39,57 @@ class _RegisterPageState extends State<RegisterPage> {
     });
 
     try {
-      // Assumption: your AuthService.register accepts (username, password)
+      // 1. Register in Firebase Auth
       final user = await authService.register(
         usernameController.text.trim(),
         passwordController.text.trim(),
       );
 
-      // Save role
-      await user!.updateDisplayName(role);
-      await user.reload();
+      if (user != null) {
+        // 2. Parse Role
+        UserRole userRole;
+        switch (role) {
+          case 'elder':
+            userRole = UserRole.elder;
+            break;
+          case 'caregiver':
+            userRole = UserRole.caregiver;
+            break;
+          case 'patient':
+            userRole = UserRole.elder; // Map patient to elder
+            break;
+          default:
+            userRole = UserRole.elder;
+        }
 
-      if (!mounted) return;
+        // 3. Save to Firestore (Users Collection)
+        final userService = UserService();
+        final name = usernameController.text.trim().split('@')[0]; // Simple name extraction
+        
+        await userService.saveUser(AppUser(
+          uid: user.uid,
+          email: user.email ?? usernameController.text.trim(),
+          role: userRole,
+          name: name,
+        ));
 
-      // AuthGate will route user automatically
-      Navigator.pop(context);
+        if (!mounted) return;
+
+        // 4. Redirect based on Role
+        if (userRole == UserRole.elder) {
+          // Elders go to Onboarding
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const SessionWrapper(child: ElderOnboardingFlow())),
+          );
+        } else {
+          // Others go to Dashboard via AuthWrapper
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const SessionWrapper(child: AuthWrapper())),
+          );
+        }
+      }
     } catch (e) {
       setState(() => error = e.toString());
     } finally {

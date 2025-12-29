@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:firebase_auth/firebase_auth.dart';
+import '../models/user_model.dart';
+import '../services/user_service.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter/services.dart'; // Clipboard
 import 'package:flutter/foundation.dart'; // debugPrint
@@ -8,6 +10,8 @@ import 'package:flutter/foundation.dart'; // debugPrint
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
+
+  User? get currentUser => _auth.currentUser;
 
   static const String _tokenKey = "idToken";
 
@@ -134,5 +138,11 @@ class AuthService {
   Future<void> dispose() async {
     await _idTokenSub?.cancel();
     _idTokenSub = null;
+  }
+
+  Future<AppUser?> getCurrentAppUser() async {
+    final user = _auth.currentUser;
+    if (user == null) return null;
+    return await UserService().getUser(user.uid);
   }
 }
