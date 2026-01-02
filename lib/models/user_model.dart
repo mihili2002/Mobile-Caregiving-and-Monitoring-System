@@ -1,6 +1,7 @@
 enum UserRole {
   elder,
   caregiver,
+  doctor,
   admin,
   therapist,
   familyMember,
@@ -43,6 +44,8 @@ class AppUser {
         return UserRole.elder;
       case 'caregiver':
         return UserRole.caregiver;
+      case 'doctor':
+        return UserRole.doctor;
       case 'therapist':
         return UserRole.therapist;
       case 'admin':

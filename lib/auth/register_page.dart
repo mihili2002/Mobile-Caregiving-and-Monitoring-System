@@ -55,6 +55,9 @@ class _RegisterPageState extends State<RegisterPage> {
           case 'caregiver':
             userRole = UserRole.caregiver;
             break;
+          case 'doctor':
+            userRole = UserRole.doctor;
+            break;
           case 'patient':
             userRole = UserRole.elder; // Map patient to elder
             break;
@@ -65,7 +68,7 @@ class _RegisterPageState extends State<RegisterPage> {
         // 3. Save to Firestore (Users Collection)
         final userService = UserService();
         final name = usernameController.text.trim().split('@')[0]; // Simple name extraction
-        
+
         await userService.saveUser(AppUser(
           uid: user.uid,
           email: user.email ?? usernameController.text.trim(),
@@ -230,6 +233,7 @@ class _RegisterPageState extends State<RegisterPage> {
                         DropdownMenuItem(value: 'elder', child: Text('Elder')),
                         DropdownMenuItem(value: 'caregiver', child: Text('Caregiver')),
                         DropdownMenuItem(value: 'patient', child: Text('Patient')),
+                        DropdownMenuItem(value: 'doctor', child: Text('Doctor')),
                       ],
                       onChanged: loading ? null : (v) => setState(() => role = v!),
                       decoration: InputDecoration(

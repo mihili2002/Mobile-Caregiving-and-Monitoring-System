@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import 'PatientHealthDetailsScreen.dart';
 import 'features/voice_chatbot/screens/chat_screen.dart';
 import 'pages/elder/daily_routine_page.dart';
 import 'ElderProfilePage.dart';
 import 'models/user_model.dart';
-import 'pages/elder/widgets/quick_stats_widget.dart'; // Assuming this exists or will be useful
-// Import other widgets if needed, user had many widgets created in lib/pages/elder/widgets based on summary
+
+// ✅ Your Meal Plan Dashboard
+import 'pages/elder/meal_plans/elder_meal_plan_dashboard.dart';
 
 class ElderDashboard extends StatelessWidget {
   final AppUser user;
@@ -34,7 +34,7 @@ class ElderDashboard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Top bar (custom to match your style)
+                // Top bar
                 Row(
                   children: [
                     Container(
@@ -86,7 +86,9 @@ class ElderDashboard extends StatelessWidget {
                       onPressed: () {
                         Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (_) => const ElderProfilePage()),
+                          MaterialPageRoute(
+                            builder: (_) => const ElderProfilePage(),
+                          ),
                         );
                       },
                       icon: Icon(Icons.settings, color: brownDark.withOpacity(0.85)),
@@ -96,7 +98,7 @@ class ElderDashboard extends StatelessWidget {
 
                 const SizedBox(height: 16),
 
-                // Welcome header card
+                // Welcome card
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
@@ -151,7 +153,7 @@ class ElderDashboard extends StatelessWidget {
 
                 const SizedBox(height: 16),
 
-                // Grid
+                // Grid of Feature Cards
                 Expanded(
                   child: GridView.count(
                     crossAxisCount: 2,
@@ -171,6 +173,7 @@ class ElderDashboard extends StatelessWidget {
                           );
                         },
                       ),
+
                       _FeatureCard(
                         title: 'Daily Routine',
                         subtitle: 'Reminders & habits',
@@ -182,12 +185,14 @@ class ElderDashboard extends StatelessWidget {
                             MaterialPageRoute(
                               builder: (_) => DailyRoutinePage(
                                 elderId: user.uid,
-                                elderName: user.name,
+                                elderName: user.name, // ✅ FIXED LINE
                               ),
                             ),
                           );
                         },
                       ),
+
+                      // ✅ Meal Planner (NOW opens Elder Meal Plan Dashboard)
                       _FeatureCard(
                         title: 'Meal Planner',
                         subtitle: 'Healthy meals',
@@ -197,11 +202,14 @@ class ElderDashboard extends StatelessWidget {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => const PatientHealthDetailsScreen(),
+                              // ✅ FIXED: No elderId is needed anymore.
+                              // Backend detects elder via Firebase token.
+                              builder: (_) => const ElderMealPlanDashboard(),
                             ),
                           );
                         },
                       ),
+
                       _FeatureCard(
                         title: 'Therapist',
                         subtitle: 'Mental support',
@@ -267,7 +275,6 @@ class _FeatureCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Icon badge with gradient (matches buttons in login/register)
                 Container(
                   width: 52,
                   height: 52,
@@ -288,7 +295,6 @@ class _FeatureCard extends StatelessWidget {
                   ),
                   child: Icon(icon, color: Colors.white, size: 28),
                 ),
-
                 const SizedBox(height: 12),
 
                 Text(
@@ -299,7 +305,6 @@ class _FeatureCard extends StatelessWidget {
                     color: brownDark,
                   ),
                 ),
-
                 const SizedBox(height: 6),
 
                 Text(

@@ -2,6 +2,15 @@ import 'package:flutter/material.dart';
 import 'auth_service.dart';
 import 'register_page.dart';
 
+// ✅ add these imports
+import '../models/user_model.dart';
+import '../ElderDashboardScreen.dart';
+
+// ✅ NEW imports for token copy + debug print
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart';
+
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
 
@@ -34,13 +43,70 @@ class _LoginPageState extends State<LoginPage> {
     });
 
     try {
-      // Assumption: your AuthService.signIn accepts (username, password)
-      await authService.signIn(
+      // ---------------------------------------------------
+      // ✅ 1) Firebase sign-in (get User back)
+      // ---------------------------------------------------
+      final User? user = await authService.signIn(
         usernameController.text.trim(),
         passwordController.text.trim(),
       );
-      // AuthGate handles redirect
+
+      if (user == null) {
+        throw Exception("Login failed (Firebase user is null)");
+      }
+
+      // ---------------------------------------------------
+      // ✅ 2) Force refresh token so custom claims appear
+      // ---------------------------------------------------
+      final tokenResult = await user.getIdTokenResult(true);
+
+      // ✅ DEBUG ONLY: print role claims + token
+      if (kDebugMode) {
+        debugPrint("✅ Firebase Claims => ${tokenResult.claims}");
+        debugPrint("✅ Firebase Token  => ${tokenResult.token}");
+      }
+
+      // ---------------------------------------------------
+      // ✅ 3) Copy token to clipboard for Swagger testing
+      // ---------------------------------------------------
+      final token = tokenResult.token;
+      if (token != null && token.isNotEmpty) {
+        await Clipboard.setData(ClipboardData(text: token));
+
+        if (kDebugMode) {
+          debugPrint("✅ Token copied to clipboard");
+        }
+      }
+
+      // ---------------------------------------------------
+      // ✅ 4) Fetch AppUser from Firestore
+      // ---------------------------------------------------
+      final AppUser? appUser = await authService.getCurrentAppUser();
+
+      if (appUser == null) {
+        throw Exception(
+          "User profile not found in Firestore. "
+          "You may have registered in Firebase Auth but didn't save the user document.",
+        );
+      }
+
+      if (!mounted) return;
+
+      // ---------------------------------------------------
+      // ✅ 5) Navigate based on role
+      // ---------------------------------------------------
+      if (appUser.role == UserRole.elder) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => ElderDashboard(user: appUser)),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Logged in as ${appUser.role.name}")),
+        );
+      }
     } catch (e) {
+      if (!mounted) return;
       setState(() => error = e.toString());
     } finally {
       if (mounted) setState(() => loading = false);
@@ -77,7 +143,7 @@ class _LoginPageState extends State<LoginPage> {
                   children: [
                     const SizedBox(height: 10),
 
-                    // Logo + App name (same as RegisterPage)
+                    // Logo + App name
                     Column(
                       children: [
                         Container(
@@ -113,7 +179,6 @@ class _LoginPageState extends State<LoginPage> {
 
                     const SizedBox(height: 22),
 
-                    // Title
                     Text(
                       'Welcome Back',
                       style: theme.textTheme.headlineSmall?.copyWith(
@@ -150,7 +215,6 @@ class _LoginPageState extends State<LoginPage> {
                       const SizedBox(height: 12),
                     ],
 
-                    // Username
                     _SoftField(
                       controller: usernameController,
                       hintText: 'Username',
@@ -160,7 +224,6 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                     const SizedBox(height: 12),
 
-                    // Password
                     _SoftField(
                       controller: passwordController,
                       hintText: 'Password',
@@ -182,7 +245,6 @@ class _LoginPageState extends State<LoginPage> {
 
                     const SizedBox(height: 22),
 
-                    // Sign in button (same style as register)
                     SizedBox(
                       height: 52,
                       child: ElevatedButton(
@@ -233,7 +295,6 @@ class _LoginPageState extends State<LoginPage> {
 
                     const SizedBox(height: 14),
 
-                    // Bottom link (to register)
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -265,7 +326,6 @@ class _LoginPageState extends State<LoginPage> {
 
                     const SizedBox(height: 14),
 
-                    // Optional illustration placeholder (same spacing as register)
                     Container(
                       height: 96,
                       margin: const EdgeInsets.symmetric(horizontal: 70),
@@ -295,7 +355,6 @@ class _LoginPageState extends State<LoginPage> {
   }
 }
 
-// Same reusable field as RegisterPage (keeps identical look)
 class _SoftField extends StatelessWidget {
   final TextEditingController controller;
   final String hintText;
