@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart';
 import 'voice_service.dart';
 
 class VoiceReminderService {
@@ -12,7 +14,10 @@ class VoiceReminderService {
   String _riskTier = "Tier 1";
   Timer? _timer;
   final Set<String> _spokenTaskIds = {}; 
+  
+  StreamSubscription<QuerySnapshot>? _subscription;
 
+  // Restore helper methods
   void updateTasks(List<dynamic> tasks, String tier) {
     _tasks = tasks;
     _riskTier = tier;
@@ -22,6 +27,41 @@ class VoiceReminderService {
   void updateRiskTier(String tier) {
     _riskTier = tier;
     debugPrint("VoiceReminderService: Updated Risk Tier to $tier");
+  }
+
+  // Start listening to Firestore for real-time updates
+  void listen(String uid) {
+    if (_subscription != null) return;
+    
+    debugPrint("VoiceReminderService: Listening to Firestore for $uid...");
+    
+    // Switch to Query-based listening to avoid Permission Denied on non-existent docs
+    // Field 'date' is stored as YYYY-MM-DD in ai_routes.py
+    final now = DateTime.now();
+    final dateStr = DateFormat('yyyy-MM-dd').format(now);
+    
+    // Use QuerySnapshot instead of DocumentSnapshot
+    // We listen to the schedules collection where uid matches and date matches today
+    final query = FirebaseFirestore.instance
+        .collection('schedules')
+        .where('uid', isEqualTo: uid)
+        .where('date', isEqualTo: dateStr)
+        .limit(1);
+
+    _subscription = query.snapshots().listen((querySnapshot) {
+       if (querySnapshot.docs.isNotEmpty) {
+          final data = querySnapshot.docs.first.data();
+          if (data['tasks'] != null) {
+              final newTasks = List<dynamic>.from(data['tasks']);
+              updateTasks(newTasks, _riskTier);
+          }
+       } else {
+          // No schedule yet for today, cleared tasks or empty
+          // updateTasks([], _riskTier); // Optional: clear tasks if day changed?
+       }
+    }, onError: (e) {
+        debugPrint("VoiceReminderService: Firestore Listen Error: $e");
+    });
   }
 
   void start() {
@@ -35,6 +75,8 @@ class VoiceReminderService {
   void stop() {
     _timer?.cancel();
     _timer = null;
+    _subscription?.cancel();
+    _subscription = null;
   }
 
   void _checkReminders() async {

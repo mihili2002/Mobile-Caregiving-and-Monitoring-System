@@ -4,6 +4,7 @@ import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:permission_handler/permission_handler.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:uuid/uuid.dart';
 
 import '../../models/user_model.dart';
 import '../../services/voice_service.dart';
@@ -23,13 +24,23 @@ class _VoiceChatbotPageState extends State<VoiceChatbotPage> {
   final TextEditingController _textController = TextEditingController();
   final VoiceService _voiceService = VoiceService();
   final stt.SpeechToText _speech = stt.SpeechToText();
+  late String _sessionId;
   
   bool _isListening = false;
+  bool _isSpeaking = false;
   String _statusText = "Hold to record your thoughts";
+  String _liveWords = "";
+  String _finalWords = "";
+
+  // New structured state
+  String _aiReply = "";
+  bool _isConfirmation = false;
+  Map<String, dynamic>? _taskPreview;
 
   @override
   void initState() {
     super.initState();
+    _sessionId = const Uuid().v4();
     _initVoice();
     
     // Auto-prompt logic
@@ -44,12 +55,31 @@ class _VoiceChatbotPageState extends State<VoiceChatbotPage> {
   
   void _initVoice() async {
     await _voiceService.init();
+
     bool available = await _speech.initialize(
-      onStatus: (status) => print('STT Status: $status'),
-      onError: (errorNotification) => print('STT Error: $errorNotification'),
+      onStatus: (status) {
+        print("STT Status: $status");
+        if (!mounted) return;
+
+        // Just update UI state, do NOT call stop here
+        if (status == "notListening" || status == "done") {
+          setState(() {
+            _isListening = false;
+          });
+        }
+      },
+      onError: (error) {
+        print("STT Error: $error");
+        if (!mounted) return;
+        setState(() {
+          _isListening = false;
+          _statusText = "Error: ${error.errorMsg}";
+        });
+      },
     );
-    if (!available) {
-        setState(() => _statusText = "Voice recognition not available");
+
+    if (!available && mounted) {
+      setState(() => _statusText = "Voice recognition not available");
     }
   }
 
@@ -64,75 +94,129 @@ class _VoiceChatbotPageState extends State<VoiceChatbotPage> {
 
 
   Future<void> _startListening() async {
+    if (_isSpeaking) return; // don't listen while speaking
+
     var status = await Permission.microphone.request();
     if (status != PermissionStatus.granted) {
-         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Microphone permission needed')));
-         return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Microphone permission needed')),
+      );
+      return;
     }
 
     if (!_speech.isAvailable) {
-        await _speech.initialize();
+      await _speech.initialize();
     }
 
     setState(() {
       _isListening = true;
       _statusText = "Listening...";
+      _liveWords = "";
+      _finalWords = "";
+      _textController.clear();
     });
-    
-    _speech.listen(
-      onResult: (val) {
-        setState(() {
-          _textController.text = val.recognizedWords;
-        });
-      },
+
+    await _speech.listen(
       localeId: "en_US",
       cancelOnError: true,
       listenFor: const Duration(seconds: 30),
-      pauseFor: const Duration(seconds: 3),
+      pauseFor: const Duration(seconds: 2),
+      partialResults: true,
+      onResult: (val) {
+        if (!mounted) return;
+
+        setState(() {
+          _liveWords = val.recognizedWords;
+          _textController.text = _liveWords;
+
+          if (val.finalResult) {
+            _finalWords = val.recognizedWords;
+          }
+        });
+      },
     );
   }
 
   Future<void> _stopListening() async {
-    _speech.stop();
+    if (!_isListening) return; // prevents double call
+    await _speech.stop();
+
     setState(() {
       _isListening = false;
       _statusText = "Processing...";
     });
-    
-    if (_textController.text.isNotEmpty) {
-        await _processVoiceCommand(_textController.text);
+
+    final capturedText = (_finalWords.trim().isNotEmpty)
+        ? _finalWords.trim()
+        : _liveWords.trim();
+
+    print("Captured final: '$capturedText'");
+
+    if (capturedText.isNotEmpty) {
+      await _processVoiceCommand(capturedText);
     } else {
-        setState(() => _statusText = "Hold to record your thoughts");
+      setState(() => _statusText = "Hold to record your thoughts");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("I didn't hear anything. Please try again.")),
+        );
+      }
     }
   }
 
   Future<void> _processVoiceCommand(String text) async {
       try {
+          setState(() {
+            _isSpeaking = true;
+          });
+          await _speech.stop();
+          
           final baseUrl = UserService.getApiUrl(context);
           final response = await http.post(
             Uri.parse('$baseUrl/api/ai/process_voice_command'),
             headers: {'Content-Type': 'application/json'},
             body: jsonEncode({
                 'uid': widget.user.uid,
-                'text': text
+                'text': text,
+                'session_id': _sessionId
             })
           );
           
           if (response.statusCode == 200) {
               final data = jsonDecode(response.body);
-              final reply = data['reply'];
-              
-              // Speak the reply
+              final reply = data['reply'] ?? "";
+              final action = data['action'] ?? "reply";
+              final isConfirmation = data['is_confirmation'] == true;
+              final taskPreview = data['task'];
+
+              if (mounted) {
+                setState(() {
+                  _aiReply = reply;
+                  _isConfirmation = isConfirmation;
+                  _taskPreview = taskPreview != null ? Map<String, dynamic>.from(taskPreview) : null;
+                  _statusText = isConfirmation ? "Checking details..." : "Speaking...";
+                });
+              }
+
+              _voiceService.setCompletionHandler(() async {
+                  if (!mounted) return;
+                  
+                  setState(() {
+                    _isSpeaking = false;
+                    if (!_isConfirmation) {
+                       _statusText = "Hold to record your thoughts";
+                    }
+                  });
+
+                  if (action == 'close') {
+                      await Future.delayed(const Duration(seconds: 2));
+                      if (mounted) Navigator.pop(context);
+                  } else {
+                      _startListening();
+                  }
+              });
+
               await _voiceService.speak(reply);
-              
-              // If it was just a recall query, maybe we don't save it as a journal entry?
-              // But for now, let's look at the action.
-              // If action is "complete_task", we might want to refresh something?
-              
-              // Only save to journal if it looks like a journal entry, 
-              // BUT the requirements say "Memory Recall Chatbot".
-              // So maybe we don't AUTO-SAVE everything to the journal UI list unless it's a "log" type.
-              // For simplicity, we can just clear the text and show the reply in a snackbar/toast
               
                if (mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -143,17 +227,20 @@ class _VoiceChatbotPageState extends State<VoiceChatbotPage> {
                   ),
                 );
               }
-              
+          } else {
+            setState(() => _isSpeaking = false);
           }
       } catch (e) {
           print("Error processing voice: $e");
+          setState(() => _isSpeaking = false);
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
           }
       }
       
       setState(() {
-          _statusText = "Hold to record your thoughts";
+          _liveWords = "";
+          _finalWords = "";
           _textController.clear();
       });
   }
@@ -174,22 +261,100 @@ class _VoiceChatbotPageState extends State<VoiceChatbotPage> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
              // Current Status / Last Reply
-             Padding(
-               padding: const EdgeInsets.all(24.0),
+             // Transcript Box
+             Container(
+               margin: const EdgeInsets.symmetric(horizontal: 24),
+               padding: const EdgeInsets.all(16),
+               width: double.infinity,
+               decoration: BoxDecoration(
+                 color: Colors.grey.shade100,
+                 borderRadius: BorderRadius.circular(12),
+                 border: Border.all(color: Colors.grey.shade300),
+               ),
                child: Text(
-                 _statusText,
-                 textAlign: TextAlign.center,
-                 style: const TextStyle(fontSize: 18, color: Colors.blueGrey),
+                 _liveWords.isEmpty ? "Your spoken text will appear here..." : _liveWords,
+                 style: const TextStyle(fontSize: 18),
                ),
              ),
              
+             const SizedBox(height: 12),
+             Text(
+               _statusText,
+               textAlign: TextAlign.center,
+               style: const TextStyle(fontSize: 16, color: Colors.blueGrey),
+             ),
+             
+             const SizedBox(height: 20),
+
+             // Task Preview Card (when confirmed)
+             if (_taskPreview != null)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Card(
+                    elevation: 4,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Row(
+                            children: [
+                              Icon(Icons.event_note, color: Colors.teal),
+                              SizedBox(width: 8),
+                              Text("Task Preview", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                            ],
+                          ),
+                          const Divider(),
+                          const SizedBox(height: 8),
+                          Text("Task: ${_taskPreview!['name']}", style: const TextStyle(fontSize: 16)),
+                          const SizedBox(height: 4),
+                          Text("Time: ${_taskPreview!['time']}", style: const TextStyle(fontSize: 16)),
+                          const SizedBox(height: 4),
+                          Text("Day: ${_taskPreview!['day_phrase']}", style: const TextStyle(fontSize: 16)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+
+             if (_isConfirmation)
+                Padding(
+                  padding: const EdgeInsets.only(top: 24),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      ElevatedButton.icon(
+                        onPressed: () => _processVoiceCommand("yes"),
+                        icon: const Icon(Icons.check),
+                        label: const Text("Yes"),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      ElevatedButton.icon(
+                        onPressed: () => _processVoiceCommand("no"),
+                        icon: const Icon(Icons.close),
+                        label: const Text("No"),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
              const SizedBox(height: 40),
 
              // Voice button
              GestureDetector(
-                onTapDown: (_) => _startListening(),
-                onTapUp: (_) => _stopListening(),
-                onTapCancel: () => _stopListening(),
+                onLongPressStart: (_) => _startListening(),
+                onLongPressEnd: (_) => _stopListening(),
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 300),
                   width: _isListening ? 150 : 120,
@@ -219,13 +384,12 @@ class _VoiceChatbotPageState extends State<VoiceChatbotPage> {
                 
              const SizedBox(height: 40),
              
-             // Instructions
-             const Padding(
+              const Padding(
                padding: EdgeInsets.symmetric(horizontal: 32),
                child: Text(
-                 "Tap and hold to add a task or ask a question.\nExample: 'Remind me to call Nikeshi at 5 PM'",
+                 "Tap and hold to add a task or ask a question.\n\nExamples:\n• 'Remind me to take my medicine at 2 PM'\n• 'Remind me to drink water'",
                  textAlign: TextAlign.center,
-                 style: TextStyle(color: Colors.grey),
+                 style: TextStyle(color: Colors.grey, height: 1.5),
                ),
              )
           ],
