@@ -10,6 +10,7 @@ import '../ElderDashboardScreen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
+import '../pages/doctor/doctor_dashboard_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -98,13 +99,25 @@ class _LoginPageState extends State<LoginPage> {
       if (appUser.role == UserRole.elder) {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (_) => ElderDashboard(user: appUser)),
+          MaterialPageRoute(
+            builder: (_) => ElderDashboard(user: appUser),
+          ),
+        );
+      } else if (appUser.role == UserRole.doctor) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const DoctorDashboardPage(),
+          ),
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Logged in as ${appUser.role.name}")),
+          SnackBar(
+            content: Text("Logged in as ${appUser.role.name}"),
+          ),
         );
       }
+
     } catch (e) {
       if (!mounted) return;
       setState(() => error = e.toString());

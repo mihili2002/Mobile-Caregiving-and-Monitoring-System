@@ -43,4 +43,53 @@ class ElderHealthSubmissionService {
       response.statusCode
     }] $message");
   }
+
+  Future<Map<String, dynamic>> getSubmissionDetails({
+    required String token,
+    required String submissionId,
+  }) async {
+    final url =
+    Uri.parse("${ApiConfig.baseUrl}/elder/health-submissions/$submissionId");
+
+    final response = await http.get(
+      url,
+      headers: {
+        "Authorization": "Bearer $token",
+        "Accept": "application/json",
+      },
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception(
+        "Failed to load submission details "
+            "(status: ${response.statusCode})",
+      );
+    }
+
+    final decoded = jsonDecode(response.body);
+
+    // ✅ Backend returns a single submission object
+    return decoded as Map<String, dynamic>;
+  }
+
+  Future<void> updateHealthDetails({
+    required String token,
+    required String submissionId,
+    required Map<String, dynamic> payload,
+  }) async {
+    final res = await http.put(
+      Uri.parse("${ApiConfig.baseUrl}/elder/health-submissions/$submissionId"),
+      headers: {
+        "Authorization": "Bearer $token",
+        "Content-Type": "application/json",
+      },
+      body: jsonEncode(payload),
+    );
+
+    if (res.statusCode != 200) {
+      throw Exception("Failed to update submission");
+    }
+  }
+
+
 }

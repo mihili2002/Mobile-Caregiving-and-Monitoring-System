@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 import '../models/meal_plan_model.dart';
 import 'meal_plan_api_service.dart';
+import '../models/all_submission_model.dart';
 
 class MealPlanService {
   final MealPlanApiService _api = MealPlanApiService();
@@ -41,6 +42,7 @@ class MealPlanService {
     return MealPlanModel.fromJson(current as Map<String, dynamic>);
   }
 
+
   /// ✅ Extract completed meal plans list from backend response
   Future<List<MealPlanModel>> getCompletedMealPlans() async {
     final data = await fetchDashboard();
@@ -66,6 +68,19 @@ class MealPlanService {
     return MealPlanModel.fromJson(json);
   }
 
+  /// ✅ Get all submitted meal plan records (summary only)
+  Future<List<AllSubmissionModel>> getAllSubmissions() async {
+    final data = await fetchDashboard();
+    print(data);
+    final list = (data["all_submissions"] as List?) ?? [];
+
+    return list
+        .map((e) => AllSubmissionModel.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+
+
   /// ✅ Backward compatible function (if your UI still calls getCompletedPlans)
   Future<List<MealPlanModel>> getCompletedPlans(String elderId) async {
     return await getCompletedMealPlans();
@@ -80,4 +95,5 @@ class MealPlanService {
   Future<MealPlanModel?> getMealPlanById(String id) async {
     return await getMealPlanDetails(id);
   }
+
 }

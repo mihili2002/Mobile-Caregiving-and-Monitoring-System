@@ -5,6 +5,7 @@ import '../../../models/meal_plan_model.dart';
 import '../../../services/meal_plan_service.dart';
 import '../../../PatientHealthDetailsScreen.dart';
 import 'meal_plan_detail_page.dart';
+import 'all_submissions_screen.dart';
 
 class ElderMealPlanDashboard extends StatefulWidget {
   const ElderMealPlanDashboard({super.key});
@@ -96,7 +97,12 @@ class _ElderMealPlanDashboardState extends State<ElderMealPlanDashboard> {
                   title: "Meal Plans",
                   subtitle: "View current & completed plans",
                   onTap: () {
-                    // You are already in meal plans dashboard, so do nothing
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const AllSubmissionsScreen(),
+                      ),
+                    );
                   },
                 ),
 
@@ -134,14 +140,14 @@ class _ElderMealPlanDashboardState extends State<ElderMealPlanDashboard> {
 
                 const SizedBox(height: 18),
 
-                _sectionTitle("Completed Meal Plans"),
-
-                const SizedBox(height: 10),
-
-                if (!_loading && _completedPlans.isEmpty)
-                  _emptyCard("No completed meal plans yet."),
-
-                ..._completedPlans.map(_completedMealPlanCard),
+                // _sectionTitle("Completed Meal Plans"),
+                //
+                // const SizedBox(height: 10),
+                //
+                // if (!_loading && _completedPlans.isEmpty)
+                //   _emptyCard("No completed meal plans yet."),
+                //
+                // ..._completedPlans.map(_completedMealPlanCard),
               ],
             ),
           ),

@@ -3,19 +3,30 @@ import 'package:flutter/material.dart';
 
 import 'widgets/role_based_wrapper.dart';
 import 'services/elder_health_submission_service.dart';
+import 'pages/elder/meal_plans/meal_plan_details_screen.dart';
 
 enum Gender { male, female }
 
 class PatientHealthDetailsScreen extends StatefulWidget {
-  const PatientHealthDetailsScreen({Key? key}) : super(key: key);
+  final String? submissionId;
+  final String? status;
+
+  const PatientHealthDetailsScreen({
+    Key? key,
+    this.submissionId,
+    this.status,
+  }) : super(key: key);
+
+  bool get isReadOnly => status == "approved";
 
   @override
   State<PatientHealthDetailsScreen> createState() =>
       _PatientHealthDetailsScreenState();
 }
 
-class _PatientHealthDetailsScreenState extends State<PatientHealthDetailsScreen> {
-  // Controllers
+class _PatientHealthDetailsScreenState
+    extends State<PatientHealthDetailsScreen> {
+  // ---------------- CONTROLLERS ----------------
   final TextEditingController _ageController = TextEditingController();
   final TextEditingController _heightController = TextEditingController();
   final TextEditingController _weightController = TextEditingController();
@@ -25,120 +36,116 @@ class _PatientHealthDetailsScreenState extends State<PatientHealthDetailsScreen>
   final TextEditingController _cholesterolController = TextEditingController();
   final TextEditingController _dailyStepsController = TextEditingController();
   final TextEditingController _sleepHoursController = TextEditingController();
-  final TextEditingController _foodAllergiesController = TextEditingController();
-  final TextEditingController _foodAversionsController = TextEditingController();
+  final TextEditingController _foodAllergiesController =
+  TextEditingController();
+  final TextEditingController _foodAversionsController =
+  TextEditingController();
+  final TextEditingController _calorieController = TextEditingController();
+  final TextEditingController _proteinController = TextEditingController();
+  final TextEditingController _carbController = TextEditingController();
+  final TextEditingController _fatController = TextEditingController();
 
+  // ---------------- STATE ----------------
   Gender? _gender;
   final List<String> _chronicConditions = [];
   bool _geneticRisk = false;
-
-  String? _exerciseFrequency; // Low, Moderate, High
+  String? _exerciseFrequency;
   bool _smoking = false;
   bool _alcohol = false;
-
   String? _dietaryHabit;
   String? _preferredCuisine;
 
   bool _isLoading = false;
+  bool get _readOnly => widget.isReadOnly;
 
   final _formKey = GlobalKey<FormState>();
   final ElderHealthSubmissionService _submissionService =
-      ElderHealthSubmissionService();
+  ElderHealthSubmissionService();
 
+  // ---------------- INIT ----------------
   @override
-  void dispose() {
-    _ageController.dispose();
-    _heightController.dispose();
-    _weightController.dispose();
-    _systolicController.dispose();
-    _diastolicController.dispose();
-    _bloodSugarController.dispose();
-    _cholesterolController.dispose();
-    _dailyStepsController.dispose();
-    _sleepHoursController.dispose();
-    _foodAllergiesController.dispose();
-    _foodAversionsController.dispose();
-    super.dispose();
+  void initState() {
+    super.initState();
+    if (widget.submissionId != null) {
+      _loadSubmission();
+    }
   }
 
-  String? _requiredNumberValidator(String? value) {
-    if (value == null || value.trim().isEmpty) return 'Required';
-    if (double.tryParse(value) == null) return 'Enter a valid number';
-    return null;
+  // ---------------- LOAD SUBMISSION ----------------
+  Future<void> _loadSubmission() async {
+    setState(() => _isLoading = true);
+
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+
+      final token = await user.getIdToken();
+      if (token == null) return;
+
+      final data = await _submissionService.getSubmissionDetails(
+        token: token,
+        submissionId: widget.submissionId!,
+      );
+
+      _ageController.text = data["age"].toString();
+      _heightController.text = data["height_cm"].toString();
+      _weightController.text = data["weight_kg"].toString();
+      _systolicController.text =
+          data["blood_pressure"]["systolic"].toString();
+      _diastolicController.text =
+          data["blood_pressure"]["diastolic"].toString();
+      _bloodSugarController.text =
+          data["blood_sugar_mg_dl"].toString();
+      _cholesterolController.text =
+          data["cholesterol_mg_dl"].toString();
+      _dailyStepsController.text =
+          data["daily_steps"].toString();
+      _sleepHoursController.text =
+          data["sleep_hours"].toString();
+
+      _calorieController.text =
+          data["caloric_intake"].toString();
+      _proteinController.text =
+          data["protein_intake"].toString();
+      _carbController.text =
+          data["carbohydrate_intake"].toString();
+      _fatController.text =
+          data["fat_intake"].toString();
+
+      _foodAllergiesController.text =
+          data["food_allergies"] ?? "";
+      _foodAversionsController.text =
+          data["food_aversions"] ?? "";
+
+      _gender = data["gender"] == "Male" ? Gender.male : Gender.female;
+      _dietaryHabit = data["dietary_habit"];
+      _preferredCuisine = data["preferred_cuisine"];
+      _exerciseFrequency = _mapExercise(data["exercise_frequency"]);
+      _smoking = data["smoking"] ?? false;
+      _alcohol = data["alcohol"] ?? false;
+      _geneticRisk = data["genetic_risk"] ?? false;
+
+      _chronicConditions
+        ..clear()
+        ..addAll(List<String>.from(data["chronic_conditions"] ?? []));
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
-  void _clearForm() {
-    _formKey.currentState?.reset();
+  String _mapExercise(int v) =>
+      v == 1 ? "Low" : v == 2 ? "Moderate" : "High";
 
-    _ageController.clear();
-    _heightController.clear();
-    _weightController.clear();
-    _systolicController.clear();
-    _diastolicController.clear();
-    _bloodSugarController.clear();
-    _cholesterolController.clear();
-    _dailyStepsController.clear();
-    _sleepHoursController.clear();
-    _foodAllergiesController.clear();
-    _foodAversionsController.clear();
-
-    setState(() {
-      _gender = null;
-      _chronicConditions.clear();
-      _geneticRisk = false;
-      _exerciseFrequency = null;
-      _smoking = false;
-      _alcohol = false;
-      _dietaryHabit = null;
-      _preferredCuisine = null;
-    });
-  }
-
+  // ---------------- SUBMIT ----------------
   Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fix validation errors')),
-      );
-      return;
-    }
-    if (_gender == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select gender')),
-      );
-      return;
-    }
-    if (_dietaryHabit == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select dietary habit')),
-      );
-      return;
-    }
-    if (_preferredCuisine == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select preferred cuisine')),
-      );
-      return;
-    }
-    if (_exerciseFrequency == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select exercise frequency')),
-      );
-      return;
-    }
+    if (_readOnly) return;
+    if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
 
     try {
-      final currentUser = FirebaseAuth.instance.currentUser;
-      if (currentUser == null) {
-        throw Exception("User not logged in.");
-      }
-
-      // ✅ FIX: token is nullable, must validate it
-      final token = await currentUser.getIdToken();
-      if (token == null || token.isEmpty) {
-        throw Exception("Failed to get Firebase token. Please login again.");
-      }
+      final token =
+      await FirebaseAuth.instance.currentUser!.getIdToken();
 
       final payload = {
         "age": int.parse(_ageController.text.trim()),
@@ -151,72 +158,74 @@ class _PatientHealthDetailsScreenState extends State<PatientHealthDetailsScreen>
           "systolic": int.parse(_systolicController.text.trim()),
           "diastolic": int.parse(_diastolicController.text.trim()),
         },
-        "blood_sugar_mg_dl": double.parse(_bloodSugarController.text.trim()),
-        "cholesterol_mg_dl": double.parse(_cholesterolController.text.trim()),
+        "blood_sugar_mg_dl":
+        double.parse(_bloodSugarController.text.trim()),
+        "cholesterol_mg_dl":
+        double.parse(_cholesterolController.text.trim()),
         "daily_steps": int.parse(_dailyStepsController.text.trim()),
-        "exercise_frequency": _exerciseFrequency == "Low"
+        "exercise_frequency":
+        _exerciseFrequency == "Low"
             ? 1
             : _exerciseFrequency == "Moderate"
-                ? 2
-                : 3,
-        "sleep_hours": double.parse(_sleepHoursController.text.trim()),
+            ? 2
+            : 3,
+        "sleep_hours":
+        double.parse(_sleepHoursController.text.trim()),
         "smoking": _smoking,
         "alcohol": _alcohol,
         "dietary_habit": _dietaryHabit,
-        "food_allergies": _foodAllergiesController.text.trim().isEmpty
+        "caloric_intake":
+        double.parse(_calorieController.text.trim()),
+        "protein_intake":
+        double.parse(_proteinController.text.trim()),
+        "carbohydrate_intake":
+        double.parse(_carbController.text.trim()),
+        "fat_intake":
+        double.parse(_fatController.text.trim()),
+        "food_allergies":
+        _foodAllergiesController.text.trim().isEmpty
             ? null
             : _foodAllergiesController.text.trim(),
         "preferred_cuisine": _preferredCuisine,
-        "food_aversions": _foodAversionsController.text.trim().isEmpty
+        "food_aversions":
+        _foodAversionsController.text.trim().isEmpty
             ? null
             : _foodAversionsController.text.trim(),
-        "extra": {"notes": "Submitted from mobile app"}
       };
 
-      await _submissionService.submitHealthDetails(
-        token: token,
-        payload: payload,
-      );
-
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Health details submitted successfully ✅")),
-      );
+      if (widget.submissionId == null) {
+        await _submissionService.submitHealthDetails(
+          token: token!,
+          payload: payload,
+        );
+      } else {
+        await _submissionService.updateHealthDetails(
+          token: token!,
+          submissionId: widget.submissionId!,
+          payload: payload,
+        );
+      }
 
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const RoleBasedWrapper()),
-      );
-    } catch (e) {
-      debugPrint("❌ Submission error: $e");
-
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error submitting details: $e")),
       );
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  Widget _sectionCard({required Widget child}) {
-    return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-      elevation: 2,
-      margin: const EdgeInsets.symmetric(vertical: 10),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: child,
-      ),
-    );
-  }
 
+  // ---------------- UI ----------------
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Upload Health Details"),
+        title: Text(
+          _readOnly
+              ? "Health Details (Approved)"
+              : "Upload Health Details",
+        ),
         centerTitle: true,
       ),
       body: Stack(
@@ -226,298 +235,265 @@ class _PatientHealthDetailsScreenState extends State<PatientHealthDetailsScreen>
             child: Form(
               key: _formKey,
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   _basicInfoCard(),
                   _healthConditionsCard(),
                   _lifestyleCard(),
+                  _nutritionTargetsCard(),
                   _dietaryCard(),
+                  const SizedBox(height: 16),
 
-                  const SizedBox(height: 14),
-
-                  ElevatedButton(
-                    onPressed: _isLoading ? null : _submit,
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
+                  if (!_readOnly)
+                    ElevatedButton(
+                      onPressed: _isLoading ? null : _submit,
+                      child: const Text("Submit Details"),
                     ),
-                    child: const Text(
-                      "Submit Details to Doctor",
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
 
-                  OutlinedButton(
-                    onPressed: _isLoading ? null : _clearForm,
-                    child: const Text("Clear Form"),
-                  ),
+                  if (_readOnly)
+                    ElevatedButton.icon(
+                      icon: const Icon(Icons.restaurant_menu),
+                      label: const Text("Show Meal Plan"),
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => MealPlanDetailsScreen(
+                              submissionId: widget.submissionId!,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
                 ],
               ),
             ),
           ),
-
           if (_isLoading)
             Container(
-              color: Colors.black.withOpacity(0.25),
+              color: Colors.black26,
               child: const Center(child: CircularProgressIndicator()),
-            )
+            ),
         ],
       ),
     );
   }
 
-  // ---------------- SECTIONS ----------------
-  Widget _basicInfoCard() {
-    return _sectionCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+  // ---------------- HELPERS ----------------
+  bool _enabled() => !_readOnly;
+
+  InputDecoration _dec(String label) =>
+      InputDecoration(labelText: label);
+
+  Widget _field(
+      TextEditingController c,
+      String label, {
+        bool number = true,
+      }) =>
+      TextFormField(
+        controller: c,
+        enabled: _enabled(),
+        keyboardType:
+        number ? TextInputType.number : TextInputType.text,
+        decoration: _dec(label),
+      );
+
+  // ---------------- SECTIONS (ORIGINAL UI PRESERVED) ----------------
+  Widget _basicInfoCard() => _sectionCard(
+    title: "Basic Information",
+    children: [
+      _field(_ageController, "Age"),
+      _genderRow(),
+      Row(
         children: [
-          const Text("Basic Information",
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-          const SizedBox(height: 12),
-          TextFormField(
-            controller: _ageController,
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(labelText: "Age"),
-            validator: _requiredNumberValidator,
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () => setState(() => _gender = Gender.male),
-                  child: const Text("Male"),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () => setState(() => _gender = Gender.female),
-                  child: const Text("Female"),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: TextFormField(
-                  controller: _heightController,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: "Height (cm)"),
-                  validator: _requiredNumberValidator,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: TextFormField(
-                  controller: _weightController,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: "Weight (kg)"),
-                  validator: _requiredNumberValidator,
-                ),
-              ),
-            ],
-          ),
+          Expanded(child: _field(_heightController, "Height (cm)")),
+          const SizedBox(width: 10),
+          Expanded(child: _field(_weightController, "Weight (kg)")),
         ],
       ),
-    );
-  }
+    ],
+  );
 
-  Widget _healthConditionsCard() {
-    return _sectionCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _healthConditionsCard() => _sectionCard(
+    title: "Health Conditions",
+    children: [
+      Wrap(
+        spacing: 8,
         children: [
-          const Text("Health Conditions",
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 8,
-            children: [
-              _condChip("Diabetes"),
-              _condChip("Hypertension"),
-              _condChip("Heart Disease"),
-              _condChip("None"),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(
-                child: TextFormField(
-                  controller: _systolicController,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: "Systolic"),
-                  validator: _requiredNumberValidator,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: TextFormField(
-                  controller: _diastolicController,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: "Diastolic"),
-                  validator: _requiredNumberValidator,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          TextFormField(
-            controller: _bloodSugarController,
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(labelText: "Blood Sugar (mg/dL)"),
-            validator: _requiredNumberValidator,
-          ),
-          const SizedBox(height: 10),
-          TextFormField(
-            controller: _cholesterolController,
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(labelText: "Cholesterol (mg/dL)"),
-            validator: _requiredNumberValidator,
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              const Text("Genetic Risk"),
-              const Spacer(),
-              Switch(
-                value: _geneticRisk,
-                onChanged: (v) => setState(() => _geneticRisk = v),
-              ),
-            ],
-          ),
+          _condChip("Diabetes"),
+          _condChip("Hypertension"),
+          _condChip("Heart Disease"),
+          _condChip("None"),
         ],
       ),
-    );
-  }
-
-  Widget _lifestyleCard() {
-    return _sectionCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      Row(
         children: [
-          const Text("Lifestyle Information",
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-          const SizedBox(height: 12),
-          TextFormField(
-            controller: _dailyStepsController,
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(labelText: "Daily Steps"),
-            validator: _requiredNumberValidator,
-          ),
-          const SizedBox(height: 10),
-          DropdownButtonFormField<String>(
-            value: _exerciseFrequency,
-            decoration:
-                const InputDecoration(labelText: "Exercise Frequency"),
-            items: const [
-              DropdownMenuItem(value: "Low", child: Text("Low")),
-              DropdownMenuItem(value: "Moderate", child: Text("Moderate")),
-              DropdownMenuItem(value: "High", child: Text("High")),
-            ],
-            onChanged: (v) => setState(() => _exerciseFrequency = v),
-            validator: (v) => v == null ? "Required" : null,
-          ),
-          const SizedBox(height: 10),
-          TextFormField(
-            controller: _sleepHoursController,
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(labelText: "Sleep Hours"),
-            validator: _requiredNumberValidator,
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              const Text("Smoking"),
-              const Spacer(),
-              Switch(value: _smoking, onChanged: (v) => setState(() => _smoking = v)),
-            ],
-          ),
-          Row(
-            children: [
-              const Text("Alcohol"),
-              const Spacer(),
-              Switch(value: _alcohol, onChanged: (v) => setState(() => _alcohol = v)),
-            ],
-          ),
+          Expanded(child: _field(_systolicController, "Systolic")),
+          const SizedBox(width: 10),
+          Expanded(child: _field(_diastolicController, "Diastolic")),
         ],
       ),
-    );
-  }
+      _field(_bloodSugarController, "Blood Sugar (mg/dL)"),
+      _field(_cholesterolController, "Cholesterol (mg/dL)"),
+      SwitchListTile(
+        title: const Text("Genetic Risk"),
+        value: _geneticRisk,
+        onChanged: _enabled()
+            ? (v) => setState(() => _geneticRisk = v)
+            : null,
+      ),
+    ],
+  );
 
-  Widget _dietaryCard() {
-    return _sectionCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _lifestyleCard() => _sectionCard(
+    title: "Lifestyle Information",
+    children: [
+      _field(_dailyStepsController, "Daily Steps"),
+      DropdownButtonFormField<String>(
+        value: _exerciseFrequency,
+        decoration:
+        const InputDecoration(labelText: "Exercise Frequency"),
+        items: const [
+          DropdownMenuItem(value: "Low", child: Text("Low")),
+          DropdownMenuItem(
+              value: "Moderate", child: Text("Moderate")),
+          DropdownMenuItem(value: "High", child: Text("High")),
+        ],
+        onChanged:
+        _enabled() ? (v) => setState(() => _exerciseFrequency = v) : null,
+      ),
+      _field(_sleepHoursController, "Sleep Hours"),
+      SwitchListTile(
+        title: const Text("Smoking"),
+        value: _smoking,
+        onChanged:
+        _enabled() ? (v) => setState(() => _smoking = v) : null,
+      ),
+      SwitchListTile(
+        title: const Text("Alcohol"),
+        value: _alcohol,
+        onChanged:
+        _enabled() ? (v) => setState(() => _alcohol = v) : null,
+      ),
+    ],
+  );
+
+  Widget _nutritionTargetsCard() => _sectionCard(
+    title: "Daily Nutrition Targets",
+    children: [
+      _field(_calorieController, "Calories (kcal)"),
+      _field(_proteinController, "Protein (g/day)"),
+      _field(_carbController, "Carbohydrates (g/day)"),
+      _field(_fatController, "Fat (g/day)"),
+    ],
+  );
+
+  Widget _dietaryCard() => _sectionCard(
+    title: "Dietary Preferences",
+    children: [
+      Wrap(
+        spacing: 8,
         children: [
-          const Text("Dietary Preferences",
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 8,
-            children: [
-              _dietChip("Vegetarian"),
-              _dietChip("Vegan"),
-              _dietChip("Non-Vegetarian"),
-            ],
-          ),
-          const SizedBox(height: 12),
-          TextFormField(
-            controller: _foodAllergiesController,
-            decoration: const InputDecoration(labelText: "Food Allergies (optional)"),
-          ),
-          const SizedBox(height: 10),
-          DropdownButtonFormField<String>(
-            value: _preferredCuisine,
-            decoration: const InputDecoration(labelText: "Preferred Cuisine"),
-            items: const [
-              DropdownMenuItem(value: "Indian", child: Text("Indian")),
-              DropdownMenuItem(value: "Chinese", child: Text("Chinese")),
-              DropdownMenuItem(value: "Mediterranean", child: Text("Mediterranean")),
-              DropdownMenuItem(value: "Continental", child: Text("Continental")),
-              DropdownMenuItem(value: "Mixed", child: Text("Mixed")),
-            ],
-            onChanged: (v) => setState(() => _preferredCuisine = v),
-            validator: (v) => v == null ? "Required" : null,
-          ),
-          const SizedBox(height: 10),
-          TextFormField(
-            controller: _foodAversionsController,
-            decoration: const InputDecoration(labelText: "Food Aversions (optional)"),
-          ),
+          _dietChip("Vegetarian"),
+          _dietChip("Vegan"),
+          _dietChip("Non-Vegetarian"),
         ],
       ),
-    );
-  }
+      TextFormField(
+        controller: _foodAllergiesController,
+        enabled: _enabled(),
+        decoration:
+        const InputDecoration(labelText: "Food Allergies"),
+      ),
+      DropdownButtonFormField<String>(
+        value: _preferredCuisine,
+        decoration:
+        const InputDecoration(labelText: "Preferred Cuisine"),
+        items: const [
+          DropdownMenuItem(value: "Indian", child: Text("Indian")),
+          DropdownMenuItem(value: "Chinese", child: Text("Chinese")),
+          DropdownMenuItem(
+              value: "Mediterranean", child: Text("Mediterranean")),
+          DropdownMenuItem(
+              value: "Continental", child: Text("Continental")),
+          DropdownMenuItem(value: "Mixed", child: Text("Mixed")),
+        ],
+        onChanged:
+        _enabled() ? (v) => setState(() => _preferredCuisine = v) : null,
+      ),
+      TextFormField(
+        controller: _foodAversionsController,
+        enabled: _enabled(),
+        decoration:
+        const InputDecoration(labelText: "Food Aversions"),
+      ),
+    ],
+  );
 
-  // ---------------- CHIPS ----------------
+  // ---------------- UI HELPERS ----------------
+  Widget _sectionCard({
+    required String title,
+    required List<Widget> children,
+  }) =>
+      Card(
+        margin: const EdgeInsets.symmetric(vertical: 10),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title,
+                  style: const TextStyle(
+                      fontWeight: FontWeight.bold, fontSize: 16)),
+              const SizedBox(height: 12),
+              ...children.map((e) => Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: e,
+              )),
+            ],
+          ),
+        ),
+      );
+
+  Widget _genderRow() => Row(
+    children: [
+      Expanded(
+        child: OutlinedButton(
+          onPressed:
+          _enabled() ? () => setState(() => _gender = Gender.male) : null,
+          child: const Text("Male"),
+        ),
+      ),
+      const SizedBox(width: 10),
+      Expanded(
+        child: OutlinedButton(
+          onPressed:
+          _enabled() ? () => setState(() => _gender = Gender.female) : null,
+          child: const Text("Female"),
+        ),
+      ),
+    ],
+  );
+
   Widget _condChip(String label) {
     final selected = _chronicConditions.contains(label);
     return ChoiceChip(
       label: Text(label),
       selected: selected,
-      onSelected: (v) {
+      onSelected: _enabled()
+          ? (v) {
         setState(() {
           if (label == "None") {
             _chronicConditions.clear();
             if (v) _chronicConditions.add("None");
           } else {
             _chronicConditions.remove("None");
-            if (v) {
-              _chronicConditions.add(label);
-            } else {
-              _chronicConditions.remove(label);
-            }
+            v
+                ? _chronicConditions.add(label)
+                : _chronicConditions.remove(label);
           }
         });
-      },
+      }
+          : null,
     );
   }
 
@@ -526,7 +502,8 @@ class _PatientHealthDetailsScreenState extends State<PatientHealthDetailsScreen>
     return ChoiceChip(
       label: Text(label),
       selected: selected,
-      onSelected: (v) => setState(() => _dietaryHabit = v ? label : null),
+      onSelected:
+      _enabled() ? (v) => setState(() => _dietaryHabit = v ? label : null) : null,
     );
   }
 }

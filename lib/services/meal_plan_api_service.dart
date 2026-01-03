@@ -27,7 +27,70 @@ class MealPlanApiService {
     );
   }
 
-  /// ✅ GET /elder/meal-plans/{meal_plan_id}
+  Future<String> getMealPlanIdBySubmission({
+    required String token,
+    required String submissionId,
+  }) async {
+    final url = Uri.parse(
+      "${ApiConfig.baseUrl}/elder/meal-plans/by-submission/$submissionId",
+    );
+
+    final response = await http.get(
+      url,
+      headers: {
+        "Authorization": "Bearer $token",
+        "Accept": "application/json",
+      },
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception(
+        "Failed to resolve meal plan for submission "
+            "(status: ${response.statusCode})",
+      );
+    }
+
+    final decoded = jsonDecode(response.body);
+
+    final mealPlanId = decoded["meal_plan_id"];
+    if (mealPlanId == null) {
+      throw Exception("meal_plan_id not found in response");
+    }
+
+    return mealPlanId as String;
+  }
+
+  // --------------------------------------------------
+  // Get full meal plan details by meal_plan_id
+  // --------------------------------------------------
+  Future<Map<String, dynamic>> getMealPlanDetails({
+    required String token,
+    required String mealPlanId,
+  }) async {
+    final url = Uri.parse(
+      "${ApiConfig.baseUrl}/elder/meal-plans/$mealPlanId",
+    );
+
+    final response = await http.get(
+      url,
+      headers: {
+        "Authorization": "Bearer $token",
+        "Accept": "application/json",
+      },
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception(
+        "Failed to load meal plan "
+            "(status: ${response.statusCode})",
+      );
+    }
+
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+}
+
+/// ✅ GET /elder/meal-plans/{meal_plan_id}
   Future<Map<String, dynamic>> getMealPlanDetails({
     required String token,
     required String mealPlanId,
@@ -50,4 +113,4 @@ class MealPlanApiService {
       "[${response.statusCode}] Failed to load meal plan: ${response.body}",
     );
   }
-}
+

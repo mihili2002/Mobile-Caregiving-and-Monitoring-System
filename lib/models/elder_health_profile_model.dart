@@ -78,6 +78,34 @@ class ElderHealthProfileModel {
     );
   }
 
+  /// Construct from JSON returned by the REST API
+  factory ElderHealthProfileModel.fromJson(Map<String, dynamic> json) {
+    return ElderHealthProfileModel(
+      uid: json['uid'] ?? json['id'] ?? '',
+      age: json['age'],
+      gender: json['gender'],
+      height: (json['height'] is num) ? (json['height'] as num).toDouble() : null,
+      weight: (json['weight'] is num) ? (json['weight'] as num).toDouble() : null,
+      chronicConditions: List<String>.from(json['chronicConditions'] ?? []),
+      bloodPressure: (json['bloodPressure'] is Map) ? Map<String, dynamic>.from(json['bloodPressure']) : null,
+      bloodSugar: (json['bloodSugar'] is num) ? (json['bloodSugar'] as num).toDouble() : null,
+      cholesterol: (json['cholesterol'] is num) ? (json['cholesterol'] as num).toDouble() : null,
+      geneticRisk: json['geneticRisk'] ?? false,
+      dailySteps: json['dailySteps'],
+      exerciseFrequency: json['exerciseFrequency'],
+      sleepHours: (json['sleepHours'] is num) ? (json['sleepHours'] as num).toDouble() : null,
+      smoking: json['smoking'] ?? false,
+      alcohol: json['alcohol'] ?? false,
+      dietaryHabit: json['dietaryHabit'],
+      preferredCuisine: json['preferredCuisine'],
+      foodAllergies: json['foodAllergies'],
+      foodAversions: json['foodAversions'],
+      createdAt: json['createdAt'] is String
+          ? DateTime.tryParse(json['createdAt'])
+          : (json['createdAt'] is int ? DateTime.fromMillisecondsSinceEpoch(json['createdAt']) : null),
+    );
+  }
+
   double? get bmi {
     if (height == null || weight == null) return null;
     final hMeters = (height! / 100.0);

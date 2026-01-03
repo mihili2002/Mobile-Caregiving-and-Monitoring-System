@@ -11,7 +11,6 @@ plugins {
 android {
     namespace = "com.example.mobile_caregiving_and_monitoring_system"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

@@ -32,19 +32,16 @@ class MealPlanModel {
   // ✅ API JSON Factory
   factory MealPlanModel.fromJson(Map<String, dynamic> json) {
     return MealPlanModel(
-      id: json["id"] ?? "",
-      elderId: json["elder_id"] ?? json["elderId"] ?? "",
-      planId: json["plan_id"] ??
-          json["planId"] ??
-          json["id"] ??
-          "", // ✅ fallback
-      status: json["status"] ?? "",
+      id: (json["id"] ?? "").toString(),
+      elderId: (json["elder_id"] ?? json["elderId"] ?? "").toString(),
+      planId: (json["plan_id"] ?? json["planId"] ?? json["id"] ?? "").toString(), // ✅ fallback
+      status: (json["status"] ?? "").toString(),
       startDate: _parseDate(json["start_date"] ?? json["startDate"]),
       endDate: _parseDate(json["end_date"] ?? json["endDate"]),
       warnings: List<String>.from(json["warnings"] ?? []),
       nutrientTargets: Map<String, dynamic>.from(json["nutrient_targets"] ?? {}),
       days: (json["days"] as List? ?? [])
-          .map((d) => MealPlanDay.fromJson(d))
+          .map((d) => MealPlanDay.fromJson(Map<String, dynamic>.from(d)))
           .toList(),
     );
   }
@@ -128,7 +125,7 @@ class MealPlanDay {
   factory MealPlanDay.fromJson(Map<String, dynamic> json) {
     return MealPlanDay(
       day: json["day"] ?? 0,
-      meals: MealDayMeals.fromJson(json["meals"] ?? {}),
+      meals: MealDayMeals.fromJson(Map<String, dynamic>.from(json["meals"] ?? {})),
     );
   }
 }
@@ -150,16 +147,16 @@ class MealDayMeals {
   factory MealDayMeals.fromJson(Map<String, dynamic> json) {
     return MealDayMeals(
       breakfast: (json["breakfast"] as List? ?? [])
-          .map((e) => MealItem.fromJson(e))
+          .map((e) => MealItem.fromJson(Map<String, dynamic>.from(e)))
           .toList(),
       lunch: (json["lunch"] as List? ?? [])
-          .map((e) => MealItem.fromJson(e))
+          .map((e) => MealItem.fromJson(Map<String, dynamic>.from(e)))
           .toList(),
       dinner: (json["dinner"] as List? ?? [])
-          .map((e) => MealItem.fromJson(e))
+          .map((e) => MealItem.fromJson(Map<String, dynamic>.from(e)))
           .toList(),
       snacks: (json["snacks"] as List? ?? [])
-          .map((e) => MealItem.fromJson(e))
+          .map((e) => MealItem.fromJson(Map<String, dynamic>.from(e)))
           .toList(),
     );
   }
@@ -179,9 +176,9 @@ class MealItem {
 
   factory MealItem.fromJson(Map<String, dynamic> json) {
     return MealItem(
-      portion: json["portion"] ?? "",
-      foodName: json["food_name"] ?? json["foodName"] ?? "",
-      notes: json["notes"] ?? "",
+      portion: (json["portion"] ?? "").toString(),
+      foodName: (json["food_name"] ?? json["foodName"] ?? "").toString(),
+      notes: (json["notes"] ?? "").toString(),
     );
   }
 }

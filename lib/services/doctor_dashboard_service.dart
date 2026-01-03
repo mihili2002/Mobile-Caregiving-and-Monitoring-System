@@ -1,38 +1,30 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import '../models/elder_health_profile_model.dart';
-import '../models/meal_plan_model.dart';
+import 'dart:convert';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:http/http.dart' as http;
+
+import '../config/api_config.dart';
+import '../models/doctor_dashboard_item_model.dart';
 
 class DoctorDashboardService {
-  final FirebaseFirestore _db = FirebaseFirestore.instance;
+  final String baseUrl = ApiConfig.baseUrl;
 
-  Stream<List<ElderHealthProfileModel>> streamHealthSubmissions() {
-    return _db
-        .collection('elder_health_profiles')
-        .orderBy('createdAt', descending: true)
-        .snapshots()
-        .map((snap) => snap.docs.map((d) => ElderHealthProfileModel.fromDoc(d)).toList());
-  }
+  Future<List<DoctorDashboardItem>> getDashboard() async {
+    final token = await FirebaseAuth.instance.currentUser!.getIdToken();
 
-  /// Get latest meal plan for elder (if exists)
-  Future<MealPlanModel?> getLatestMealPlanForElder(String elderId) async {
-    final query = await _db
-        .collection('meal_plans')
-        .where('elderId', isEqualTo: elderId)
-        .orderBy('startDate', descending: true)
-        .limit(1)
-        .get();
+    final res = await http.get(
+      Uri.parse("$baseUrl/doctor/dashboard"),
+      headers: {
+        "Authorization": "Bearer $token",
+      },
+    );
 
-    if (query.docs.isEmpty) return null;
-    return MealPlanModel.fromDoc(query.docs.first);
-  }
+    if (res.statusCode != 200) {
+      throw Exception("Failed to load dashboard");
+    }
 
-  Future<void> updateMealPlanStatus({
-    required String mealPlanDocId,
-    required String status,
-  }) async {
-    await _db.collection('meal_plans').doc(mealPlanDocId).update({
-      'status': status,
-      'updatedAt': Timestamp.now(),
-    });
+    final json = jsonDecode(res.body);
+    return (json["items"] as List)
+        .map((e) => DoctorDashboardItem.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 }
