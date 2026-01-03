@@ -26,6 +26,7 @@ class UserSetupHelper {
         uid: uid,
         email: email,
         name: name,
+        elderId: uid,
         role: defaultRole,
       );
 
@@ -61,6 +62,7 @@ class UserSetupHelper {
       uid: currentUser.uid,
       email: currentUser.email ?? '',
       name: currentUser.displayName,
+      elderId: currentUser.uid,
       role: role,
     );
 
