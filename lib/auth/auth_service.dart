@@ -86,7 +86,11 @@ class AuthService {
 
       // ✅ Copy token to clipboard for Swagger testing
       await Clipboard.setData(ClipboardData(text: token));
-      debugPrint("✅ Firebase ID token copied to clipboard");
+     // debugPrint("✅ Firebase ID token copied to clipboard");
+     debugPrint("🔥 FIREBASE ID TOKEN ↓↓↓");
+debugPrint(token);
+debugPrint("🔥 END TOKEN");
+
     }
 
     return user;

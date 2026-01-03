@@ -2,6 +2,11 @@ import 'package:flutter/material.dart';
 import 'auth_service.dart';
 import 'register_page.dart';
 
+// ✅ add these imports
+import '../models/user_model.dart';
+//import '../pages/elder/elder_dashboard_screen.dart'; // <-- adjust path to your ElderDashboard file
+import '../ElderDashboardScreen.dart';
+
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
 
@@ -34,12 +39,37 @@ class _LoginPageState extends State<LoginPage> {
     });
 
     try {
-      // Assumption: your AuthService.signIn accepts (username, password)
+      // 1) Firebase sign-in
       await authService.signIn(
         usernameController.text.trim(),
         passwordController.text.trim(),
       );
-      // AuthGate handles redirect
+
+      // 2) Fetch AppUser from Firestore
+      final AppUser? appUser = await authService.getCurrentAppUser();
+
+      if (appUser == null) {
+        throw Exception(
+          "User profile not found in Firestore. "
+          "You may have registered in Firebase Auth but didn't save the user document.",
+        );
+      }
+
+      if (!mounted) return;
+
+      // 3) Navigate to ElderDashboard (only if elder)
+      if (appUser.role == UserRole.elder) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => ElderDashboard(user: appUser)),
+        );
+      } else {
+        // If you have other dashboards, route them here
+        // For now just show message (or navigate to RoleBasedWrapper/AuthWrapper)
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Logged in as ${appUser.role.name}")),
+        );
+      }
     } catch (e) {
       setState(() => error = e.toString());
     } finally {
@@ -77,7 +107,7 @@ class _LoginPageState extends State<LoginPage> {
                   children: [
                     const SizedBox(height: 10),
 
-                    // Logo + App name (same as RegisterPage)
+                    // Logo + App name
                     Column(
                       children: [
                         Container(
@@ -113,7 +143,6 @@ class _LoginPageState extends State<LoginPage> {
 
                     const SizedBox(height: 22),
 
-                    // Title
                     Text(
                       'Welcome Back',
                       style: theme.textTheme.headlineSmall?.copyWith(
@@ -150,7 +179,6 @@ class _LoginPageState extends State<LoginPage> {
                       const SizedBox(height: 12),
                     ],
 
-                    // Username
                     _SoftField(
                       controller: usernameController,
                       hintText: 'Username',
@@ -160,7 +188,6 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                     const SizedBox(height: 12),
 
-                    // Password
                     _SoftField(
                       controller: passwordController,
                       hintText: 'Password',
@@ -182,7 +209,6 @@ class _LoginPageState extends State<LoginPage> {
 
                     const SizedBox(height: 22),
 
-                    // Sign in button (same style as register)
                     SizedBox(
                       height: 52,
                       child: ElevatedButton(
@@ -233,7 +259,6 @@ class _LoginPageState extends State<LoginPage> {
 
                     const SizedBox(height: 14),
 
-                    // Bottom link (to register)
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -265,7 +290,6 @@ class _LoginPageState extends State<LoginPage> {
 
                     const SizedBox(height: 14),
 
-                    // Optional illustration placeholder (same spacing as register)
                     Container(
                       height: 96,
                       margin: const EdgeInsets.symmetric(horizontal: 70),
@@ -295,7 +319,6 @@ class _LoginPageState extends State<LoginPage> {
   }
 }
 
-// Same reusable field as RegisterPage (keeps identical look)
 class _SoftField extends StatelessWidget {
   final TextEditingController controller;
   final String hintText;

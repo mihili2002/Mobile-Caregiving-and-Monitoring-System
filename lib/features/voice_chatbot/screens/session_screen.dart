@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
 import 'history_screen.dart';
-
+import 'package:firebase_auth/firebase_auth.dart';
 class SessionsScreen extends StatefulWidget {
   final String baseUrl;
   const SessionsScreen({super.key, required this.baseUrl});
@@ -27,45 +27,59 @@ class _SessionsScreenState extends State<SessionsScreen> {
     _loadSessions();
   }
 
-  Future<void> _loadSessions() async {
-    setState(() {
-      _loading = true;
-      _error = "";
-    });
+  
+Future<void> _loadSessions() async {
+  setState(() {
+    _loading = true;
+    _error = "";
+  });
 
-    try {
-      final uri = Uri.parse("${widget.baseUrl}/chatbot/sessions?limit=50");
-      final res = await http.get(uri);
-
-      if (res.statusCode == 200) {
-        final data = jsonDecode(res.body);
-        final raw = (data["sessions"] as List?) ?? [];
-
-        final parsed = <Map<String, dynamic>>[];
-        for (final s in raw) {
-          if (s is Map) {
-            parsed.add(s.map((k, v) => MapEntry(k.toString(), v)));
-          }
-        }
-
-        setState(() {
-          _sessions = parsed;
-          _loading = false;
-        });
-      } else {
-        setState(() {
-          _error = "Failed to load sessions (${res.statusCode})";
-          _loading = false;
-        });
-      }
-    } catch (e) {
+  try {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
       setState(() {
-        _error = "Error: $e";
+        _error = "Not logged in";
+        _loading = false;
+      });
+      return;
+    }
+
+    final token = await user.getIdToken();
+
+    final uri = Uri.parse("${widget.baseUrl}/chatbot/sessions?limit=50");
+    final res = await http.get(
+      uri,
+      headers: {"Authorization": "Bearer $token"},
+    );
+
+    if (res.statusCode == 200) {
+      final data = jsonDecode(res.body);
+      final raw = (data["sessions"] as List?) ?? [];
+
+      final parsed = <Map<String, dynamic>>[];
+      for (final s in raw) {
+        if (s is Map) {
+          parsed.add(s.map((k, v) => MapEntry(k.toString(), v)));
+        }
+      }
+
+      setState(() {
+        _sessions = parsed;
+        _loading = false;
+      });
+    } else {
+      setState(() {
+        _error = "Failed to load sessions (${res.statusCode})";
         _loading = false;
       });
     }
+  } catch (e) {
+    setState(() {
+      _error = "Error: $e";
+      _loading = false;
+    });
   }
-
+}
   @override
   Widget build(BuildContext context) {
     return Scaffold(

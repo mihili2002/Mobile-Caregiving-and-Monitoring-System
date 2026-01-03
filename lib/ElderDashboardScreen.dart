@@ -6,7 +6,7 @@ import 'ElderProfilePage.dart';
 import 'models/user_model.dart';
 import 'pages/elder/widgets/quick_stats_widget.dart'; // Assuming this exists or will be useful
 // Import other widgets if needed, user had many widgets created in lib/pages/elder/widgets based on summary
-
+import './RoutineHome.dart';
 class ElderDashboard extends StatelessWidget {
   final AppUser user;
   const ElderDashboard({Key? key, required this.user}) : super(key: key);
@@ -20,6 +20,7 @@ class ElderDashboard extends StatelessWidget {
     const bgBottom = Color(0xFFF2EEF5);
 
     return Scaffold(
+      
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
@@ -180,11 +181,10 @@ class ElderDashboard extends StatelessWidget {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => DailyRoutinePage(
-                                elderId: user.uid,
-                                elderName: user.name,
+                            builder: (_) => RoleProfilePage(user: user),
+                               
                               ),
-                            ),
+                            
                           );
                         },
                       ),
