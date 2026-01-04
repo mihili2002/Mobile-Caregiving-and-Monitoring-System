@@ -21,6 +21,11 @@ class RoleHelper {
     return role == UserRole.familyMember;
   }
 
+  // Check if user is doctor
+  static bool isDoctor(UserRole role) {
+    return role == UserRole.doctor;
+  }
+
   // Check if user can manage users (Admin only)
   static bool canManageUsers(UserRole role) {
     return role == UserRole.admin;
@@ -54,11 +59,12 @@ class RoleHelper {
         return 0xFF2196F3; // Blue
       case UserRole.elder:
         return 0xFF4CAF50; // Green
+      case UserRole.doctor:
+        return 0xFF9C27B0; // Purple
       case UserRole.familyMember:
         return 0xFFFF9800; // Orange
       case UserRole.therapist:
-        // TODO: Handle this case.
-        throw UnimplementedError();
+        return 0xFF009688; // Teal
     }
   }
 }
