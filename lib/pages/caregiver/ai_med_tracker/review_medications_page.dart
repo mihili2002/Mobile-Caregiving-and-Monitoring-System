@@ -53,8 +53,9 @@ class _ReviewMedicationsPageState extends State<ReviewMedicationsPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Prescription saved successfully!")),
       );
-      // Navigate back to dashboard or previous screen
-      Navigator.popUntil(context, (route) => route.isFirst);
+      // Navigate back to medications page (pop ReviewMedicationsPage and UploadPrescriptionPage)
+      Navigator.of(context).pop();
+      Navigator.of(context).pop();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

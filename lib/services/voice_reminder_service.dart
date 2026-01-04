@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'voice_service.dart';
+import 'notification_service.dart';
 
 class VoiceReminderService {
   static final VoiceReminderService _instance = VoiceReminderService._internal();
@@ -10,6 +11,8 @@ class VoiceReminderService {
   VoiceReminderService._internal();
 
   final VoiceService _voiceService = VoiceService();
+  final NotificationService _notificationService = NotificationService(); // Helper
+  
   List<dynamic> _tasks = [];
   String _riskTier = "Tier 1";
   Timer? _timer;
@@ -22,6 +25,9 @@ class VoiceReminderService {
     _tasks = tasks;
     _riskTier = tier;
     debugPrint("VoiceReminderService: Updated with ${tasks.length} tasks and Tier: $tier");
+    
+    // Schedule Local Notifications immediately
+    _scheduleNotificationsForTasks();
   }
 
   void updateRiskTier(String tier) {
@@ -67,7 +73,7 @@ class VoiceReminderService {
   void start() {
     if (_timer != null) return;
     debugPrint("VoiceReminderService: Starting timer...");
-    _timer = Timer.periodic(const Duration(seconds: 45), (timer) {
+    _timer = Timer.periodic(const Duration(seconds: 15), (timer) {
       _checkReminders();
     });
   }
@@ -77,6 +83,48 @@ class VoiceReminderService {
     _timer = null;
     _subscription?.cancel();
     _subscription = null;
+  }
+
+  // NEW: Schedule Local Notifications for reliability
+  Future<void> _scheduleNotificationsForTasks() async {
+    await _notificationService.init();
+    
+    for (var task in _tasks) {
+      if (task['completed'] == true) continue;
+      
+      final timeStr = task['time']?.toString() ?? "";
+      if (!timeStr.contains(":")) continue;
+      
+      try {
+        final parts = timeStr.split(":");
+        final taskHour = int.parse(parts[0]);
+        final taskMinute = int.parse(parts[1]);
+        
+        final now = DateTime.now();
+        final scheduledTime = DateTime(
+          now.year, now.month, now.day,
+          taskHour, taskMinute
+        );
+        
+        // Only schedule if time is in future
+        if (scheduledTime.isAfter(now)) {
+           final taskIdStr = task['id']?.toString() ?? task['task_name']?.toString() ?? "";
+           
+           // Use hash for ID
+           // We use offset 0 for main reminder
+           final notifId = NotificationService.makeId(task['uid'] ?? "user", taskIdStr, 0);
+           
+           await _notificationService.scheduleNotification(
+             id: notifId, 
+             title: "Reminder", 
+             body: "Time for ${task['task_name']}", 
+             scheduledTime: scheduledTime
+           );
+        }
+      } catch (e) {
+        debugPrint("VoiceReminderService: Error scheduling local notification: $e");
+      }
+    }
   }
 
   void _checkReminders() async {

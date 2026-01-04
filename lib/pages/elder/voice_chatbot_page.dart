@@ -119,8 +119,8 @@ class _VoiceChatbotPageState extends State<VoiceChatbotPage> {
     await _speech.listen(
       localeId: "en_US",
       cancelOnError: true,
-      listenFor: const Duration(seconds: 30),
-      pauseFor: const Duration(seconds: 2),
+      listenFor: const Duration(seconds: 60),
+      pauseFor: const Duration(seconds: 10),
       partialResults: true,
       onResult: (val) {
         if (!mounted) return;
@@ -216,7 +216,13 @@ class _VoiceChatbotPageState extends State<VoiceChatbotPage> {
                   }
               });
 
-              await _voiceService.speak(reply);
+              // Construct spoken reply
+              String spokenReply = reply;
+              if (isConfirmation) {
+                  spokenReply = "I heard you say: '$text'. $reply";
+              }
+
+              await _voiceService.speak(spokenReply);
               
                if (mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(

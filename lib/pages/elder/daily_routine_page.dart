@@ -68,6 +68,7 @@ class _DailyRoutinePageState extends State<DailyRoutinePage> with SingleTickerPr
        
        // Automatic Voice Check: Updates the service whenever schedule changes
        // Local timer removed in favor of global VoiceReminderService
+       VoiceReminderService().listen(effectiveUid);
     }
   }
 
@@ -103,18 +104,21 @@ class _DailyRoutinePageState extends State<DailyRoutinePage> with SingleTickerPr
        
        final url = Uri.parse("$baseUrl/api/ai/check_profile/$effectiveUid");
        final response = await http.get(url);
-       if (response.statusCode == 200) {
-          final data = json.decode(response.body);
-          if (data['exists'] == true) {
-             final freshTier = data['data']['prediction_tier'] ?? "Tier 1";
-             final freshProb = data['data']['prediction_probability'];
-             
-             // Update Cache
-             await prefs.setString('cached_risk_tier', freshTier);
-             if (freshProb != null) {
-                double p = (freshProb is int) ? freshProb.toDouble() : freshProb;
-                await prefs.setDouble('cached_risk_prob', p);
-             }
+        if (response.statusCode == 200) {
+           final data = json.decode(response.body);
+           debugPrint("Profile Debug: received data: $data");
+
+           if (data is Map && data['exists'] == true && data['data'] is Map) {
+              final Map<String, dynamic> profileMap = data['data'];
+              final freshTier = profileMap['prediction_tier']?.toString() ?? "Tier 1";
+              final freshProb = profileMap['prediction_probability'];
+              
+              // Update Cache
+              await prefs.setString('cached_risk_tier', freshTier);
+              if (freshProb != null) {
+                 double p = (freshProb is int) ? freshProb.toDouble() : freshProb;
+                 await prefs.setDouble('cached_risk_prob', p);
+              }
              
              if (freshTier != _riskTier && mounted) {
                 setState(() {
@@ -404,7 +408,7 @@ class _DailyRoutinePageState extends State<DailyRoutinePage> with SingleTickerPr
       }
       _fetchSchedule(); 
       
-    } catch(e) {
+    } catch (e) {
       print("Error saving plan: $e");
     } finally {
       if (mounted) setState(() => _isLoading = false);
