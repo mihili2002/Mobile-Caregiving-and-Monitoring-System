@@ -44,19 +44,29 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
     // 2. Create Model
     Medication newMed = Medication(
       elderId: widget.elderId,
-      name: _drugName,
+      drugName: _drugName,
       dosage: _dosage,
-      frequency: "Daily $_selectedTiming", // Embedding timing in frequency string for now
+      frequency: ["Daily"], // Defaulting to daily for meal-based meds
+      times: [proxyTime], // Proxy for AI
+      timing: _selectedTiming,
+      isActive: true,
     );
 
     // 3. Send to Backend
     try {
-      await _routineService.addMedication(newMed);
+      final result = await _routineService.addMedication(newMed);
       if (mounted) {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Medication Added Successfully")),
-        );
+        if (result != null) {
+          Navigator.pop(context);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Medication Added Successfully")),
+          );
+        } else {
+             ScaffoldMessenger.of(context).showSnackBar(
+               const SnackBar(content: Text("Error: Failed to save medication to database.")),
+             );
+             setState(() => _isLoading = false);
+        }
       }
     } catch (e) {
       if (mounted) {

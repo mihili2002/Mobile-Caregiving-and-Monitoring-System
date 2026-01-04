@@ -38,6 +38,7 @@ class _RoleProfilePageState extends State<RoleProfilePage> {
   void initState() {
     super.initState();
     _reminderService.start();
+    _reminderService.listen(widget.user.uid);
   }
 
     void _logout() async {

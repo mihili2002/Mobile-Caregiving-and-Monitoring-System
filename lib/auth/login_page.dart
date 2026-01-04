@@ -119,8 +119,7 @@ class _LoginPageState extends State<LoginPage> {
       }
 
     } catch (e) {
-      if (!mounted) return;
-      setState(() => error = e.toString());
+      if (mounted) setState(() => error = e.toString());
     } finally {
       if (mounted) setState(() => loading = false);
     }
