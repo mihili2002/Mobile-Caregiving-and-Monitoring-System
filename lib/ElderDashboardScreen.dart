@@ -4,8 +4,11 @@ import 'features/voice_chatbot/screens/chat_screen.dart';
 import 'pages/elder/daily_routine_page.dart';
 import 'ElderProfilePage.dart';
 import 'models/user_model.dart';
-import 'pages/elder/widgets/quick_stats_widget.dart'; // Assuming this exists or will be useful
-// Import other widgets if needed, user had many widgets created in lib/pages/elder/widgets based on summary
+import 'pages/elder/widgets/quick_stats_widget.dart';
+
+
+// ✅ ADD THIS IMPORT (make sure the path matches your project structure)
+import 'TherapistRiskFormScreen.dart';
 
 class ElderDashboard extends StatelessWidget {
   final AppUser user;
@@ -34,7 +37,7 @@ class ElderDashboard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Top bar (custom to match your style)
+                // Top bar
                 Row(
                   children: [
                     Container(
@@ -202,14 +205,19 @@ class ElderDashboard extends StatelessWidget {
                           );
                         },
                       ),
+
+                      // ✅ FIXED Therapist Card: now navigates to TherapistRiskFormScreen
                       _FeatureCard(
                         title: 'Therapist',
                         subtitle: 'Mental support',
                         icon: Icons.health_and_safety,
                         gradient: const [Color(0xFF3E2723), Color(0xFF8D6E63)],
                         onTap: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Therapist coming soon')),
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const TherapistRiskFormScreen(),
+                            ),
                           );
                         },
                       ),
@@ -267,7 +275,6 @@ class _FeatureCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Icon badge with gradient (matches buttons in login/register)
                 Container(
                   width: 52,
                   height: 52,
@@ -288,9 +295,7 @@ class _FeatureCard extends StatelessWidget {
                   ),
                   child: Icon(icon, color: Colors.white, size: 28),
                 ),
-
                 const SizedBox(height: 12),
-
                 Text(
                   title,
                   style: const TextStyle(
@@ -299,9 +304,7 @@ class _FeatureCard extends StatelessWidget {
                     color: brownDark,
                   ),
                 ),
-
                 const SizedBox(height: 6),
-
                 Text(
                   subtitle,
                   style: TextStyle(
@@ -310,9 +313,7 @@ class _FeatureCard extends StatelessWidget {
                     height: 1.25,
                   ),
                 ),
-
                 const Spacer(),
-
                 Row(
                   children: [
                     Text(
