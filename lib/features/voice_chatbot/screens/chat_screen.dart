@@ -11,7 +11,8 @@ import 'history_screen.dart';
 import 'emotions_screen.dart';
 import 'session_screen.dart'; // must contain SessionsScreen
 import 'all_emotion_screen.dart';
-//import 'package:mobile_caregiving_and_monitoring_system/features/voice_chatbot/screens/all_emotions_screen.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'api.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -35,7 +36,8 @@ class _ChatScreenState extends State<ChatScreen> {
   String _sessionId = "";
 
   // ⚠️ Chrome/Web: 127.0.0.1
-  // Android Emulator: 10.0.2.2
+  //Android Emulator: 10.0.2.2
+  // Real device: your PC LAN IP, e.g. 192.168.1.5
   final String _baseUrl = 'http://127.0.0.1:8000';
 
   // ---------- Brown theme colors ----------
@@ -103,59 +105,95 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  Future<void> _sendMessage(String text) async {
-    if (_sessionId.isEmpty) {
-      debugPrint("Session not ready yet");
-      return;
-    }
-    if (text.trim().isEmpty) return;
+  // ✅ NEW: Q&A dialog for elders (quick mood questions)
+  Future<void> _openQaDialog() async {
+    final TextEditingController qaController = TextEditingController();
 
-    setState(() {
-      _messages.add(ChatMessage(text: text, isUser: true));
-      _textController.clear();
+    await showDialog(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          title: const Text("Ask the Bot (Mood Q&A)"),
+          content: TextField(
+            controller: qaController,
+            maxLines: 3,
+            decoration: const InputDecoration(
+              hintText: "Example: Summarize my mood yesterday",
+              border: OutlineInputBorder(),
+            ),
+          ),
+          actions: [
+            // ✅ quick one-tap for elders
+            TextButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                _sendMessage("Summarize my mood yesterday");
+              },
+              child: const Text("Yesterday Mood"),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text("Cancel"),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final q = qaController.text.trim();
+                Navigator.pop(ctx);
+                if (q.isNotEmpty) {
+                  _sendMessage(q); // reuse normal chat flow
+                }
+              },
+              child: const Text("Ask"),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _sendMessage(String text) async {
+  if (_sessionId.isEmpty) {
+    debugPrint("Session not ready yet");
+    return;
+  }
+  if (text.trim().isEmpty) return;
+
+  setState(() {
+    _messages.add(ChatMessage(text: text, isUser: true));
+    _textController.clear();
+  });
+
+  try {
+    final api = Api(_baseUrl);
+
+    final data = await api.postJson("/chatbot/chat", {
+      "message": text,
+      "session_id": _sessionId,
     });
 
-    try {
-      final response = await http.post(
-        Uri.parse('$_baseUrl/chatbot/chat'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'message': text,
-          'session_id': _sessionId,
-        }),
-      );
+    final reply = data["reply"] ?? "No reply";
+    final emotion = data["emotion"] ?? "unknown";
+    final intent = data["intent"] ?? "none";
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
+    if (!mounted) return;
+    setState(() {
+      _messages.add(ChatMessage(
+        text: reply,
+        isUser: false,
+        emotion: emotion,
+        intent: intent,
+      ));
+    });
 
-        final reply = data['reply'] ?? 'No reply';
-        final emotion = data['emotion'] ?? 'unknown';
-        final intent = data['intent'] ?? 'none';
-
-        setState(() {
-          _messages.add(ChatMessage(
-            text: reply,
-            isUser: false,
-            emotion: emotion,
-            intent: intent,
-          ));
-        });
-
-        await _speak(reply);
-      } else {
-        setState(() {
-          _messages.add(ChatMessage(
-            text: 'Server error ${response.statusCode}',
-            isUser: false,
-          ));
-        });
-      }
-    } catch (e) {
-      setState(() {
-        _messages.add(ChatMessage(text: 'Error: $e', isUser: false));
-      });
-    }
+    await _speak(reply);
+  } catch (e) {
+    if (!mounted) return;
+    setState(() {
+      _messages.add(ChatMessage(text: "Error: $e", isUser: false));
+    });
   }
+}
+
 
   @override
   void dispose() {
@@ -174,6 +212,13 @@ class _ChatScreenState extends State<ChatScreen> {
         style: TextStyle(fontWeight: FontWeight.w700),
       ),
       actions: [
+        // ✅ NEW: Q&A dialog button
+        IconButton(
+          tooltip: "Q & A",
+          icon: const Icon(Icons.question_answer),
+          onPressed: _openQaDialog,
+        ),
+
         // ✅ All Sessions
         IconButton(
           tooltip: "All Sessions",
@@ -188,33 +233,19 @@ class _ChatScreenState extends State<ChatScreen> {
           },
         ),
 
-
-IconButton(
-  tooltip: "All Emotions (Weekly)",
-  icon: const Icon(Icons.calendar_month),
-  onPressed: () {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => AllEmotionsScreen(baseUrl: _baseUrl, days: 7),
-      ),
-    );
-  },
-),
-
-        // ✅ Weekly Emotions (FIXED: inside actions)
-    //    IconButton(
-        //  tooltip: "Weekly Emotions",
-       //   icon: const Icon(Icons.calendar_month),
-        //  onPressed: () {
-         //   Navigator.push(
-         //     context,
-           //   MaterialPageRoute(
-             //   builder: (_) => AllEmotionsScreen(baseUrl: _baseUrl, days: 7),
-         //     ),
-         //   );
-       //   },
-      //  ),
+        // ✅ All Emotions (Weekly)
+        IconButton(
+          tooltip: "All Emotions (Weekly)",
+          icon: const Icon(Icons.calendar_month),
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => AllEmotionsScreen(baseUrl: _baseUrl, days: 7),
+              ),
+            );
+          },
+        ),
 
         // ✅ Chat History for current session
         IconButton(

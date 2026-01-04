@@ -7,6 +7,9 @@ import 'models/user_model.dart';
 // ✅ Your Meal Plan Dashboard
 import 'pages/elder/meal_plans/elder_meal_plan_dashboard.dart';
 
+import 'pages/elder/widgets/quick_stats_widget.dart'; // Assuming this exists or will be useful
+// Import other widgets if needed, user had many widgets created in lib/pages/elder/widgets based on summary
+import './RoutineHome.dart';
 class ElderDashboard extends StatelessWidget {
   final AppUser user;
   const ElderDashboard({Key? key, required this.user}) : super(key: key);
@@ -20,6 +23,7 @@ class ElderDashboard extends StatelessWidget {
     const bgBottom = Color(0xFFF2EEF5);
 
     return Scaffold(
+      
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
@@ -187,7 +191,7 @@ class ElderDashboard extends StatelessWidget {
                                 elderId: user.uid,
                                 elderName: user.name, // ✅ FIXED LINE
                               ),
-                            ),
+                            )
                           );
                         },
                       ),
