@@ -55,6 +55,9 @@ class _RegisterPageState extends State<RegisterPage> {
           case 'caregiver':
             userRole = UserRole.caregiver;
             break;
+          case 'doctor':
+            userRole = UserRole.doctor;
+            break;
           case 'patient':
             userRole = UserRole.elder; // Map patient to elder
             break;
@@ -239,6 +242,7 @@ class _RegisterPageState extends State<RegisterPage> {
                         DropdownMenuItem(
                             value: 'caregiver', child: Text('Caregiver')),
                         DropdownMenuItem(value: 'patient', child: Text('Patient')),
+                        DropdownMenuItem(value: 'doctor', child: Text('Doctor')),
                       ],
                       onChanged: loading ? null : (v) => setState(() => role = v!),
                       decoration: InputDecoration(

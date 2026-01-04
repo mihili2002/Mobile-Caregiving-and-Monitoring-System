@@ -4,8 +4,13 @@ import 'register_page.dart';
 
 // ✅ add these imports
 import '../models/user_model.dart';
-//import '../pages/elder/elder_dashboard_screen.dart'; // <-- adjust path to your ElderDashboard file
 import '../ElderDashboardScreen.dart';
+
+// ✅ NEW imports for token copy + debug print
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart';
+import '../pages/doctor/doctor_dashboard_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -39,13 +44,44 @@ class _LoginPageState extends State<LoginPage> {
     });
 
     try {
-      // 1) Firebase sign-in
-      await authService.signIn(
+      // ---------------------------------------------------
+      // ✅ 1) Firebase sign-in (get User back)
+      // ---------------------------------------------------
+      final User? user = await authService.signIn(
         usernameController.text.trim(),
         passwordController.text.trim(),
       );
 
-      // 2) Fetch AppUser from Firestore
+      if (user == null) {
+        throw Exception("Login failed (Firebase user is null)");
+      }
+
+      // ---------------------------------------------------
+      // ✅ 2) Force refresh token so custom claims appear
+      // ---------------------------------------------------
+      final tokenResult = await user.getIdTokenResult(true);
+
+      // ✅ DEBUG ONLY: print role claims + token
+      if (kDebugMode) {
+        debugPrint("✅ Firebase Claims => ${tokenResult.claims}");
+        debugPrint("✅ Firebase Token  => ${tokenResult.token}");
+      }
+
+      // ---------------------------------------------------
+      // ✅ 3) Copy token to clipboard for Swagger testing
+      // ---------------------------------------------------
+      final token = tokenResult.token;
+      if (token != null && token.isNotEmpty) {
+        await Clipboard.setData(ClipboardData(text: token));
+
+        if (kDebugMode) {
+          debugPrint("✅ Token copied to clipboard");
+        }
+      }
+
+      // ---------------------------------------------------
+      // ✅ 4) Fetch AppUser from Firestore
+      // ---------------------------------------------------
       final AppUser? appUser = await authService.getCurrentAppUser();
 
       if (appUser == null) {
@@ -57,20 +93,33 @@ class _LoginPageState extends State<LoginPage> {
 
       if (!mounted) return;
 
-      // 3) Navigate to ElderDashboard (only if elder)
+      // ---------------------------------------------------
+      // ✅ 5) Navigate based on role
+      // ---------------------------------------------------
       if (appUser.role == UserRole.elder) {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (_) => ElderDashboard(user: appUser)),
+          MaterialPageRoute(
+            builder: (_) => ElderDashboard(user: appUser),
+          ),
+        );
+      } else if (appUser.role == UserRole.doctor) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const DoctorDashboardPage(),
+          ),
         );
       } else {
-        // If you have other dashboards, route them here
-        // For now just show message (or navigate to RoleBasedWrapper/AuthWrapper)
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Logged in as ${appUser.role.name}")),
+          SnackBar(
+            content: Text("Logged in as ${appUser.role.name}"),
+          ),
         );
       }
+
     } catch (e) {
+      if (!mounted) return;
       setState(() => error = e.toString());
     } finally {
       if (mounted) setState(() => loading = false);
