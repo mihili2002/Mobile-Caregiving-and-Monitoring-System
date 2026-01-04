@@ -15,6 +15,10 @@ class VoiceService {
     _isInit = true;
   }
 
+  void setCompletionHandler(Function handler) {
+    _flutterTts.setCompletionHandler(() => handler());
+  }
+
   Future<void> speak(String text) async {
     if (!_isInit) await init();
     try {

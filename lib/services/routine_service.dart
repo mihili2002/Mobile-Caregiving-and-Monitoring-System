@@ -19,17 +19,24 @@ class RoutineService {
 
   // 1. Add Common Routine
   Future<CommonTask?> addCommonTask(CommonTask task) async {
-    return await _sendData('/add_task', task.toJson(), (json) => CommonTask.fromJson(json));
+    return await _sendData('/api/schedule/add_task', task.toJson(), (json) => CommonTask.fromJson(json));
   }
 
   // 2. Add Therapist Activity
   Future<TherapistActivity?> addTherapistActivity(TherapistActivity activity) async {
-    return await _sendData('/add_task', activity.toJson(), (json) => TherapistActivity.fromJson(json));
+    return await _sendData('/api/schedule/add_task', activity.toJson(), (json) => TherapistActivity.fromJson(json));
   }
 
   // 3. Add Medication
   Future<Medication?> addMedication(Medication med) async {
-    return await _sendData('/add_task', med.toJson(), (json) => Medication.fromJson(json, json['id'] ?? ''));
+    final payload = {
+      'elder_id': med.elderId,
+      'drug_name': med.drugName,
+      'dosage': med.dosage,
+      'frequency': med.frequency?.join(', ') ?? 'Daily',
+      'timing': med.timing,
+    };
+    return await _sendData('/api/medications/add_medication', payload, (json) => Medication.fromJson(json));
   }
 
   // Helper for HTTP POST
@@ -119,13 +126,16 @@ class RoutineService {
             // Filter only active meds
             if (medData['status'] == 'active') {
               allMeds.add(Medication(
-                id: null,
+                id: null, // IDs are no longer per document
                 elderId: elderId,
-                name: medData['drug_name'] ?? '',
+                drugName: medData['drug_name'] ?? '',
                 dosage: medData['dosage'] ?? '',
-                frequency: medData['frequency'] != null ? medData['frequency'].toString() : '',
-                startDate: medData['start_date'] != null ? DateTime.tryParse(medData['start_date']) : null,
-                endDate: medData['end_date'] != null ? DateTime.tryParse(medData['end_date']) : null,
+                frequency: medData['frequency'] != null ? [medData['frequency'].toString()] : [],
+                times: [], 
+                isActive: true,
+                timing: medData['timing'],
+                startDate: medData['start_date'],
+                endDate: medData['end_date'],
               ));
             }
           }
@@ -153,7 +163,7 @@ class RoutineService {
           // Find the medication to "delete" (deactivate)
           bool found = false;
           for (var item in meds) {
-            if (item['drug_name'] == med.name && 
+            if (item['drug_name'] == med.drugName && 
                 item['dosage'] == med.dosage && 
                 item['status'] == 'active') {
               item['status'] = 'inactive';
@@ -172,7 +182,7 @@ class RoutineService {
       final snapshot = await _db
           .collection('medication_prescriptions')
           .where('elder_id', isEqualTo: med.elderId)
-          .where('drug_name', isEqualTo: med.name)
+          .where('drug_name', isEqualTo: med.drugName)
           .where('dosage', isEqualTo: med.dosage)
           .get();
 
@@ -194,13 +204,13 @@ class RoutineService {
           .get();
 
       return snapshot.docs.map((doc) {
-
         final data = doc.data();
         return TherapistActivity(
-          title: data['activity_name'] ?? 'Therapy Session',
-          description: data['description'] ?? '',
-          elderId: data['elder_id'] ?? '',
-          assignedDate: data['assigned_time'] != null ? DateTime.tryParse(data['assigned_time']) ?? DateTime.now() : DateTime.now(),
+          id: null,
+          elderId: data['elder_id'],
+          activityName: data['activity_name'] ?? '',
+          assignedTime: data['assigned_time'] ?? '',
+          isActive: data['is_active'] ?? true,
         );
       }).toList();
     } catch (e) {
@@ -217,7 +227,7 @@ class RoutineService {
   }) async {
     try {
       final response = await http.post(
-        Uri.parse('$baseUrl/predict_task_outcomes'),
+        Uri.parse('$baseUrl/api/schedule/predict_task_outcomes'),
         headers: {"Content-Type": "application/json"},
         body: jsonEncode({
           "uid": uid,

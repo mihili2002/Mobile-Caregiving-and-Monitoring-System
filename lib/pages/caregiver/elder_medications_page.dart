@@ -3,7 +3,7 @@ import '../../models/user_model.dart';
 import '../../models/routine_models.dart';
 import '../../services/routine_service.dart';
 import 'add_medication_page.dart';
-import 'upload_prescription_page.dart';
+import 'ai_med_tracker/upload_prescription_page.dart';
 
 class ElderMedicationsPage extends StatefulWidget {
   final AppUser elder;
@@ -233,7 +233,10 @@ class _ElderMedicationsPageState extends State<ElderMedicationsPage> {
 
   Widget _buildMedicationCard(int index) {
     final med = _medications[index];
-    final  frequencyText = med.frequency ?? 'Not specified';
+    final frequencyText =
+        (med.frequency != null && med.frequency!.contains('Daily')) 
+            ? 'Daily' 
+            : (med.frequency?.join(', ') ?? 'Not specified');
 
     return Card(
       elevation: 4,
@@ -265,7 +268,7 @@ class _ElderMedicationsPageState extends State<ElderMedicationsPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        med.name,
+                        med.drugName,
                         style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
@@ -322,7 +325,7 @@ class _ElderMedicationsPageState extends State<ElderMedicationsPage> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'No times set',
+                    med.times?.join(', ') ?? 'No times set',
                     style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w500,
