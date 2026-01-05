@@ -21,11 +21,11 @@ class _EmotionsScreenState extends State<EmotionsScreen> {
   String _error = "";
   List<Map<String, dynamic>> _emotionRows = [];
 
-  // ---------- Brown theme colors ----------
-  static const _brown900 = Color(0xFF3E2723);
-  static const _brown800 = Color(0xFF4E342E);
-  static const _brown200 = Color(0xFFD7CCC8);
-  static const _cream = Color(0xFFF7F3EF);
+  // ✅ GREEN THEME
+  static const _green900 = Color(0xFF00A693);
+  static const _green800 = Color(0xFF00A693);
+  static const _green200 = Color(0xFFA7DCCB);
+  static const _mint = Color(0xFFF2FBF7);
 
   @override
   void initState() {
@@ -55,7 +55,6 @@ class _EmotionsScreenState extends State<EmotionsScreen> {
   }
 
   DateTime? _parseCreatedAt(dynamic createdAt) {
-    // backend returns createdAt like: "2025-12-22T15:06:35.601000+00:00"
     if (createdAt == null) return null;
     try {
       return DateTime.parse(createdAt.toString()).toLocal();
@@ -85,16 +84,11 @@ class _EmotionsScreenState extends State<EmotionsScreen> {
     });
 
     try {
-      // days=0 means "no filter" in your current API usage
       final uri = Uri.parse(
         "${widget.baseUrl}/chatbot/history/${widget.sessionId}?days=0",
       );
 
       final res = await http.get(uri);
-
-      debugPrint("EMOTION HISTORY URL: $uri");
-      debugPrint("STATUS: ${res.statusCode}");
-      debugPrint("BODY: ${res.body}");
 
       if (res.statusCode != 200) {
         setState(() {
@@ -107,7 +101,6 @@ class _EmotionsScreenState extends State<EmotionsScreen> {
       final data = jsonDecode(res.body);
       final msgs = (data["messages"] as List?) ?? [];
 
-      // ✅ IMPORTANT: emotions are inside the "messages" list (usually bot messages)
       final rows = <Map<String, dynamic>>[];
 
       for (final m in msgs) {
@@ -116,7 +109,7 @@ class _EmotionsScreenState extends State<EmotionsScreen> {
         final mm = m.map((k, v) => MapEntry(k.toString(), v));
 
         final emotion = mm["emotion"]?.toString();
-        if (emotion == null || emotion.trim().isEmpty) continue; // keep only emotion rows
+        if (emotion == null || emotion.trim().isEmpty) continue;
 
         final intent = mm["intent"]?.toString();
         final text = (mm["text"] ?? "").toString();
@@ -137,7 +130,6 @@ class _EmotionsScreenState extends State<EmotionsScreen> {
         });
       }
 
-      // sort oldest -> newest (or flip if you want newest first)
       rows.sort((a, b) {
         final da = a["created"] as DateTime?;
         final db = b["created"] as DateTime?;
@@ -162,7 +154,7 @@ class _EmotionsScreenState extends State<EmotionsScreen> {
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
       elevation: 0,
-      backgroundColor: _brown900,
+      backgroundColor: _green900,
       title: const Text(
         "Emotion History",
         style: TextStyle(fontWeight: FontWeight.w700),
@@ -180,7 +172,7 @@ class _EmotionsScreenState extends State<EmotionsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _cream,
+      backgroundColor: _mint,
       appBar: _buildAppBar(),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
@@ -197,7 +189,7 @@ class _EmotionsScreenState extends State<EmotionsScreen> {
                       padding: const EdgeInsets.all(14),
                       itemCount: _emotionRows.length,
                       separatorBuilder: (_, __) =>
-                          Divider(color: _brown200.withOpacity(0.7)),
+                          Divider(color: _green200.withOpacity(0.8)),
                       itemBuilder: (_, i) {
                         final row = _emotionRows[i];
                         final emotion = (row["emotion"] ?? "unknown").toString();
@@ -214,7 +206,7 @@ class _EmotionsScreenState extends State<EmotionsScreen> {
                             color: Colors.white.withOpacity(0.95),
                             borderRadius: BorderRadius.circular(14),
                             border: Border.all(
-                              color: _brown200.withOpacity(0.8),
+                              color: _green200.withOpacity(0.8),
                             ),
                             boxShadow: [
                               BoxShadow(
@@ -250,14 +242,14 @@ class _EmotionsScreenState extends State<EmotionsScreen> {
                                           padding: const EdgeInsets.symmetric(
                                               horizontal: 10, vertical: 6),
                                           decoration: BoxDecoration(
-                                            color: _brown200.withOpacity(0.35),
+                                            color: _green200.withOpacity(0.35),
                                             borderRadius:
                                                 BorderRadius.circular(999),
                                           ),
                                           child: Text(
                                             "Intent: $intent",
                                             style: TextStyle(
-                                              color: _brown800.withOpacity(0.9),
+                                              color: _green800.withOpacity(0.9),
                                               fontWeight: FontWeight.w700,
                                               fontSize: 12,
                                             ),
@@ -269,7 +261,7 @@ class _EmotionsScreenState extends State<EmotionsScreen> {
                                     Text(
                                       displayTime,
                                       style: TextStyle(
-                                        color: _brown800.withOpacity(0.6),
+                                        color: _green800.withOpacity(0.6),
                                         fontWeight: FontWeight.w700,
                                         fontSize: 12,
                                       ),
@@ -278,7 +270,7 @@ class _EmotionsScreenState extends State<EmotionsScreen> {
                                     Text(
                                       text,
                                       style: TextStyle(
-                                        color: _brown800.withOpacity(0.95),
+                                        color: _green800.withOpacity(0.95),
                                         height: 1.35,
                                         fontWeight: FontWeight.w600,
                                       ),

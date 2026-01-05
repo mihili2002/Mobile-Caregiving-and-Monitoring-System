@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 
-import './api.dart'; // ✅ NEW
+import './api.dart';
 
 class AllEmotionsScreen extends StatefulWidget {
   final String baseUrl;
@@ -25,20 +25,19 @@ class _AllEmotionsScreenState extends State<AllEmotionsScreen>
 
   late TabController _tab;
 
-  bool _hasLoaded = false; // ✅ prevent duplicate calls
+  bool _hasLoaded = false;
 
-  // Brown theme
-  static const _brown900 = Color(0xFF3E2723);
-  static const _brown700 = Color(0xFF5D4037);
-  static const _brown200 = Color(0xFFD7CCC8);
-  static const _cream = Color(0xFFF7F3EF);
+  // GREEN THEME
+  static const _green900 = Color(0xFF00A693);
+  static const _green700 = Color(0xFF00A693);
+  static const _green200 = Color(0xFFA7DCCB);
+  static const _mint = Color(0xFFF2FBF7);
 
   @override
   void initState() {
     super.initState();
     _tab = TabController(length: 4, vsync: this);
 
-    // ✅ delay until first frame (auth will be ready)
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadOnce());
   }
 
@@ -63,14 +62,13 @@ class _AllEmotionsScreenState extends State<AllEmotionsScreen>
     try {
       final api = Api(widget.baseUrl);
 
-   final data = await api.getJson(
-  "/chatbot/emotions?days=${widget.days}&limit=500",
-);
+      final data = await api.getJson(
+        "/chatbot/emotions?days=${widget.days}&limit=500",
+      );
 
       final raw = (data["items"] ?? []) as List<dynamic>;
       final list = raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
 
-      // Sort by time ascending for timeline views
       list.sort((a, b) {
         final ta = _parseTime(a);
         final tb = _parseTime(b);
@@ -148,15 +146,13 @@ class _AllEmotionsScreenState extends State<AllEmotionsScreen>
         return 0;
       case "sad":
       case "sadness":
-        return -2;
       case "fear":
       case "anxiety":
+      case "disgust":
         return -2;
       case "anger":
       case "angry":
         return -3;
-      case "disgust":
-        return -2;
       default:
         return 0;
     }
@@ -228,7 +224,7 @@ class _AllEmotionsScreenState extends State<AllEmotionsScreen>
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: _brown200),
+          border: Border.all(color: _green200),
         ),
         child: SizedBox(
           height: 260,
@@ -335,7 +331,7 @@ class _AllEmotionsScreenState extends State<AllEmotionsScreen>
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: _brown200),
+          border: Border.all(color: _green200),
         ),
         child: SizedBox(
           height: 260,
@@ -376,6 +372,7 @@ class _AllEmotionsScreenState extends State<AllEmotionsScreen>
                   isCurved: true,
                   dotData: const FlDotData(show: true),
                   barWidth: 3,
+                  color: _green700,
                 ),
               ],
             ),
@@ -416,7 +413,7 @@ class _AllEmotionsScreenState extends State<AllEmotionsScreen>
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: _brown200),
+          border: Border.all(color: _green200),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -451,9 +448,9 @@ class _AllEmotionsScreenState extends State<AllEmotionsScreen>
                           SizedBox(
                             width: 70,
                             child: Text(label,
-                                style: TextStyle(
-                                    color: _brown700,
-                                    fontWeight: FontWeight.w700)),
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                    color: _green700)),
                           ),
                           ...emotions.map((e) {
                             final c = counts[e] ?? 0;
@@ -464,7 +461,7 @@ class _AllEmotionsScreenState extends State<AllEmotionsScreen>
                               decoration: BoxDecoration(
                                 color: cellColor(e, c),
                                 borderRadius: BorderRadius.circular(6),
-                                border: Border.all(color: _brown200),
+                                border: Border.all(color: _green200),
                               ),
                               alignment: Alignment.center,
                               child: Text(
@@ -505,7 +502,7 @@ class _AllEmotionsScreenState extends State<AllEmotionsScreen>
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: _brown200),
+            border: Border.all(color: _green200),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -522,7 +519,7 @@ class _AllEmotionsScreenState extends State<AllEmotionsScreen>
               Text(
                 time,
                 style: TextStyle(
-                    color: _brown700.withOpacity(0.75),
+                    color: _green900.withOpacity(0.75),
                     fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 10),
@@ -539,9 +536,9 @@ class _AllEmotionsScreenState extends State<AllEmotionsScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _cream,
+      backgroundColor: _mint,
       appBar: AppBar(
-        backgroundColor: _brown900,
+        backgroundColor: _green900,
         title: Text("All Emotions (last ${widget.days} days)"),
         actions: [
           IconButton(

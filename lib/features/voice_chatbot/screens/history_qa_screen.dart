@@ -23,9 +23,9 @@ class _HistoryQAScreenState extends State<HistoryQAScreen> {
   String _answer = "";
   String _error = "";
 
-  // theme (same palette idea)
-  static const _brown900 = Color(0xFF3E2723);
-  static const _cream = Color(0xFFF7F3EF);
+  // GREEN THEME
+  static const _green900 = Color(0xFF00A693);
+  static const _mint = Color(0xFFF2FBF7);
 
   Future<void> _ask() async {
     final question = _q.text.trim();
@@ -88,9 +88,9 @@ class _HistoryQAScreenState extends State<HistoryQAScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _cream,
+      backgroundColor: _mint,
       appBar: AppBar(
-        backgroundColor: _brown900,
+        backgroundColor: _green900,
         title: const Text("Ask about this chat"),
       ),
       body: Padding(
@@ -118,6 +118,11 @@ class _HistoryQAScreenState extends State<HistoryQAScreen> {
               width: double.infinity,
               child: ElevatedButton(
                 onPressed: _loading ? null : _ask,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _green900,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
                 child: _loading
                     ? const SizedBox(
                         height: 18,
@@ -137,12 +142,17 @@ class _HistoryQAScreenState extends State<HistoryQAScreen> {
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFFA7DCCB)),
                   ),
                   child: SingleChildScrollView(
                     child: Text(
                       _answer,
-                      style: const TextStyle(fontSize: 15, height: 1.35),
+                      style: const TextStyle(
+                        fontSize: 15,
+                        height: 1.35,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ),

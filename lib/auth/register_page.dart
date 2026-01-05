@@ -23,6 +23,12 @@ class _RegisterPageState extends State<RegisterPage> {
   bool loading = false;
   bool showPassword = false;
 
+  // GREEN THEME
+  static const Color green900 = Color(0xFF00A693);
+  static const Color green700 = Color(0xFF00A693);
+  static const Color bgTop = Color(0xFFF2FBF7);
+  static const Color bgBottom = Color(0xFFE9F7F1);
+
   @override
   void dispose() {
     usernameController.dispose();
@@ -39,14 +45,12 @@ class _RegisterPageState extends State<RegisterPage> {
     });
 
     try {
-      // 1. Register in Firebase Auth
       final user = await authService.register(
         usernameController.text.trim(),
         passwordController.text.trim(),
       );
 
       if (user != null) {
-        // 2. Parse Role
         UserRole userRole;
         switch (role) {
           case 'elder':
@@ -59,20 +63,19 @@ class _RegisterPageState extends State<RegisterPage> {
             userRole = UserRole.doctor;
             break;
           case 'patient':
-            userRole = UserRole.elder; // Map patient to elder
+            userRole = UserRole.elder;
             break;
           default:
             userRole = UserRole.elder;
         }
 
-        // 3. Save to Firestore (Users Collection)
         final userService = UserService();
-        final name = usernameController.text.trim().split('@')[0]; // Simple name extraction
+        final name = usernameController.text.trim().split('@')[0];
 
         await userService.saveUser(
           AppUser(
             uid: user.uid,
-            elderId: user.uid, // ✅ NEW: elderId == uid
+            elderId: user.uid,
             email: user.email ?? usernameController.text.trim(),
             role: userRole,
             name: name,
@@ -81,18 +84,14 @@ class _RegisterPageState extends State<RegisterPage> {
 
         if (!mounted) return;
 
-        // 4. Redirect based on Role
         if (userRole == UserRole.elder) {
-          // Elders go to Onboarding
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
-              builder: (_) =>
-                  const SessionWrapper(child: ElderOnboardingFlow()),
+              builder: (_) => const SessionWrapper(child: ElderOnboardingFlow()),
             ),
           );
         } else {
-          // Others go to Dashboard via AuthWrapper
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
@@ -110,12 +109,6 @@ class _RegisterPageState extends State<RegisterPage> {
 
   @override
   Widget build(BuildContext context) {
-    // Dark brown palette (based on your request)
-    const brown = Color(0xFF4E342E);
-    const brownDark = Color(0xFF3E2723);
-    const bgTop = Color(0xFFF7F3F0);
-    const bgBottom = Color(0xFFF2EEF5);
-
     final theme = Theme.of(context);
 
     return Scaffold(
@@ -138,7 +131,6 @@ class _RegisterPageState extends State<RegisterPage> {
                   children: [
                     const SizedBox(height: 10),
 
-                    // Logo + App name (like the design)
                     Column(
                       children: [
                         Container(
@@ -149,7 +141,7 @@ class _RegisterPageState extends State<RegisterPage> {
                             gradient: const LinearGradient(
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
-                              colors: [Color(0xFF6D4C41), Color(0xFF8D6E63)],
+                              colors: [green700, green900],
                             ),
                             boxShadow: [
                               BoxShadow(
@@ -166,7 +158,7 @@ class _RegisterPageState extends State<RegisterPage> {
                           'ElderCare',
                           style: theme.textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.w700,
-                            color: brownDark,
+                            color: green900,
                           ),
                         ),
                       ],
@@ -174,12 +166,11 @@ class _RegisterPageState extends State<RegisterPage> {
 
                     const SizedBox(height: 22),
 
-                    // Title
                     Text(
                       'Create Account',
                       style: theme.textTheme.headlineSmall?.copyWith(
                         fontWeight: FontWeight.w800,
-                        color: brownDark,
+                        color: green900,
                       ),
                     ),
 
@@ -204,23 +195,21 @@ class _RegisterPageState extends State<RegisterPage> {
                       const SizedBox(height: 12),
                     ],
 
-                    // Username
                     _SoftField(
                       controller: usernameController,
                       hintText: 'Username',
                       icon: Icons.person_outline,
                       enabled: !loading,
-                      brown: brown,
+                      themeColor: green900,
                     ),
                     const SizedBox(height: 12),
 
-                    // Password
                     _SoftField(
                       controller: passwordController,
                       hintText: 'Password',
                       icon: Icons.lock_outline,
                       enabled: !loading,
-                      brown: brown,
+                      themeColor: green900,
                       obscureText: !showPassword,
                       suffix: IconButton(
                         onPressed: loading
@@ -228,19 +217,17 @@ class _RegisterPageState extends State<RegisterPage> {
                             : () => setState(() => showPassword = !showPassword),
                         icon: Icon(
                           showPassword ? Icons.visibility_off : Icons.visibility,
-                          color: brown.withOpacity(0.7),
+                          color: green900.withOpacity(0.7),
                         ),
                       ),
                     ),
                     const SizedBox(height: 12),
 
-                    // Role dropdown
                     DropdownButtonFormField<String>(
                       value: role,
                       items: const [
                         DropdownMenuItem(value: 'elder', child: Text('Elder')),
-                        DropdownMenuItem(
-                            value: 'caregiver', child: Text('Caregiver')),
+                        DropdownMenuItem(value: 'caregiver', child: Text('Caregiver')),
                         DropdownMenuItem(value: 'patient', child: Text('Patient')),
                         DropdownMenuItem(value: 'doctor', child: Text('Doctor')),
                       ],
@@ -249,72 +236,53 @@ class _RegisterPageState extends State<RegisterPage> {
                         filled: true,
                         fillColor: Colors.white.withOpacity(0.9),
                         hintText: 'Select Role',
-                        prefixIcon:
-                            Icon(Icons.badge_outlined, color: brown.withOpacity(0.8)),
-                        contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 14),
+                        prefixIcon: Icon(Icons.badge_outlined,
+                            color: green900.withOpacity(0.8)),
+                        contentPadding:
+                            const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(14),
                           borderSide: BorderSide.none,
                         ),
                       ),
                       dropdownColor: Colors.white,
-                      iconEnabledColor: brown,
+                      iconEnabledColor: green900,
                     ),
 
                     const SizedBox(height: 22),
 
-                    // Sign up button
                     SizedBox(
                       height: 52,
                       child: ElevatedButton(
                         onPressed: loading ? null : _handleRegister,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: brownDark,
+                          backgroundColor: green900,
                           foregroundColor: Colors.white,
                           elevation: 10,
-                          shadowColor: brownDark.withOpacity(0.35),
+                          shadowColor: green900.withOpacity(0.35),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(14),
                           ),
-                        ).copyWith(
-                          backgroundColor: WidgetStateProperty.resolveWith((states) {
-                            return Colors.transparent;
-                          }),
                         ),
-                        child: Ink(
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              begin: Alignment.centerLeft,
-                              end: Alignment.centerRight,
-                              colors: [Color(0xFF3E2723), Color(0xFF6D4C41)],
-                            ),
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          child: Container(
-                            alignment: Alignment.center,
-                            child: loading
-                                ? const SizedBox(
-                                    width: 22,
-                                    height: 22,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2.6,
-                                      valueColor: AlwaysStoppedAnimation<Color>(
-                                          Colors.white),
-                                    ),
-                                  )
-                                : const Text(
-                                    'Sign Up',
-                                    style: TextStyle(fontWeight: FontWeight.w700),
-                                  ),
-                          ),
-                        ),
+                        child: loading
+                            ? const SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2.6,
+                                  valueColor:
+                                      AlwaysStoppedAnimation<Color>(Colors.white),
+                                ),
+                              )
+                            : const Text(
+                                'Sign Up',
+                                style: TextStyle(fontWeight: FontWeight.w700),
+                              ),
                       ),
                     ),
 
                     const SizedBox(height: 14),
 
-                    // Bottom link
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -324,10 +292,10 @@ class _RegisterPageState extends State<RegisterPage> {
                         ),
                         GestureDetector(
                           onTap: loading ? null : () => Navigator.pop(context),
-                          child: Text(
+                          child: const Text(
                             'Log in',
                             style: TextStyle(
-                              color: brownDark,
+                              color: green900,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
@@ -337,7 +305,6 @@ class _RegisterPageState extends State<RegisterPage> {
 
                     const SizedBox(height: 14),
 
-                    // Optional illustration placeholder
                     Container(
                       height: 96,
                       margin: const EdgeInsets.symmetric(horizontal: 70),
@@ -348,10 +315,9 @@ class _RegisterPageState extends State<RegisterPage> {
                       ),
                       child: Center(
                         child: Icon(Icons.volunteer_activism,
-                            color: brown.withOpacity(0.55), size: 44),
+                            color: green900.withOpacity(0.55), size: 44),
                       ),
                     ),
-
                     const SizedBox(height: 8),
                   ],
                 ),
@@ -364,13 +330,12 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 }
 
-// Reusable soft input like the mockup
 class _SoftField extends StatelessWidget {
   final TextEditingController controller;
   final String hintText;
   final IconData icon;
   final bool enabled;
-  final Color brown;
+  final Color themeColor;
   final bool obscureText;
   final Widget? suffix;
 
@@ -379,7 +344,7 @@ class _SoftField extends StatelessWidget {
     required this.hintText,
     required this.icon,
     required this.enabled,
-    required this.brown,
+    required this.themeColor,
     this.obscureText = false,
     this.suffix,
   });
@@ -394,7 +359,7 @@ class _SoftField extends StatelessWidget {
         filled: true,
         fillColor: Colors.white.withOpacity(0.9),
         hintText: hintText,
-        prefixIcon: Icon(icon, color: brown.withOpacity(0.8)),
+        prefixIcon: Icon(icon, color: themeColor.withOpacity(0.8)),
         suffixIcon: suffix,
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
         border: OutlineInputBorder(
