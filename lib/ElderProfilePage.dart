@@ -1,11 +1,12 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+
 import 'PatientHealthDetailsScreen.dart';
 import 'auth/login_page.dart';
 
 class ElderProfilePage extends StatelessWidget {
-  const ElderProfilePage({Key? key}) : super(key: key);
+  const ElderProfilePage({super.key});
 
   // ✅ GREEN THEME COLORS
   static const Color green900 = Color(0xFF007A5E);
@@ -16,6 +17,7 @@ class ElderProfilePage extends StatelessWidget {
   Future<void> _signOut(BuildContext context) async {
     await FirebaseAuth.instance.signOut();
     if (!context.mounted) return;
+
     Navigator.pushAndRemoveUntil(
       context,
       MaterialPageRoute(builder: (context) => const LoginPage()),
@@ -55,9 +57,9 @@ class ElderProfilePage extends StatelessWidget {
           ),
         ],
       ),
-      body: StreamBuilder<DocumentSnapshot>(
+      body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
         stream: FirebaseFirestore.instance
-            .collection('elder_health_profiles')
+            .collection('elder_profiles')
             .doc(user.uid)
             .snapshots(),
         builder: (context, snapshot) {
@@ -69,47 +71,12 @@ class ElderProfilePage extends StatelessWidget {
             return Center(child: Text('Error: ${snapshot.error}'));
           }
 
-          if (!snapshot.hasData || !snapshot.data!.exists) {
+          if (!snapshot.hasData || snapshot.data == null || !snapshot.data!.exists) {
             return _buildEmptyState(context);
           }
 
-          final data = snapshot.data!.data() as Map<String, dynamic>;
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                _buildHeader(user),
-                const SizedBox(height: 24),
-                _buildHealthCard(data),
-                const SizedBox(height: 16),
-                _buildLifestyleCard(data),
-                const SizedBox(height: 16),
-                _buildDietCard(data),
-                const SizedBox(height: 24),
-                // Edit Button
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const PatientHealthDetailsScreen(),
-                        ),
-                      );
-                    },
-                    icon: const Icon(Icons.edit),
-                    label: const Text('Edit Profile'),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      side: const BorderSide(color: green700),
-                      foregroundColor: green700,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          );
+          final data = snapshot.data!.data() ?? {};
+          return _buildElderProfilesUI(context, user, data);
         },
       ),
     );
@@ -137,7 +104,7 @@ class ElderProfilePage extends StatelessWidget {
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const PatientHealthDetailsScreen()),
+                MaterialPageRoute(builder: (context) => const PatientHealthDetailsScreen()),
               );
             },
             style: ElevatedButton.styleFrom(
@@ -159,9 +126,7 @@ class ElderProfilePage extends StatelessWidget {
           radius: 50,
           backgroundColor: green500,
           child: Text(
-            user.email != null && user.email!.isNotEmpty
-                ? user.email![0].toUpperCase()
-                : 'U',
+            user.email != null && user.email!.isNotEmpty ? user.email![0].toUpperCase() : 'U',
             style: const TextStyle(
               fontSize: 40,
               color: Colors.white,
@@ -186,58 +151,120 @@ class ElderProfilePage extends StatelessWidget {
     );
   }
 
-  Widget _buildHealthCard(Map<String, dynamic> data) {
-    return _SectionCard(
-      title: 'Health Overview',
-      icon: Icons.health_and_safety,
-      children: [
-        _InfoRow(label: 'Age', value: '${data['age'] ?? 'N/A'} years'),
-        _InfoRow(label: 'Gender', value: '${data['gender'] ?? 'N/A'}'),
-        _InfoRow(label: 'Height', value: '${data['height'] ?? 'N/A'} cm'),
-        _InfoRow(label: 'Weight', value: '${data['weight'] ?? 'N/A'} kg'),
-        const Divider(),
-        _InfoRow(
-          label: 'Conditions',
-          value: (data['chronicConditions'] as List<dynamic>?)?.join(', ') ?? 'None',
-        ),
-        _InfoRow(label: 'Blood Type', value: 'Not set'),
-      ],
-    );
-  }
+  Widget _buildElderProfilesUI(BuildContext context, User user, Map<String, dynamic> data) {
+    String score(dynamic v) => v == null ? "N/A" : "$v / 5";
 
-  Widget _buildLifestyleCard(Map<String, dynamic> data) {
-    return _SectionCard(
-      title: 'Lifestyle',
-      icon: Icons.directions_walk,
-      children: [
-        _InfoRow(label: 'Daily Steps', value: '${data['dailySteps'] ?? 'N/A'}'),
-        _InfoRow(label: 'Exercise', value: '${data['exerciseFrequency'] ?? 'N/A'}'),
-        _InfoRow(label: 'Sleep', value: '${data['sleepHours'] ?? 'N/A'} hrs/night'),
-        _InfoRow(
-            label: 'Habits',
-            value: [
-              if (data['smoking'] == true) 'Smoking',
-              if (data['alcohol'] == true) 'Alcohol',
-              if (data['smoking'] != true && data['alcohol'] != true) 'None'
-            ].join(', ')),
-      ],
-    );
-  }
+    double? probabilityValue;
+    final raw = data['prediction_probability'];
+    if (raw != null) {
+      probabilityValue = double.tryParse(raw.toString());
+    }
 
-  Widget _buildDietCard(Map<String, dynamic> data) {
-    return _SectionCard(
-      title: 'Diet & Nutrition',
-      icon: Icons.restaurant,
-      children: [
-        _InfoRow(label: 'Diet', value: '${data['dietaryHabit'] ?? 'N/A'}'),
-        _InfoRow(label: 'Cuisine', value: '${data['preferredCuisine'] ?? 'N/A'}'),
-        if (data['foodAllergies'] != null)
-          _InfoRow(
-            label: 'Allergies',
-            value: '${data['foodAllergies']}',
-            isWarning: true,
+    final probabilityText =
+        probabilityValue == null ? "N/A" : "${(probabilityValue * 100).toStringAsFixed(1)}%";
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        children: [
+          _buildHeader(user),
+          const SizedBox(height: 24),
+
+          _SectionCard(
+            title: "Basic Info",
+            icon: Icons.person,
+            children: [
+              _InfoRow(label: "Name", value: "${data['name'] ?? 'N/A'}"),
+              _InfoRow(label: "Age", value: "${data['age'] ?? 'N/A'}"),
+              _InfoRow(label: "Long-term illness", value: "${data['long_term_illness'] ?? 'N/A'}"),
+              _InfoRow(label: "Completed At", value: "${data['completed_at'] ?? data['created_at'] ?? 'N/A'}"),
+            ],
           ),
-      ],
+
+          const SizedBox(height: 16),
+
+          _SectionCard(
+            title: "Sleep & Energy",
+            icon: Icons.bedtime,
+            children: [
+              _InfoRow(label: "Sleep well", value: score(data['sleep_well_1to5'])),
+              _InfoRow(label: "Tired during day", value: score(data['tired_day_1to5'])),
+            ],
+          ),
+
+          const SizedBox(height: 16),
+
+          _SectionCard(
+            title: "Memory & Daily Tasks",
+            icon: Icons.psychology,
+            children: [
+              _InfoRow(label: "Forget recent things", value: score(data['forget_recent_1to5'])),
+              _InfoRow(label: "Difficulty remembering tasks", value: score(data['difficulty_remember_tasks_1to5'])),
+              _InfoRow(label: "Forget taking meds", value: score(data['forget_take_meds_1to5'])),
+              _InfoRow(label: "Tasks feel harder", value: score(data['tasks_harder_1to5'])),
+            ],
+          ),
+
+          const SizedBox(height: 16),
+
+          _SectionCard(
+            title: "Mood & Social",
+            icon: Icons.mood,
+            children: [
+              _InfoRow(label: "Loneliness", value: score(data['lonely_1to5'])),
+              _InfoRow(label: "Sad / anxious", value: score(data['sad_anxious_1to5'])),
+              _InfoRow(label: "Social talk", value: score(data['social_talk_1to5'])),
+              _InfoRow(label: "Enjoy hobbies", value: score(data['enjoy_hobbies_1to5'])),
+            ],
+          ),
+
+          const SizedBox(height: 16),
+
+          _SectionCard(
+            title: "App & Reminders",
+            icon: Icons.notifications_active,
+            children: [
+              _InfoRow(label: "Comfort with app", value: score(data['comfortable_app_1to5'])),
+              _InfoRow(label: "Reminders helpful", value: score(data['reminders_helpful_1to5'])),
+              _InfoRow(label: "Right time", value: score(data['reminders_right_time_1to5'])),
+              _InfoRow(label: "Reminder preference", value: "${data['reminders_preference'] ?? 'N/A'}"),
+            ],
+          ),
+
+          const SizedBox(height: 16),
+
+          _SectionCard(
+            title: "Risk Prediction",
+            icon: Icons.analytics,
+            children: [
+              _InfoRow(label: "Tier", value: "${data['prediction_tier'] ?? 'N/A'}"),
+              _InfoRow(label: "Probability", value: probabilityText),
+              _InfoRow(label: "Updated At", value: "${data['prediction_updated_at'] ?? 'N/A'}"),
+            ],
+          ),
+
+          const SizedBox(height: 24),
+
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const PatientHealthDetailsScreen()),
+                );
+              },
+              icon: const Icon(Icons.edit),
+              label: const Text('Edit Profile'),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                side: const BorderSide(color: green700),
+                foregroundColor: green700,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -311,7 +338,13 @@ class _InfoRow extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: TextStyle(color: Colors.grey[600], fontSize: 15)),
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(color: Colors.grey[600], fontSize: 15),
+            ),
+          ),
+          const SizedBox(width: 12),
           Flexible(
             child: Text(
               value,

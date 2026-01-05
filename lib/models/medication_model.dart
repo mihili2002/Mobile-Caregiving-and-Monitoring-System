@@ -6,7 +6,6 @@ class MedicationModel {
   List<String>? meals; // breakfast/lunch/dinner
   String? duration;
   String? notes;
-  double confidence;
 
   MedicationModel({
     required this.drugName,
@@ -16,7 +15,6 @@ class MedicationModel {
     this.meals,
     this.duration,
     this.notes,
-    required this.confidence,
   });
 
   factory MedicationModel.fromJson(Map<String, dynamic> json) {
@@ -28,9 +26,6 @@ class MedicationModel {
       meals: (json["meals"] as List?)?.map((e) => e.toString()).toList(),
       duration: json["duration"],
       notes: json["notes"],
-      confidence: (json["confidence"] is int)
-          ? (json["confidence"] as int).toDouble()
-          : (json["confidence"] ?? 0.0).toDouble(),
     );
   }
 
@@ -42,6 +37,5 @@ class MedicationModel {
     "meals": meals,
     "duration": duration,
     "notes": notes,
-    "confidence": confidence,
   };
 }

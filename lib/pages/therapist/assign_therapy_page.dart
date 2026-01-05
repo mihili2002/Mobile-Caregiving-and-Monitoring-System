@@ -29,9 +29,10 @@ class _AssignTherapyPageState extends State<AssignTherapyPage> {
     // Create Model
     TherapistActivity newActivity = TherapistActivity(
       elderId: widget.elderId,
-      title: _activityName,
-      description: "$_instructions (Duration: $_duration)",
-      assignedDate: DateTime.now(),
+      activityName: _activityName,
+      duration: _duration,
+      assignedTime: "Flexible",
+      isActive: true,
     );
 
     try {
