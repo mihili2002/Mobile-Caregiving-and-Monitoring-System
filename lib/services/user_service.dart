@@ -13,11 +13,11 @@ class UserService {
 
   static String getApiUrl(dynamic context) {
     if (kIsWeb) {
-      return "http://127.0.0.1:5000"; // Chrome
+      return "http://127.0.0.1:8000"; // Chrome
     } else if (defaultTargetPlatform == TargetPlatform.android) {
-      return "http://10.0.2.2:5000"; // Android Emulator
+      return "http://10.0.2.2:8000"; // Android Emulator
     } else {
-      return "http://192.168.8.115:5000"; // Real Phone / iOS
+      return "http://192.168.8.115:8000"; // Real Phone / iOS
     }
   }
 
