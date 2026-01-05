@@ -2,11 +2,9 @@ import 'package:flutter/material.dart';
 import 'auth_service.dart';
 import 'register_page.dart';
 
-// ✅ add these imports
 import '../models/user_model.dart';
 import '../ElderDashboardScreen.dart';
 
-// ✅ NEW imports for token copy + debug print
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
@@ -28,6 +26,13 @@ class _LoginPageState extends State<LoginPage> {
   bool loading = false;
   bool showPassword = false;
 
+  // ✅ GREEN THEME
+  static const Color green900 = Color(0xFF00A693);
+  static const Color green700 = Color(0xFF00A693);
+  static const Color green200 = Color(0xFFA7DCCB);
+  static const Color bgTop = Color(0xFFF2FBF7);
+  static const Color bgBottom = Color(0xFFE9F7F1);
+
   @override
   void dispose() {
     usernameController.dispose();
@@ -44,9 +49,6 @@ class _LoginPageState extends State<LoginPage> {
     });
 
     try {
-      // ---------------------------------------------------
-      // ✅ 1) Firebase sign-in (get User back)
-      // ---------------------------------------------------
       final User? user = await authService.signIn(
         usernameController.text.trim(),
         passwordController.text.trim(),
@@ -56,34 +58,20 @@ class _LoginPageState extends State<LoginPage> {
         throw Exception("Login failed (Firebase user is null)");
       }
 
-      // ---------------------------------------------------
-      // ✅ 2) Force refresh token so custom claims appear
-      // ---------------------------------------------------
       final tokenResult = await user.getIdTokenResult(true);
 
-      // ✅ DEBUG ONLY: print role claims + token
       if (kDebugMode) {
-        debugPrint("✅ Firebase Claims => ${tokenResult.claims}");
-        debugPrint("✅ Firebase Token  => ${tokenResult.token}");
+        debugPrint("Firebase Claims => ${tokenResult.claims}");
+        debugPrint("Firebase Token  => ${tokenResult.token}");
       }
 
-      // ---------------------------------------------------
-      // ✅ 3) Copy token to clipboard for Swagger testing
-      // ---------------------------------------------------
       final token = tokenResult.token;
       if (token != null && token.isNotEmpty) {
         await Clipboard.setData(ClipboardData(text: token));
-
-        if (kDebugMode) {
-          debugPrint("✅ Token copied to clipboard");
-        }
+        if (kDebugMode) debugPrint("Token copied to clipboard");
       }
 
-      // ---------------------------------------------------
-      // ✅ 4) Fetch AppUser from Firestore
-      // ---------------------------------------------------
       final AppUser? appUser = await authService.getCurrentAppUser();
-
       if (appUser == null) {
         throw Exception(
           "User profile not found in Firestore. "
@@ -93,9 +81,6 @@ class _LoginPageState extends State<LoginPage> {
 
       if (!mounted) return;
 
-      // ---------------------------------------------------
-      // ✅ 5) Navigate based on role
-      // ---------------------------------------------------
       if (appUser.role == UserRole.elder) {
         Navigator.pushReplacement(
           context,
@@ -112,12 +97,9 @@ class _LoginPageState extends State<LoginPage> {
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Logged in as ${appUser.role.name}"),
-          ),
+          SnackBar(content: Text("Logged in as ${appUser.role.name}")),
         );
       }
-
     } catch (e) {
       if (mounted) setState(() => error = e.toString());
     } finally {
@@ -127,12 +109,6 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
-    // Same palette + feel as RegisterPage
-    const brown = Color(0xFF4E342E);
-    const brownDark = Color(0xFF3E2723);
-    const bgTop = Color(0xFFF7F3F0);
-    const bgBottom = Color(0xFFF2EEF5);
-
     final theme = Theme.of(context);
 
     return Scaffold(
@@ -155,7 +131,7 @@ class _LoginPageState extends State<LoginPage> {
                   children: [
                     const SizedBox(height: 10),
 
-                    // Logo + App name
+                    // App icon
                     Column(
                       children: [
                         Container(
@@ -166,7 +142,7 @@ class _LoginPageState extends State<LoginPage> {
                             gradient: const LinearGradient(
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
-                              colors: [Color(0xFF6D4C41), Color(0xFF8D6E63)],
+                              colors: [green700, green900],
                             ),
                             boxShadow: [
                               BoxShadow(
@@ -183,7 +159,7 @@ class _LoginPageState extends State<LoginPage> {
                           'ElderCare',
                           style: theme.textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.w700,
-                            color: brownDark,
+                            color: green900,
                           ),
                         ),
                       ],
@@ -195,7 +171,7 @@ class _LoginPageState extends State<LoginPage> {
                       'Welcome Back',
                       style: theme.textTheme.headlineSmall?.copyWith(
                         fontWeight: FontWeight.w800,
-                        color: brownDark,
+                        color: green900,
                       ),
                     ),
                     const SizedBox(height: 6),
@@ -232,7 +208,7 @@ class _LoginPageState extends State<LoginPage> {
                       hintText: 'Username',
                       icon: Icons.person_outline,
                       enabled: !loading,
-                      brown: brown,
+                      themeColor: green900,
                     ),
                     const SizedBox(height: 12),
 
@@ -241,7 +217,7 @@ class _LoginPageState extends State<LoginPage> {
                       hintText: 'Password',
                       icon: Icons.lock_outline,
                       enabled: !loading,
-                      brown: brown,
+                      themeColor: green900,
                       obscureText: !showPassword,
                       suffix: IconButton(
                         tooltip: showPassword ? 'Hide password' : 'Show password',
@@ -250,7 +226,7 @@ class _LoginPageState extends State<LoginPage> {
                             : () => setState(() => showPassword = !showPassword),
                         icon: Icon(
                           showPassword ? Icons.visibility_off : Icons.visibility,
-                          color: brown.withOpacity(0.7),
+                          color: green900.withOpacity(0.7),
                         ),
                       ),
                     ),
@@ -262,46 +238,28 @@ class _LoginPageState extends State<LoginPage> {
                       child: ElevatedButton(
                         onPressed: loading ? null : _handleLogin,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: brownDark,
+                          backgroundColor: green900,
                           foregroundColor: Colors.white,
                           elevation: 10,
-                          shadowColor: brownDark.withOpacity(0.35),
+                          shadowColor: green900.withOpacity(0.35),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(14),
                           ),
-                        ).copyWith(
-                          backgroundColor: WidgetStateProperty.resolveWith((_) {
-                            return Colors.transparent;
-                          }),
                         ),
-                        child: Ink(
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              begin: Alignment.centerLeft,
-                              end: Alignment.centerRight,
-                              colors: [Color(0xFF3E2723), Color(0xFF6D4C41)],
-                            ),
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          child: Container(
-                            alignment: Alignment.center,
-                            child: loading
-                                ? const SizedBox(
-                                    width: 22,
-                                    height: 22,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2.6,
-                                      valueColor: AlwaysStoppedAnimation<Color>(
-                                        Colors.white,
-                                      ),
-                                    ),
-                                  )
-                                : const Text(
-                                    'Sign In',
-                                    style: TextStyle(fontWeight: FontWeight.w700),
-                                  ),
-                          ),
-                        ),
+                        child: loading
+                            ? const SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2.6,
+                                  valueColor:
+                                      AlwaysStoppedAnimation<Color>(Colors.white),
+                                ),
+                              )
+                            : const Text(
+                                'Sign In',
+                                style: TextStyle(fontWeight: FontWeight.w700),
+                              ),
                       ),
                     ),
 
@@ -325,10 +283,10 @@ class _LoginPageState extends State<LoginPage> {
                                     ),
                                   );
                                 },
-                          child: Text(
+                          child: const Text(
                             'Sign up',
                             style: TextStyle(
-                              color: brownDark,
+                              color: green900,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
@@ -349,12 +307,11 @@ class _LoginPageState extends State<LoginPage> {
                       child: Center(
                         child: Icon(
                           Icons.health_and_safety,
-                          color: brown.withOpacity(0.55),
+                          color: green900.withOpacity(0.55),
                           size: 44,
                         ),
                       ),
                     ),
-
                     const SizedBox(height: 8),
                   ],
                 ),
@@ -372,7 +329,7 @@ class _SoftField extends StatelessWidget {
   final String hintText;
   final IconData icon;
   final bool enabled;
-  final Color brown;
+  final Color themeColor;
   final bool obscureText;
   final Widget? suffix;
 
@@ -381,7 +338,7 @@ class _SoftField extends StatelessWidget {
     required this.hintText,
     required this.icon,
     required this.enabled,
-    required this.brown,
+    required this.themeColor,
     this.obscureText = false,
     this.suffix,
   });
@@ -396,7 +353,7 @@ class _SoftField extends StatelessWidget {
         filled: true,
         fillColor: Colors.white.withOpacity(0.9),
         hintText: hintText,
-        prefixIcon: Icon(icon, color: brown.withOpacity(0.8)),
+        prefixIcon: Icon(icon, color: themeColor.withOpacity(0.8)),
         suffixIcon: suffix,
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
         border: OutlineInputBorder(

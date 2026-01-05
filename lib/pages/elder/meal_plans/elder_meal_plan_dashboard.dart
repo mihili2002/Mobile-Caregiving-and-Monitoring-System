@@ -58,13 +58,16 @@ class _ElderMealPlanDashboardState extends State<ElderMealPlanDashboard> {
 
   @override
   Widget build(BuildContext context) {
-    const brown = Color(0xFF4E342E);
-    const bgTop = Color(0xFFF8FBFF);
-    const bgBottom = Color(0xFFF2F3FA);
+    // ✅ GREEN THEME
+    const green = Color(0xFF00A693);
+    const greenDark = Color(0xFF007D6E);
+
+    const bgTop = Color(0xFFF2FBF7);
+    const bgBottom = Color(0xFFE9F7F1);
 
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: brown,
+        backgroundColor: greenDark,
         foregroundColor: Colors.white,
         title: const Text("Meal Plans"),
         centerTitle: true,
@@ -93,7 +96,7 @@ class _ElderMealPlanDashboardState extends State<ElderMealPlanDashboard> {
                 _actionCard(
                   icon: Icons.restaurant_menu,
                   iconBg: const Color(0xFFE6FBF7),
-                  iconColor: const Color(0xFF11BFA8),
+                  iconColor: green,
                   title: "Meal Plans",
                   subtitle: "View current & completed plans",
                   onTap: () {
@@ -111,8 +114,8 @@ class _ElderMealPlanDashboardState extends State<ElderMealPlanDashboard> {
                 // ✅ FULL-WIDTH CARD 2 (Upload Health Details)
                 _actionCard(
                   icon: Icons.description_outlined,
-                  iconBg: const Color(0xFFF2E9FF),
-                  iconColor: const Color(0xFF8B5CF6),
+                  iconBg: const Color(0xFFE6FBF7),
+                  iconColor: green,
                   title: "Upload Health Details",
                   subtitle: "Submit your latest health data",
                   onTap: () {
@@ -136,7 +139,7 @@ class _ElderMealPlanDashboardState extends State<ElderMealPlanDashboard> {
                 else if (_currentPlan == null)
                   _emptyCard("No current meal plan found.")
                 else
-                  _currentMealPlanCard(_currentPlan!),
+                  _currentMealPlanCard(_currentPlan!, green),
 
                 const SizedBox(height: 18),
 
@@ -283,9 +286,7 @@ class _ElderMealPlanDashboardState extends State<ElderMealPlanDashboard> {
     );
   }
 
-  Widget _currentMealPlanCard(MealPlanModel plan) {
-    const teal = Color(0xFF11BFA8);
-
+  Widget _currentMealPlanCard(MealPlanModel plan, Color green) {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -321,7 +322,7 @@ class _ElderMealPlanDashboardState extends State<ElderMealPlanDashboard> {
             width: double.infinity,
             child: ElevatedButton(
               style: ElevatedButton.styleFrom(
-                backgroundColor: teal,
+                backgroundColor: green,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(

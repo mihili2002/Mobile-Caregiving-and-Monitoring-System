@@ -24,8 +24,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
   String _error = "";
   List<Map<String, dynamic>> _messages = [];
 
-  static const _brown900 = Color(0xFF3E2723);
-  static const _cream = Color(0xFFF7F3EF);
+  // GREEN THEME
+  static const _green900 = Color(0xFF00A693);
+  static const _mint = Color(0xFFF2FBF7);
 
   @override
   void initState() {
@@ -92,14 +93,14 @@ class _HistoryScreenState extends State<HistoryScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _cream,
+      backgroundColor: _mint,
       appBar: AppBar(
-        backgroundColor: _brown900,
+        backgroundColor: _green900,
         title: Text("History: ${widget.sessionId}"),
         actions: [
           IconButton(icon: const Icon(Icons.refresh), onPressed: _loadHistory),
 
-          // ✅ NEW: Q&A button
+          // Q&A button
           IconButton(
             icon: const Icon(Icons.question_answer),
             onPressed: () {
@@ -141,11 +142,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
                         margin: const EdgeInsets.symmetric(vertical: 6),
                         padding: const EdgeInsets.all(12),
                         constraints: BoxConstraints(
-                          maxWidth:
-                              MediaQuery.of(context).size.width * 0.78,
+                          maxWidth: MediaQuery.of(context).size.width * 0.78,
                         ),
                         decoration: BoxDecoration(
-                          color: isUser ? Colors.brown.shade200 : Colors.white,
+                          color: isUser
+                              ? const Color(0xFFA7DCCB) // ✅ soft mint bubble
+                              : Colors.white,
                           borderRadius: BorderRadius.circular(14),
                         ),
                         child: Column(
@@ -153,7 +155,13 @@ class _HistoryScreenState extends State<HistoryScreen> {
                               ? CrossAxisAlignment.end
                               : CrossAxisAlignment.start,
                           children: [
-                            Text(text, style: const TextStyle(fontSize: 15)),
+                            Text(
+                              text,
+                              style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                             const SizedBox(height: 6),
                             Row(
                               mainAxisSize: MainAxisSize.min,
