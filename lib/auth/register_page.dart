@@ -55,9 +55,6 @@ class _RegisterPageState extends State<RegisterPage> {
           case 'caregiver':
             userRole = UserRole.caregiver;
             break;
-          case 'doctor':
-            userRole = UserRole.doctor;
-            break;
           case 'patient':
             userRole = UserRole.elder; // Map patient to elder
             break;
@@ -69,12 +66,15 @@ class _RegisterPageState extends State<RegisterPage> {
         final userService = UserService();
         final name = usernameController.text.trim().split('@')[0]; // Simple name extraction
 
-        await userService.saveUser(AppUser(
-          uid: user.uid,
-          email: user.email ?? usernameController.text.trim(),
-          role: userRole,
-          name: name,
-        ));
+        await userService.saveUser(
+          AppUser(
+            uid: user.uid,
+            elderId: user.uid, // ✅ NEW: elderId == uid
+            email: user.email ?? usernameController.text.trim(),
+            role: userRole,
+            name: name,
+          ),
+        );
 
         if (!mounted) return;
 
@@ -83,13 +83,18 @@ class _RegisterPageState extends State<RegisterPage> {
           // Elders go to Onboarding
           Navigator.pushReplacement(
             context,
-            MaterialPageRoute(builder: (_) => const SessionWrapper(child: ElderOnboardingFlow())),
+            MaterialPageRoute(
+              builder: (_) =>
+                  const SessionWrapper(child: ElderOnboardingFlow()),
+            ),
           );
         } else {
           // Others go to Dashboard via AuthWrapper
           Navigator.pushReplacement(
             context,
-            MaterialPageRoute(builder: (_) => const SessionWrapper(child: AuthWrapper())),
+            MaterialPageRoute(
+              builder: (_) => const SessionWrapper(child: AuthWrapper()),
+            ),
           );
         }
       }
@@ -103,8 +108,8 @@ class _RegisterPageState extends State<RegisterPage> {
   @override
   Widget build(BuildContext context) {
     // Dark brown palette (based on your request)
-    const brown = Color(0xFF00BBA7);
-    const brownDark = Color(0xFF009E8D);
+    const brown = Color(0xFF4E342E);
+    const brownDark = Color(0xFF3E2723);
     const bgTop = Color(0xFFF7F3F0);
     const bgBottom = Color(0xFFF2EEF5);
 
@@ -141,7 +146,7 @@ class _RegisterPageState extends State<RegisterPage> {
                             gradient: const LinearGradient(
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
-                              colors: [Color(0xFF009E8D), Color(0xFF009E8D)],
+                              colors: [Color(0xFF6D4C41), Color(0xFF8D6E63)],
                             ),
                             boxShadow: [
                               BoxShadow(
@@ -226,22 +231,24 @@ class _RegisterPageState extends State<RegisterPage> {
                     ),
                     const SizedBox(height: 12),
 
-                    // Role dropdown (styled like the design)
+                    // Role dropdown
                     DropdownButtonFormField<String>(
                       value: role,
                       items: const [
                         DropdownMenuItem(value: 'elder', child: Text('Elder')),
-                        DropdownMenuItem(value: 'caregiver', child: Text('Caregiver')),
+                        DropdownMenuItem(
+                            value: 'caregiver', child: Text('Caregiver')),
                         DropdownMenuItem(value: 'patient', child: Text('Patient')),
-                        DropdownMenuItem(value: 'doctor', child: Text('Doctor')),
                       ],
                       onChanged: loading ? null : (v) => setState(() => role = v!),
                       decoration: InputDecoration(
                         filled: true,
                         fillColor: Colors.white.withOpacity(0.9),
                         hintText: 'Select Role',
-                        prefixIcon: Icon(Icons.badge_outlined, color: brown.withOpacity(0.8)),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                        prefixIcon:
+                            Icon(Icons.badge_outlined, color: brown.withOpacity(0.8)),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 14),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(14),
                           borderSide: BorderSide.none,
@@ -253,7 +260,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
                     const SizedBox(height: 22),
 
-                    // Sign up button (gradient like design, but brown)
+                    // Sign up button
                     SizedBox(
                       height: 52,
                       child: ElevatedButton(
@@ -268,7 +275,6 @@ class _RegisterPageState extends State<RegisterPage> {
                           ),
                         ).copyWith(
                           backgroundColor: WidgetStateProperty.resolveWith((states) {
-                            // simulate gradient by using a decorated child (below)
                             return Colors.transparent;
                           }),
                         ),
@@ -277,7 +283,7 @@ class _RegisterPageState extends State<RegisterPage> {
                             gradient: const LinearGradient(
                               begin: Alignment.centerLeft,
                               end: Alignment.centerRight,
-                              colors: [Color(0xFF009E8D), Color(0xFF00BBA7)],
+                              colors: [Color(0xFF3E2723), Color(0xFF6D4C41)],
                             ),
                             borderRadius: BorderRadius.circular(14),
                           ),
@@ -289,7 +295,8 @@ class _RegisterPageState extends State<RegisterPage> {
                                     height: 22,
                                     child: CircularProgressIndicator(
                                       strokeWidth: 2.6,
-                                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                          Colors.white),
                                     ),
                                   )
                                 : const Text(
@@ -303,7 +310,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
                     const SizedBox(height: 14),
 
-                    // Bottom link (like design)
+                    // Bottom link
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -326,7 +333,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
                     const SizedBox(height: 14),
 
-                    // Optional illustration placeholder (matches layout)
+                    // Optional illustration placeholder
                     Container(
                       height: 96,
                       margin: const EdgeInsets.symmetric(horizontal: 70),
@@ -336,7 +343,8 @@ class _RegisterPageState extends State<RegisterPage> {
                         border: Border.all(color: Colors.black.withOpacity(0.06)),
                       ),
                       child: Center(
-                        child: Icon(Icons.volunteer_activism, color: brown.withOpacity(0.55), size: 44),
+                        child: Icon(Icons.volunteer_activism,
+                            color: brown.withOpacity(0.55), size: 44),
                       ),
                     ),
 

@@ -21,7 +21,7 @@ class ElderProfileService {
     try {
       final doc = await _db.collection('elder_profiles').doc(uid).get();
       if (doc.exists) {
-        return ElderProfile.fromMap(doc.data() as Map<String, dynamic>, uid);
+        return ElderProfile.fromMap(doc.data() as Map<String, dynamic>);
       }
       return null;
     } catch (e) {
@@ -42,10 +42,10 @@ class ElderProfileService {
   /// Mark onboarding as complete
   Future<void> completeOnboarding(String uid) async {
     try {
-      await _db.collection('elder_profiles').doc(uid).set({
+      await _db.collection('elder_profiles').doc(uid).update({
         'is_onboarding_complete': true,
         'updated_at': Timestamp.now(),
-      }, SetOptions(merge: true));
+      });
     } catch (e) {
       throw Exception('Failed to complete onboarding: $e');
     }
