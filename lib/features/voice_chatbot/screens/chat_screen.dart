@@ -174,7 +174,7 @@ class _ChatScreenState extends State<ChatScreen> {
         style: TextStyle(fontWeight: FontWeight.w700),
       ),
       actions: [
-        // ✅ All Sessions
+        // All Sessions
         IconButton(
           tooltip: "All Sessions",
           icon: const Icon(Icons.list_alt),
@@ -202,7 +202,7 @@ IconButton(
   },
 ),
 
-        // ✅ Weekly Emotions (FIXED: inside actions)
+        // Weekly Emotions (FIXED: inside actions)
     //    IconButton(
         //  tooltip: "Weekly Emotions",
        //   icon: const Icon(Icons.calendar_month),
@@ -216,7 +216,7 @@ IconButton(
        //   },
       //  ),
 
-        // ✅ Chat History for current session
+        // Chat History for current session
         IconButton(
           tooltip: "History",
           icon: const Icon(Icons.history),
@@ -240,7 +240,7 @@ IconButton(
           },
         ),
 
-        // ✅ Emotions for current session
+        // Emotions for current session
         IconButton(
           tooltip: "Emotions",
           icon: const Icon(Icons.emoji_emotions),
@@ -258,7 +258,7 @@ IconButton(
           },
         ),
 
-        // ✅ TTS toggle
+        // TTS toggle
         IconButton(
           tooltip: _ttsEnabled ? "Mute" : "Unmute",
           icon: Icon(_ttsEnabled ? Icons.volume_up : Icons.volume_off),

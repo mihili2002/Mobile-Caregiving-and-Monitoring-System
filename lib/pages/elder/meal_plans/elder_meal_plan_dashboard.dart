@@ -1,40 +1,40 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-
+ 
 import '../../../models/meal_plan_model.dart';
 import '../../../services/meal_plan_service.dart';
 import '../../../PatientHealthDetailsScreen.dart';
 import 'meal_plan_detail_page.dart';
 import 'all_submissions_screen.dart';
-
+ 
 class ElderMealPlanDashboard extends StatefulWidget {
   const ElderMealPlanDashboard({super.key});
-
+ 
   @override
   State<ElderMealPlanDashboard> createState() => _ElderMealPlanDashboardState();
 }
-
+ 
 class _ElderMealPlanDashboardState extends State<ElderMealPlanDashboard> {
   final MealPlanService _mealPlanService = MealPlanService();
-
+ 
   MealPlanModel? _currentPlan;
   List<MealPlanModel> _completedPlans = [];
-
+ 
   bool _loading = true;
-
+ 
   @override
   void initState() {
     super.initState();
     _loadPlans();
   }
-
+ 
   Future<void> _loadPlans() async {
     setState(() => _loading = true);
-
+ 
     try {
       final current = await _mealPlanService.getCurrentMealPlan();
       final completed = await _mealPlanService.getCompletedMealPlans();
-
+ 
       if (!mounted) return;
       setState(() {
         _currentPlan = current;
@@ -50,26 +50,32 @@ class _ElderMealPlanDashboardState extends State<ElderMealPlanDashboard> {
       if (mounted) setState(() => _loading = false);
     }
   }
-
+ 
   String _formatDateRange(MealPlanModel plan) {
     final df = DateFormat("MMM d");
     return "${df.format(plan.startDate)} – ${df.format(plan.endDate)}";
   }
-
+ 
   @override
   Widget build(BuildContext context) {
-    const brown = Color(0xFF4E342E);
+    const brown = Color(0xFF11BFA8);
     const bgTop = Color(0xFFF8FBFF);
     const bgBottom = Color(0xFFF2F3FA);
-
+ 
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: brown,
+  backgroundColor: brown,
         foregroundColor: Colors.white,
         title: const Text("Meal Plans"),
         centerTitle: true,
         elevation: 0,
-      ),
+  // ✅ back button
+  leading: IconButton(
+    icon: const Icon(Icons.arrow_back),
+    onPressed: () => Navigator.pop(context),
+  ),
+),
+
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
@@ -86,9 +92,9 @@ class _ElderMealPlanDashboardState extends State<ElderMealPlanDashboard> {
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 18),
               children: [
                 _welcomeCard(),
-
+ 
                 const SizedBox(height: 14),
-
+ 
                 // ✅ FULL-WIDTH CARD 1 (Meal Plans)
                 _actionCard(
                   icon: Icons.restaurant_menu,
@@ -105,9 +111,9 @@ class _ElderMealPlanDashboardState extends State<ElderMealPlanDashboard> {
                     );
                   },
                 ),
-
+ 
                 const SizedBox(height: 12),
-
+ 
                 // ✅ FULL-WIDTH CARD 2 (Upload Health Details)
                 _actionCard(
                   icon: Icons.description_outlined,
@@ -124,22 +130,22 @@ class _ElderMealPlanDashboardState extends State<ElderMealPlanDashboard> {
                     );
                   },
                 ),
-
+ 
                 const SizedBox(height: 18),
-
+ 
                 _sectionTitle("Current Meal Plan"),
-
+ 
                 const SizedBox(height: 10),
-
+ 
                 if (_loading)
                   const Center(child: CircularProgressIndicator())
                 else if (_currentPlan == null)
                   _emptyCard("No current meal plan found.")
                 else
                   _currentMealPlanCard(_currentPlan!),
-
+ 
                 const SizedBox(height: 18),
-
+ 
                 // _sectionTitle("Completed Meal Plans"),
                 //
                 // const SizedBox(height: 10),
@@ -155,9 +161,9 @@ class _ElderMealPlanDashboardState extends State<ElderMealPlanDashboard> {
       ),
     );
   }
-
+ 
   // ---------------- UI Components ----------------
-
+ 
   Widget _welcomeCard() {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -185,14 +191,14 @@ class _ElderMealPlanDashboardState extends State<ElderMealPlanDashboard> {
       ),
     );
   }
-
+ 
   Widget _sectionTitle(String title) {
     return Text(
       title,
       style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
     );
   }
-
+ 
   /// ✅ This matches Photo 2: full width, no overflow, clean
   Widget _actionCard({
     required IconData icon,
@@ -271,7 +277,7 @@ class _ElderMealPlanDashboardState extends State<ElderMealPlanDashboard> {
       ),
     );
   }
-
+ 
   Widget _emptyCard(String text) {
     return Container(
       padding: const EdgeInsets.all(14),
@@ -282,10 +288,10 @@ class _ElderMealPlanDashboardState extends State<ElderMealPlanDashboard> {
       child: Text(text),
     );
   }
-
+ 
   Widget _currentMealPlanCard(MealPlanModel plan) {
     const teal = Color(0xFF11BFA8);
-
+ 
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -347,10 +353,10 @@ class _ElderMealPlanDashboardState extends State<ElderMealPlanDashboard> {
       ),
     );
   }
-
+ 
   Widget _completedMealPlanCard(MealPlanModel plan) {
     final completedDate = DateFormat("MMM d, yyyy").format(plan.endDate);
-
+ 
     return Container(
       margin: const EdgeInsets.only(top: 10),
       padding: const EdgeInsets.all(14),

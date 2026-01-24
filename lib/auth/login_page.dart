@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'auth_service.dart';
 import 'register_page.dart';
 
-// ✅ add these imports
+// add these imports
 import '../models/user_model.dart';
 import '../ElderDashboardScreen.dart';
 
-// ✅ NEW imports for token copy + debug print
+// NEW imports for token copy + debug print
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
@@ -45,7 +45,7 @@ class _LoginPageState extends State<LoginPage> {
 
     try {
       // ---------------------------------------------------
-      // ✅ 1) Firebase sign-in (get User back)
+      //  1) Firebase sign-in (get User back)
       // ---------------------------------------------------
       final User? user = await authService.signIn(
         usernameController.text.trim(),
@@ -57,30 +57,30 @@ class _LoginPageState extends State<LoginPage> {
       }
 
       // ---------------------------------------------------
-      // ✅ 2) Force refresh token so custom claims appear
+      // 2) Force refresh token so custom claims appear
       // ---------------------------------------------------
       final tokenResult = await user.getIdTokenResult(true);
 
-      // ✅ DEBUG ONLY: print role claims + token
+      // DEBUG ONLY: print role claims + token
       if (kDebugMode) {
-        debugPrint("✅ Firebase Claims => ${tokenResult.claims}");
-        debugPrint("✅ Firebase Token  => ${tokenResult.token}");
+        debugPrint("Firebase Claims => ${tokenResult.claims}");
+        debugPrint("Firebase Token  => ${tokenResult.token}");
       }
 
       // ---------------------------------------------------
-      // ✅ 3) Copy token to clipboard for Swagger testing
+      // 3) Copy token to clipboard for Swagger testing
       // ---------------------------------------------------
       final token = tokenResult.token;
       if (token != null && token.isNotEmpty) {
         await Clipboard.setData(ClipboardData(text: token));
 
         if (kDebugMode) {
-          debugPrint("✅ Token copied to clipboard");
+          debugPrint("Token copied to clipboard");
         }
       }
 
       // ---------------------------------------------------
-      // ✅ 4) Fetch AppUser from Firestore
+      // 4) Fetch AppUser from Firestore
       // ---------------------------------------------------
       final AppUser? appUser = await authService.getCurrentAppUser();
 
@@ -94,7 +94,7 @@ class _LoginPageState extends State<LoginPage> {
       if (!mounted) return;
 
       // ---------------------------------------------------
-      // ✅ 5) Navigate based on role
+      // 5) Navigate based on role
       // ---------------------------------------------------
       if (appUser.role == UserRole.elder) {
         Navigator.pushReplacement(
@@ -129,8 +129,8 @@ class _LoginPageState extends State<LoginPage> {
   @override
   Widget build(BuildContext context) {
     // Same palette + feel as RegisterPage
-    const brown = Color(0xFF4E342E);
-    const brownDark = Color(0xFF3E2723);
+    const brown = Color(0xFF00BBA7);
+    const brownDark = Color(0xFF009E8D);
     const bgTop = Color(0xFFF7F3F0);
     const bgBottom = Color(0xFFF2EEF5);
 
@@ -167,7 +167,7 @@ class _LoginPageState extends State<LoginPage> {
                             gradient: const LinearGradient(
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
-                              colors: [Color(0xFF6D4C41), Color(0xFF8D6E63)],
+                              colors: [Color(0xFF009E8D), Color(0xFF009E8D)],
                             ),
                             boxShadow: [
                               BoxShadow(
@@ -280,7 +280,7 @@ class _LoginPageState extends State<LoginPage> {
                             gradient: const LinearGradient(
                               begin: Alignment.centerLeft,
                               end: Alignment.centerRight,
-                              colors: [Color(0xFF3E2723), Color(0xFF6D4C41)],
+                              colors: [Color(0xFF009E8D), Color(0xFF009E8D)],
                             ),
                             borderRadius: BorderRadius.circular(14),
                           ),

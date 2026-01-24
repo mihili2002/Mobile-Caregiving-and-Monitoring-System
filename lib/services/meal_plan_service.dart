@@ -7,7 +7,7 @@ import '../models/all_submission_model.dart';
 class MealPlanService {
   final MealPlanApiService _api = MealPlanApiService();
 
-  /// ✅ Get Firebase token safely (Fixes String? issue)
+  ///Get Firebase token safely (Fixes String? issue)
   Future<String> _getToken() async {
     final user = FirebaseAuth.instance.currentUser;
 
@@ -17,7 +17,7 @@ class MealPlanService {
 
     final token = await user.getIdToken();
 
-    // ✅ Fix: token could be null in some setups
+    //Fix: token could be null in some setups
     if (token == null || token.trim().isEmpty) {
       throw Exception("Firebase token is empty. Please login again.");
     }
@@ -25,14 +25,14 @@ class MealPlanService {
     return token;
   }
 
-  /// ✅ Loads dashboard JSON from backend:
+  ///Loads dashboard JSON from backend:
   /// GET /elder/meal-plans/dashboard
   Future<Map<String, dynamic>> fetchDashboard() async {
     final token = await _getToken();
     return await _api.getDashboard(token: token);
   }
 
-  /// ✅ Extract current approved meal plan from backend response
+  ///Extract current approved meal plan from backend response
   Future<MealPlanModel?> getCurrentMealPlan() async {
     final data = await fetchDashboard();
 
@@ -43,7 +43,7 @@ class MealPlanService {
   }
 
 
-  /// ✅ Extract completed meal plans list from backend response
+  ///Extract completed meal plans list from backend response
   Future<List<MealPlanModel>> getCompletedMealPlans() async {
     final data = await fetchDashboard();
 
@@ -54,7 +54,7 @@ class MealPlanService {
         .toList();
   }
 
-  /// ✅ Get full meal plan details by mealPlanId
+  ///Get full meal plan details by mealPlanId
   /// GET /elder/meal-plans/{meal_plan_id}
   Future<MealPlanModel> getMealPlanDetails(String mealPlanId) async {
     final token = await _getToken();
@@ -64,11 +64,11 @@ class MealPlanService {
       mealPlanId: mealPlanId,
     );
 
-    // ✅ The backend returns a single plan JSON
+    //The backend returns a single plan JSON
     return MealPlanModel.fromJson(json);
   }
 
-  /// ✅ Get all submitted meal plan records (summary only)
+  ///Get all submitted meal plan records (summary only)
   Future<List<AllSubmissionModel>> getAllSubmissions() async {
     final data = await fetchDashboard();
     print(data);
@@ -81,17 +81,17 @@ class MealPlanService {
 
 
 
-  /// ✅ Backward compatible function (if your UI still calls getCompletedPlans)
+  ///Backward compatible function (if your UI still calls getCompletedPlans)
   Future<List<MealPlanModel>> getCompletedPlans(String elderId) async {
     return await getCompletedMealPlans();
   }
 
-  /// ✅ Backward compatible function (if your UI still calls getCurrentMealPlan(elderId))
+  ///Backward compatible function (if your UI still calls getCurrentMealPlan(elderId))
   Future<MealPlanModel?> getCurrentMealPlanByElder(String elderId) async {
     return await getCurrentMealPlan();
   }
 
-  /// ✅ Backward compatible function (if your UI still calls getMealPlanById)
+  ///Backward compatible function (if your UI still calls getMealPlanById)
   Future<MealPlanModel?> getMealPlanById(String id) async {
     return await getMealPlanDetails(id);
   }

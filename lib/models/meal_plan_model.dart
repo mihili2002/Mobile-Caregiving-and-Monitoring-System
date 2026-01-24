@@ -3,9 +3,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 class MealPlanModel {
   final String id;
 
-  /// ✅ Support both API snake_case + Firestore camelCase
+  /// Support both API snake_case + Firestore camelCase
   final String elderId;
-  final String planId; // ✅ Added back for old UI
+  final String planId; // Added back for old UI
   final String status;
 
   final DateTime startDate;
@@ -14,7 +14,7 @@ class MealPlanModel {
   final List<String> warnings;
   final Map<String, dynamic> nutrientTargets;
 
-  /// ✅ API structure
+  /// API structure
   final List<MealPlanDay> days;
 
   MealPlanModel({
@@ -29,12 +29,12 @@ class MealPlanModel {
     required this.days,
   });
 
-  // ✅ API JSON Factory
+  // API JSON Factory
   factory MealPlanModel.fromJson(Map<String, dynamic> json) {
     return MealPlanModel(
       id: (json["id"] ?? "").toString(),
       elderId: (json["elder_id"] ?? json["elderId"] ?? "").toString(),
-      planId: (json["plan_id"] ?? json["planId"] ?? json["id"] ?? "").toString(), // ✅ fallback
+      planId: (json["plan_id"] ?? json["planId"] ?? json["id"] ?? "").toString(), //fallback
       status: (json["status"] ?? "").toString(),
       startDate: _parseDate(json["start_date"] ?? json["startDate"]),
       endDate: _parseDate(json["end_date"] ?? json["endDate"]),
@@ -46,7 +46,7 @@ class MealPlanModel {
     );
   }
 
-  /// ✅ Firestore Document Factory (BACKWARD SUPPORT)
+  ///Firestore Document Factory (BACKWARD SUPPORT)
   factory MealPlanModel.fromDoc(DocumentSnapshot doc) {
     final data = (doc.data() as Map<String, dynamic>? ?? {});
 
@@ -60,11 +60,11 @@ class MealPlanModel {
       warnings: List<String>.from(data["warnings"] ?? []),
       nutrientTargets:
           Map<String, dynamic>.from(data["nutrientTargets"] ?? data["nutrient_targets"] ?? {}),
-      days: [], // ✅ Firestore old structure does not contain days
+      days: [], //Firestore old structure does not contain days
     );
   }
 
-  /// ✅ Compatibility: Old UI expects plan.meals
+  ///Compatibility: Old UI expects plan.meals
   /// Convert API days -> old meals map format
   Map<String, dynamic> get meals {
     final Map<String, dynamic> map = {};
@@ -83,7 +83,7 @@ class MealPlanModel {
     return map;
   }
 
-  // ✅ Helper for API string dates
+  //Helper for API string dates
   static DateTime _parseDate(dynamic value) {
     if (value == null) return DateTime.now();
 
@@ -96,7 +96,7 @@ class MealPlanModel {
     return DateTime.now();
   }
 
-  // ✅ Helper for Firestore timestamps
+  //Helper for Firestore timestamps
   static DateTime _parseTimestamp(dynamic value) {
     if (value == null) return DateTime.now();
 
@@ -112,7 +112,7 @@ class MealPlanModel {
   }
 }
 
-// ✅ Day Model
+//Day Model
 class MealPlanDay {
   final int day;
   final MealDayMeals meals;
@@ -130,7 +130,7 @@ class MealPlanDay {
   }
 }
 
-// ✅ Meals inside each day
+//Meals inside each day
 class MealDayMeals {
   final List<MealItem> breakfast;
   final List<MealItem> lunch;
@@ -162,7 +162,7 @@ class MealDayMeals {
   }
 }
 
-// ✅ Single Meal Item
+//Single Meal Item
 class MealItem {
   final String portion;
   final String foodName;

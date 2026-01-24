@@ -1,29 +1,29 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-
+ 
 import 'widgets/role_based_wrapper.dart';
 import 'services/elder_health_submission_service.dart';
 import 'pages/elder/meal_plans/meal_plan_details_screen.dart';
-
+ 
 enum Gender { male, female }
-
+ 
 class PatientHealthDetailsScreen extends StatefulWidget {
   final String? submissionId;
   final String? status;
-
+ 
   const PatientHealthDetailsScreen({
     Key? key,
     this.submissionId,
     this.status,
   }) : super(key: key);
-
+ 
   bool get isReadOnly => status == "approved";
-
+ 
   @override
   State<PatientHealthDetailsScreen> createState() =>
       _PatientHealthDetailsScreenState();
 }
-
+ 
 class _PatientHealthDetailsScreenState
     extends State<PatientHealthDetailsScreen> {
   // ---------------- CONTROLLERS ----------------
@@ -44,7 +44,7 @@ class _PatientHealthDetailsScreenState
   final TextEditingController _proteinController = TextEditingController();
   final TextEditingController _carbController = TextEditingController();
   final TextEditingController _fatController = TextEditingController();
-
+ 
   // ---------------- STATE ----------------
   Gender? _gender;
   final List<String> _chronicConditions = [];
@@ -54,14 +54,14 @@ class _PatientHealthDetailsScreenState
   bool _alcohol = false;
   String? _dietaryHabit;
   String? _preferredCuisine;
-
+ 
   bool _isLoading = false;
   bool get _readOnly => widget.isReadOnly;
-
+ 
   final _formKey = GlobalKey<FormState>();
   final ElderHealthSubmissionService _submissionService =
   ElderHealthSubmissionService();
-
+ 
   // ---------------- INIT ----------------
   @override
   void initState() {
@@ -70,23 +70,23 @@ class _PatientHealthDetailsScreenState
       _loadSubmission();
     }
   }
-
+ 
   // ---------------- LOAD SUBMISSION ----------------
   Future<void> _loadSubmission() async {
     setState(() => _isLoading = true);
-
+ 
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) return;
-
+ 
       final token = await user.getIdToken();
       if (token == null) return;
-
+ 
       final data = await _submissionService.getSubmissionDetails(
         token: token,
         submissionId: widget.submissionId!,
       );
-
+ 
       _ageController.text = data["age"].toString();
       _heightController.text = data["height_cm"].toString();
       _weightController.text = data["weight_kg"].toString();
@@ -102,7 +102,7 @@ class _PatientHealthDetailsScreenState
           data["daily_steps"].toString();
       _sleepHoursController.text =
           data["sleep_hours"].toString();
-
+ 
       _calorieController.text =
           data["caloric_intake"].toString();
       _proteinController.text =
@@ -111,12 +111,12 @@ class _PatientHealthDetailsScreenState
           data["carbohydrate_intake"].toString();
       _fatController.text =
           data["fat_intake"].toString();
-
+ 
       _foodAllergiesController.text =
           data["food_allergies"] ?? "";
       _foodAversionsController.text =
           data["food_aversions"] ?? "";
-
+ 
       _gender = data["gender"] == "Male" ? Gender.male : Gender.female;
       _dietaryHabit = data["dietary_habit"];
       _preferredCuisine = data["preferred_cuisine"];
@@ -124,7 +124,7 @@ class _PatientHealthDetailsScreenState
       _smoking = data["smoking"] ?? false;
       _alcohol = data["alcohol"] ?? false;
       _geneticRisk = data["genetic_risk"] ?? false;
-
+ 
       _chronicConditions
         ..clear()
         ..addAll(List<String>.from(data["chronic_conditions"] ?? []));
@@ -132,21 +132,21 @@ class _PatientHealthDetailsScreenState
       if (mounted) setState(() => _isLoading = false);
     }
   }
-
+ 
   String _mapExercise(int v) =>
       v == 1 ? "Low" : v == 2 ? "Moderate" : "High";
-
+ 
   // ---------------- SUBMIT ----------------
   Future<void> _submit() async {
     if (_readOnly) return;
     if (!_formKey.currentState!.validate()) return;
-
+ 
     setState(() => _isLoading = true);
-
+ 
     try {
       final token =
       await FirebaseAuth.instance.currentUser!.getIdToken();
-
+ 
       final payload = {
         "age": int.parse(_ageController.text.trim()),
         "gender": _gender == Gender.male ? "Male" : "Female",
@@ -174,14 +174,14 @@ class _PatientHealthDetailsScreenState
         "smoking": _smoking,
         "alcohol": _alcohol,
         "dietary_habit": _dietaryHabit,
-        "caloric_intake":
-        double.parse(_calorieController.text.trim()),
-        "protein_intake":
-        double.parse(_proteinController.text.trim()),
-        "carbohydrate_intake":
-        double.parse(_carbController.text.trim()),
-        "fat_intake":
-        double.parse(_fatController.text.trim()),
+        // "caloric_intake":
+        // double.parse(_calorieController.text.trim()),
+        // "protein_intake":
+        // double.parse(_proteinController.text.trim()),
+        // "carbohydrate_intake":
+        // double.parse(_carbController.text.trim()),
+        // "fat_intake":
+        // double.parse(_fatController.text.trim()),
         "food_allergies":
         _foodAllergiesController.text.trim().isEmpty
             ? null
@@ -192,7 +192,7 @@ class _PatientHealthDetailsScreenState
             ? null
             : _foodAversionsController.text.trim(),
       };
-
+ 
       if (widget.submissionId == null) {
         await _submissionService.submitHealthDetails(
           token: token!,
@@ -205,7 +205,7 @@ class _PatientHealthDetailsScreenState
           payload: payload,
         );
       }
-
+ 
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const RoleBasedWrapper()),
@@ -214,8 +214,8 @@ class _PatientHealthDetailsScreenState
       if (mounted) setState(() => _isLoading = false);
     }
   }
-
-
+ 
+ 
   // ---------------- UI ----------------
   @override
   Widget build(BuildContext context) {
@@ -239,16 +239,16 @@ class _PatientHealthDetailsScreenState
                   _basicInfoCard(),
                   _healthConditionsCard(),
                   _lifestyleCard(),
-                  _nutritionTargetsCard(),
+                  // _nutritionTargetsCard(),
                   _dietaryCard(),
                   const SizedBox(height: 16),
-
+ 
                   if (!_readOnly)
                     ElevatedButton(
                       onPressed: _isLoading ? null : _submit,
                       child: const Text("Submit Details"),
                     ),
-
+ 
                   if (_readOnly)
                     ElevatedButton.icon(
                       icon: const Icon(Icons.restaurant_menu),
@@ -277,13 +277,13 @@ class _PatientHealthDetailsScreenState
       ),
     );
   }
-
+ 
   // ---------------- HELPERS ----------------
   bool _enabled() => !_readOnly;
-
+ 
   InputDecoration _dec(String label) =>
       InputDecoration(labelText: label);
-
+ 
   Widget _field(
       TextEditingController c,
       String label, {
@@ -296,7 +296,7 @@ class _PatientHealthDetailsScreenState
         number ? TextInputType.number : TextInputType.text,
         decoration: _dec(label),
       );
-
+ 
   // ---------------- SECTIONS (ORIGINAL UI PRESERVED) ----------------
   Widget _basicInfoCard() => _sectionCard(
     title: "Basic Information",
@@ -312,12 +312,13 @@ class _PatientHealthDetailsScreenState
       ),
     ],
   );
-
+ 
   Widget _healthConditionsCard() => _sectionCard(
     title: "Health Conditions",
     children: [
       Wrap(
-        spacing: 8,
+        spacing: 12,
+        runSpacing: 12,
         children: [
           _condChip("Diabetes"),
           _condChip("Hypertension"),
@@ -343,7 +344,7 @@ class _PatientHealthDetailsScreenState
       ),
     ],
   );
-
+ 
   Widget _lifestyleCard() => _sectionCard(
     title: "Lifestyle Information",
     children: [
@@ -376,7 +377,7 @@ class _PatientHealthDetailsScreenState
       ),
     ],
   );
-
+ 
   Widget _nutritionTargetsCard() => _sectionCard(
     title: "Daily Nutrition Targets",
     children: [
@@ -386,12 +387,13 @@ class _PatientHealthDetailsScreenState
       _field(_fatController, "Fat (g/day)"),
     ],
   );
-
+ 
   Widget _dietaryCard() => _sectionCard(
     title: "Dietary Preferences",
     children: [
       Wrap(
-        spacing: 8,
+        spacing: 12,
+        runSpacing: 12,
         children: [
           _dietChip("Vegetarian"),
           _dietChip("Vegan"),
@@ -428,7 +430,7 @@ class _PatientHealthDetailsScreenState
       ),
     ],
   );
-
+ 
   // ---------------- UI HELPERS ----------------
   Widget _sectionCard({
     required String title,
@@ -453,57 +455,149 @@ class _PatientHealthDetailsScreenState
           ),
         ),
       );
-
+ 
   Widget _genderRow() => Row(
-    children: [
-      Expanded(
-        child: OutlinedButton(
-          onPressed:
-          _enabled() ? () => setState(() => _gender = Gender.male) : null,
-          child: const Text("Male"),
+  children: [
+    Expanded(
+      child: OutlinedButton(
+        onPressed: () => setState(() => _gender = Gender.male), // ✅ always clickable
+        style: OutlinedButton.styleFrom(
+          backgroundColor: _gender == Gender.male ? const Color(0xFF11BFA8) : Colors.white,
+          foregroundColor: _gender == Gender.male ? Colors.white : Colors.black87,
+          side: BorderSide(
+            color: _gender == Gender.male ? const Color(0xFF11BFA8) : Colors.black26,
+          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          padding: const EdgeInsets.symmetric(vertical: 14),
         ),
+        child: const Text("Male", style: TextStyle(fontWeight: FontWeight.w800)),
       ),
-      const SizedBox(width: 10),
-      Expanded(
-        child: OutlinedButton(
-          onPressed:
-          _enabled() ? () => setState(() => _gender = Gender.female) : null,
-          child: const Text("Female"),
+    ),
+    const SizedBox(width: 10),
+    Expanded(
+      child: OutlinedButton(
+        onPressed: () => setState(() => _gender = Gender.female), // ✅ always clickable
+        style: OutlinedButton.styleFrom(
+          backgroundColor: _gender == Gender.female ? const Color(0xFF11BFA8) : Colors.white,
+          foregroundColor: _gender == Gender.female ? Colors.white : Colors.black87,
+          side: BorderSide(
+            color: _gender == Gender.female ? const Color(0xFF11BFA8) : Colors.black26,
+          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          padding: const EdgeInsets.symmetric(vertical: 14),
         ),
+        child: const Text("Female", style: TextStyle(fontWeight: FontWeight.w800)),
       ),
-    ],
-  );
+    ),
+  ],
+);
 
+ 
   Widget _condChip(String label) {
-    final selected = _chronicConditions.contains(label);
-    return ChoiceChip(
-      label: Text(label),
-      selected: selected,
-      onSelected: _enabled()
-          ? (v) {
-        setState(() {
-          if (label == "None") {
-            _chronicConditions.clear();
-            if (v) _chronicConditions.add("None");
-          } else {
-            _chronicConditions.remove("None");
-            v
-                ? _chronicConditions.add(label)
-                : _chronicConditions.remove(label);
-          }
-        });
-      }
-          : null,
-    );
-  }
+  final bool selected = _chronicConditions.contains(label);
+  final bool isNone = label == "None";
 
+  return ChoiceChip(
+    label: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 16, // ✅ bigger text
+          fontWeight: FontWeight.w700,
+          color: selected
+              ? Colors.white
+              : (isNone ? Colors.red.shade800 : Colors.grey.shade900),
+        ),
+      ),
+    ),
+
+    selected: selected,
+
+    // ✅ Strong, visible colors
+    selectedColor: isNone ? Colors.red.shade600 : const Color.fromARGB(255, 36, 196, 177),
+    backgroundColor: isNone ? Colors.red.shade50 : Colors.grey.shade200,
+
+    // ✅ Bigger tap target (this matters a LOT)
+    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+
+    // ✅ Clear border + rounded corners
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(16),
+      side: BorderSide(
+        color: selected
+            ? Colors.transparent
+            : (isNone ? Colors.red.shade300 : Colors.grey.shade400),
+        width: 1.5,
+      ),
+    ),
+
+    // ✅ Slight elevation makes it pop (looks like a real button)
+    elevation: selected ? 3 : 0,
+    pressElevation: 4,
+
+    onSelected: _enabled()
+        ? (v) {
+            setState(() {
+              if (label == "None") {
+                _chronicConditions.clear();
+                if (v) _chronicConditions.add("None");
+              } else {
+                _chronicConditions.remove("None");
+                v
+                    ? _chronicConditions.add(label)
+                    : _chronicConditions.remove(label);
+              }
+            });
+          }
+        : null,
+  );
+}
+
+ 
   Widget _dietChip(String label) {
-    final selected = _dietaryHabit == label;
-    return ChoiceChip(
-      label: Text(label),
-      selected: selected,
-      onSelected:
-      _enabled() ? (v) => setState(() => _dietaryHabit = v ? label : null) : null,
-    );
-  }
+  final bool selected = _dietaryHabit == label;
+
+  return ChoiceChip(
+    label: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 16, // ✅ Bigger text
+          fontWeight: FontWeight.w700,
+          color: selected ? Colors.white : Colors.grey.shade900,
+        ),
+      ),
+    ),
+
+    selected: selected,
+
+    // ✅ High contrast colors
+    selectedColor: const Color(0xFF67D2DA),
+    backgroundColor: Colors.grey.shade200,
+
+    // ✅ Bigger tap target
+    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+
+    // ✅ Button-like look
+    elevation: selected ? 3 : 0,
+    pressElevation: 4,
+
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(16),
+      side: BorderSide(
+        color: selected ? Colors.transparent : Colors.grey.shade400,
+        width: 1.5,
+      ),
+    ),
+
+    onSelected: _enabled()
+        ? (v) {
+            setState(() => _dietaryHabit = v ? label : null);
+          }
+        : null,
+  );
+ }
+
 }

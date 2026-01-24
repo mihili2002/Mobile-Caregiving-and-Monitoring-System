@@ -103,8 +103,8 @@ class _RegisterPageState extends State<RegisterPage> {
   @override
   Widget build(BuildContext context) {
     // Dark brown palette (based on your request)
-    const brown = Color(0xFF4E342E);
-    const brownDark = Color(0xFF3E2723);
+    const brown = Color(0xFF00BBA7);
+    const brownDark = Color(0xFF009E8D);
     const bgTop = Color(0xFFF7F3F0);
     const bgBottom = Color(0xFFF2EEF5);
 
@@ -141,7 +141,7 @@ class _RegisterPageState extends State<RegisterPage> {
                             gradient: const LinearGradient(
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
-                              colors: [Color(0xFF6D4C41), Color(0xFF8D6E63)],
+                              colors: [Color(0xFF009E8D), Color(0xFF009E8D)],
                             ),
                             boxShadow: [
                               BoxShadow(
@@ -277,7 +277,7 @@ class _RegisterPageState extends State<RegisterPage> {
                             gradient: const LinearGradient(
                               begin: Alignment.centerLeft,
                               end: Alignment.centerRight,
-                              colors: [Color(0xFF3E2723), Color(0xFF6D4C41)],
+                              colors: [Color(0xFF009E8D), Color(0xFF00BBA7)],
                             ),
                             borderRadius: BorderRadius.circular(14),
                           ),

@@ -107,7 +107,7 @@ class _EmotionsScreenState extends State<EmotionsScreen> {
       final data = jsonDecode(res.body);
       final msgs = (data["messages"] as List?) ?? [];
 
-      // ✅ IMPORTANT: emotions are inside the "messages" list (usually bot messages)
+      // IMPORTANT: emotions are inside the "messages" list (usually bot messages)
       final rows = <Map<String, dynamic>>[];
 
       for (final m in msgs) {

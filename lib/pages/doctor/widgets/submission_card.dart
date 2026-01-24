@@ -13,7 +13,7 @@ class SubmissionCard extends StatefulWidget {
   final VoidCallback onGenerateMealPlan;
   final VoidCallback onApprove;
   final VoidCallback onReject;
-  final VoidCallback onEdit;
+  // final VoidCallback onEdit;
   final bool canApproveRejectEdit;
 
   const SubmissionCard({
@@ -26,7 +26,7 @@ class SubmissionCard extends StatefulWidget {
     required this.onGenerateMealPlan,
     required this.onApprove,
     required this.onReject,
-    required this.onEdit,
+    // required this.onEdit,
     required this.canApproveRejectEdit,
   });
 
@@ -304,9 +304,9 @@ class _SubmissionCardState extends State<SubmissionCard> {
         const SizedBox(width: 10),
         _actionBtn("Reject", Icons.close, const Color(0xFFFF1744),
             widget.onReject),
-        const SizedBox(width: 10),
-        _actionBtn(
-            "Edit", Icons.edit, const Color(0xFF2979FF), widget.onEdit),
+        // const SizedBox(width: 10),
+        // _actionBtn(
+        //     "Edit", Icons.edit, const Color(0xFF2979FF), widget.onEdit),
       ],
     );
   }

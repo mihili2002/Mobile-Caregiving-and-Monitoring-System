@@ -19,11 +19,11 @@ class AuthGate extends StatelessWidget {
         }
 
         if (snapshot.hasData) {
-          // ✅ Show role based wrapper
+          // Show role based wrapper
           return const RoleBasedWrapper();
         }
 
-        // ✅ Show login page when logged out
+        // Show login page when logged out
         return const LoginPage();
       },
     );

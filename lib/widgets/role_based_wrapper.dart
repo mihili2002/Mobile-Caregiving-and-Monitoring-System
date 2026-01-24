@@ -14,7 +14,7 @@ import '../services/elder_profile_service.dart';
 import '../pages/elder/onboarding_flow.dart';
 import '../pages/setup_required_page.dart';
 
-// ✅ IMPORTANT: Import Doctor Dashboard
+//IMPORTANT: Import Doctor Dashboard
 import '../pages/doctor/doctor_dashboard_page.dart';
 
 class RoleBasedWrapper extends StatefulWidget {
@@ -78,7 +78,7 @@ class _RoleBasedWrapperState extends State<RoleBasedWrapper> {
           );
         }
 
-        // ✅ Role routing
+        //Role routing
         switch (appUser.role) {
           case UserRole.admin:
             return AdminDashboard(user: appUser);
@@ -103,7 +103,7 @@ class _RoleBasedWrapperState extends State<RoleBasedWrapper> {
           case UserRole.caregiver:
             return CaregiverDashboard(user: appUser);
 
-          // ✅ FIXED ROUTE: Doctor now goes to DoctorDashboardPage
+          //FIXED ROUTE: Doctor now goes to DoctorDashboardPage
           case UserRole.doctor:
             return const DoctorDashboardPage();
 

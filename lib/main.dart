@@ -1,21 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 
 import 'firebase_options.dart';
-
-// Auth gate
-import 'auth/auth_gate.dart';
 
 // Auth & Session
 import 'widgets/auth_wrapper.dart';
 import 'widgets/session_wrapper.dart';
 
-// Elder dashboard
+// Doctor dashboard route
+import 'pages/doctor/doctor_dashboard_page.dart';
 
-
-// ✅ Voice chatbot feature imports
+// Voice chatbot route
 import 'features/voice_chatbot/screens/chat_screen.dart';
+
+// App theme (use YOUR existing theme file path here)
 import 'features/voice_chatbot/theme/app_theme.dart';
 
 Future<void> main() async {
@@ -35,20 +33,23 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'Eldercare App',
 
-      // ✅ Using your chatbot theme for the whole app
+      // Global theme
       theme: AppTheme.lightTheme,
 
-      // App starts with SessionWrapper + AuthWrapper
+      // Default entry (auth flow)
       home: const SessionWrapper(child: AuthWrapper()),
 
-      // ✅ Add route to open your ChatScreen from anywhere
+      // Named routes (so you can navigate + sign out cleanly)
       routes: {
+        // Auth entry page (Login/Register via your wrapper)
+        '/auth': (_) => const SessionWrapper(child: AuthWrapper()),
+
+        // Doctor dashboard
+        '/doctor': (_) => const DoctorDashboardPage(),
+
+        // Voice chatbot
         '/voice-chatbot': (_) => const ChatScreen(),
       },
     );
   }
 }
-
-/* ------------------------------------------------------------------
-   HOME PAGE (shown after successful login)
--------------------------------------------------------------------*/

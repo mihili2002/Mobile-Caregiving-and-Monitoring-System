@@ -1,10 +1,10 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
-import '../config/api_config.dart'; // ✅ adjust path if yours is different
+import '../config/api_config.dart'; //adjust path if yours is different
 
 class ElderHealthSubmissionService {
-  /// ✅ Calls backend API:
+  ///Calls backend API:
   /// POST /elder/health-submissions/
   Future<void> submitHealthDetails({
     required String token,
@@ -22,7 +22,7 @@ class ElderHealthSubmissionService {
     );
 
     if (response.statusCode == 200 || response.statusCode == 201) {
-      // ✅ success
+      //success
       return;
     }
 
@@ -68,7 +68,7 @@ class ElderHealthSubmissionService {
 
     final decoded = jsonDecode(response.body);
 
-    // ✅ Backend returns a single submission object
+    //Backend returns a single submission object
     return decoded as Map<String, dynamic>;
   }
 

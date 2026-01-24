@@ -14,8 +14,8 @@ class ElderDashboard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // ✅ Match Login/Register design language (brown + soft gradients)
-    const brown = Color(0xFF4E342E);
-    const brownDark = Color(0xFF3E2723);
+    const brown = Color(0xFF11BFA8);
+    const brownDark = Color(0xFF11BFA8);
     const bgTop = Color(0xFFF7F3F0);
     const bgBottom = Color(0xFFF2EEF5);
 
@@ -45,7 +45,7 @@ class ElderDashboard extends StatelessWidget {
                         gradient: const LinearGradient(
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
-                          colors: [Color(0xFF6D4C41), Color(0xFF8D6E63)],
+                          colors: [Color(0xFF11BFA8), Color(0xFF11BFA8)],
                         ),
                         boxShadow: [
                           BoxShadow(
@@ -165,7 +165,7 @@ class ElderDashboard extends StatelessWidget {
                         title: 'Voice Chatbot',
                         subtitle: 'Talk & ask for help',
                         icon: Icons.mic,
-                        gradient: const [Color(0xFF3E2723), Color(0xFF6D4C41)],
+                        gradient: const [Color(0xFF11BFA8), Color(0xFF11BFA8)],
                         onTap: () {
                           Navigator.push(
                             context,
@@ -178,7 +178,7 @@ class ElderDashboard extends StatelessWidget {
                         title: 'Daily Routine',
                         subtitle: 'Reminders & habits',
                         icon: Icons.schedule,
-                        gradient: const [Color(0xFF4E342E), Color(0xFF8D6E63)],
+                        gradient: const [Color(0xFF11BFA8), Color(0xFF11BFA8)],
                         onTap: () {
                           Navigator.push(
                             context,
@@ -197,7 +197,7 @@ class ElderDashboard extends StatelessWidget {
                         title: 'Meal Planner',
                         subtitle: 'Healthy meals',
                         icon: Icons.restaurant_menu,
-                        gradient: const [Color(0xFF5D4037), Color(0xFFA1887F)],
+                        gradient: const [Color(0xFF11BFA8), Color(0xFF11BFA8)],
                         onTap: () {
                           Navigator.push(
                             context,
@@ -214,7 +214,7 @@ class ElderDashboard extends StatelessWidget {
                         title: 'Therapist',
                         subtitle: 'Mental support',
                         icon: Icons.health_and_safety,
-                        gradient: const [Color(0xFF3E2723), Color(0xFF8D6E63)],
+                        gradient: const [Color(0xFF11BFA8), Color(0xFF11BFA8)],
                         onTap: () {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(content: Text('Therapist coming soon')),
@@ -250,7 +250,7 @@ class _FeatureCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const brownDark = Color(0xFF3E2723);
+    const brownDark = Color(0xFF11BFA8);
 
     return Material(
       color: Colors.transparent,

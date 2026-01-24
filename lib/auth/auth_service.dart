@@ -51,7 +51,7 @@ class AuthService {
 
     final user = result.user;
     if (user != null) {
-      final token = await user.getIdToken(true); // ✅ force refresh
+      final token = await user.getIdToken(true); // force refresh
 
       if (token == null || token.isEmpty) {
         throw Exception("Failed to retrieve Firebase ID token");
@@ -59,9 +59,9 @@ class AuthService {
 
       await _storage.write(key: _tokenKey, value: token);
 
-      // ✅ Copy token to clipboard for Swagger testing
+      // Copy token to clipboard for Swagger testing
       await Clipboard.setData(ClipboardData(text: token));
-      debugPrint("✅ Firebase ID token copied to clipboard");
+      debugPrint("Firebase ID token copied to clipboard");
     }
 
     return user;
@@ -84,9 +84,9 @@ class AuthService {
 
       await _storage.write(key: _tokenKey, value: token);
 
-      // ✅ Copy token to clipboard for Swagger testing
+      // Copy token to clipboard for Swagger testing
       await Clipboard.setData(ClipboardData(text: token));
-     // debugPrint("✅ Firebase ID token copied to clipboard");
+     // debugPrint("Firebase ID token copied to clipboard");
      debugPrint("🔥 FIREBASE ID TOKEN ↓↓↓");
 debugPrint(token);
 debugPrint("🔥 END TOKEN");
@@ -135,7 +135,7 @@ debugPrint("🔥 END TOKEN");
     }
 
     await Clipboard.setData(ClipboardData(text: token));
-    debugPrint("✅ Token copied to clipboard");
+    debugPrint("Token copied to clipboard");
   }
 
   /// Cleanup

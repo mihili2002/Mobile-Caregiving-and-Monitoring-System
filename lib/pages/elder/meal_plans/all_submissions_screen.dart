@@ -101,7 +101,7 @@ class _AllSubmissionsScreenState extends State<AllSubmissionsScreen> {
       itemBuilder: (context, index) {
         final submission = _submissions[index];
 
-        // ✅ THIS IS THE KEY CHANGE
+        //THIS IS THE KEY CHANGE
         return GestureDetector(
           onTap: () {
             Navigator.push(

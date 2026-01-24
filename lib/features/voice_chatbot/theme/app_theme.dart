@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 
 class AppTheme {
-  // ✅ Your login/register palette
-  static const Color brown = Color(0xFF4E342E);
-  static const Color brownDark = Color(0xFF3E2723);
-  static const Color brownLight = Color(0xFF6D4C41);
+  // Your login/register palette
+  static const Color brown = Color(0xFF00BBA7);
+  static const Color brownDark = Color(0xFF009E8D);
+  static const Color brownLight = Color(0xFF2FE6D2);
 
-  static const Color bgTop = Color(0xFFF7F3F0);
-  static const Color bgBottom = Color(0xFFF2EEF5);
+  static const Color bgTop = Color(0xFFE9FBF8);
+  static const Color bgBottom = Color(0xFFF4FFFD);
 
   static ThemeData lightTheme = ThemeData(
     useMaterial3: true,
@@ -22,7 +22,7 @@ class AppTheme {
       background: bgTop,
     ),
 
-    // ✅ AppBar matches screenshots
+    // AppBar matches screenshots
     appBarTheme: const AppBarTheme(
       backgroundColor: brownDark,
       foregroundColor: Colors.white,
@@ -30,7 +30,7 @@ class AppTheme {
       elevation: 0,
     ),
 
-    // ✅ Global card design
+    // Global card design
     cardTheme: CardThemeData(
       elevation: 4,
       color: Colors.white.withOpacity(0.95),
@@ -39,7 +39,7 @@ class AppTheme {
       margin: const EdgeInsets.symmetric(vertical: 10),
     ),
 
-    // ✅ Global inputs (same as Login/Register soft inputs)
+    // Global inputs (same as Login/Register soft inputs)
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: Colors.white.withOpacity(0.90),
@@ -62,7 +62,7 @@ class AppTheme {
       ),
     ),
 
-    // ✅ Elevated buttons match your login/register button
+    // Elevated buttons match your login/register button
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
         backgroundColor: brownDark,
@@ -75,7 +75,7 @@ class AppTheme {
       ),
     ),
 
-    // ✅ Outlined buttons match
+    // Outlined buttons match
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
         foregroundColor: brownDark,
@@ -86,7 +86,7 @@ class AppTheme {
       ),
     ),
 
-    // ✅ ChoiceChips for PatientHealthDetailsScreen
+    // ChoiceChips for PatientHealthDetailsScreen
     chipTheme: ChipThemeData(
       backgroundColor: Colors.white,
       selectedColor: brownDark.withOpacity(0.12),
@@ -95,7 +95,7 @@ class AppTheme {
       side: BorderSide(color: Colors.black.withOpacity(0.06)),
     ),
 
-    // ✅ Switch styling
+    // Switch styling
     switchTheme: SwitchThemeData(
       thumbColor: WidgetStateProperty.resolveWith((states) {
         if (states.contains(WidgetState.selected)) return brownDark;

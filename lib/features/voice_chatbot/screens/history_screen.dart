@@ -62,7 +62,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     });
 
     try {
-      // ✅ IMPORTANT: days=0 -> fetch ALL messages (not only last 7 days)
+      // IMPORTANT: days=0 -> fetch ALL messages (not only last 7 days)
       final uri = Uri.parse(
         "${widget.baseUrl}/chatbot/history/${widget.sessionId}?days=0",
       );

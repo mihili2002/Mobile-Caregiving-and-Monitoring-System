@@ -105,11 +105,11 @@ class _MealPlanDetailPageState extends State<MealPlanDetailPage> {
 
             const SizedBox(height: 12),
 
-            // ✅ API-based plan days
+            //API-based plan days
             if (plan.days.isNotEmpty)
               ...plan.days.map((dayObj) => _dayAccordion(dayObj)).toList()
 
-            // ✅ fallback for Firestore old plan.meals
+            //fallback for Firestore old plan.meals
             else
               ...plan.meals.keys.map((dayKey) {
                 final dayMeals = plan.meals[dayKey] as Map<String, dynamic>;

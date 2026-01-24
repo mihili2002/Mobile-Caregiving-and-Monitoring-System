@@ -4,7 +4,7 @@ import 'package:http/http.dart' as http;
 import '../config/api_config.dart';
 
 class MealPlanApiService {
-  /// ✅ GET /elder/meal-plans/dashboard
+  ///GET /elder/meal-plans/dashboard
   Future<Map<String, dynamic>> getDashboard({
     required String token,
   }) async {
@@ -90,7 +90,7 @@ class MealPlanApiService {
   }
 }
 
-/// ✅ GET /elder/meal-plans/{meal_plan_id}
+///GET /elder/meal-plans/{meal_plan_id}
   Future<Map<String, dynamic>> getMealPlanDetails({
     required String token,
     required String mealPlanId,
