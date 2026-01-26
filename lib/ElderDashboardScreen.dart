@@ -4,11 +4,16 @@ import 'pages/elder/daily_routine_page.dart';
 import 'ElderProfilePage.dart';
 import 'models/user_model.dart';
 
-// ✅ Your Meal Plan Dashboard
+// Meal Plan Dashboard
 import 'pages/elder/meal_plans/elder_meal_plan_dashboard.dart';
 
-import 'pages/elder/widgets/quick_stats_widget.dart'; // optional
-import './RoutineHome.dart';
+// If you really use these, keep; otherwise remove unused imports
+// import 'pages/elder/widgets/quick_stats_widget.dart';
+// import './RoutineHome.dart';
+
+// ✅ If PatientHealthDetailsScreen is a real screen, import it correctly.
+// Otherwise remove this feature card entirely.
+// import 'pages/elder/meal_plans/patient_health_details_screen.dart';
 
 class ElderDashboard extends StatelessWidget {
   final AppUser user;
@@ -16,20 +21,19 @@ class ElderDashboard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // ✅ Use theme colors instead of hardcoded brown
-    final scheme = Theme.of(context).colorScheme;
+    // Theme colors (define the ones you actually use)
+    const primary = Color(0xFF00BBA7);
+    const secondary = Color(0xFF009E8D);
 
-    final primary = scheme.primary; // main green
-    final secondary = scheme.secondary; // green dark
-    final bgTop = Theme.of(context).scaffoldBackgroundColor;
-    final bgBottom = scheme.background;
+    const bgTop = Color(0xFFF7F3F0);
+    const bgBottom = Color(0xFFF2EEF5);
 
     final titleColor = Colors.black.withOpacity(0.85);
     final subtitleColor = Colors.black.withOpacity(0.55);
 
     return Scaffold(
       body: Container(
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
@@ -50,7 +54,7 @@ class ElderDashboard extends StatelessWidget {
                       height: 44,
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(14),
-                        gradient: LinearGradient(
+                        gradient: const LinearGradient(
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                           colors: [primary, secondary],
@@ -119,9 +123,7 @@ class ElderDashboard extends StatelessWidget {
                         offset: const Offset(0, 10),
                       ),
                     ],
-                    border: Border.all(
-                      color: Colors.black.withOpacity(0.04),
-                    ),
+                    border: Border.all(color: Colors.black.withOpacity(0.04)),
                   ),
                   child: Row(
                     children: [
@@ -132,7 +134,8 @@ class ElderDashboard extends StatelessWidget {
                           color: primary.withOpacity(0.12),
                           borderRadius: BorderRadius.circular(14),
                         ),
-                        child: Icon(Icons.waving_hand, color: primary, size: 26),
+                        child:
+                            const Icon(Icons.waving_hand, color: primary, size: 26),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
@@ -176,7 +179,7 @@ class ElderDashboard extends StatelessWidget {
                         title: 'Voice Chatbot',
                         subtitle: 'Talk & ask for help',
                         icon: Icons.mic,
-                        gradient: [primary, secondary],
+                        gradient: const [primary, secondary],
                         onTap: () {
                           Navigator.push(
                             context,
@@ -203,12 +206,12 @@ class ElderDashboard extends StatelessWidget {
                         },
                       ),
 
-                      // ✅ Meal Planner (NOW opens Elder Meal Plan Dashboard)
+                      // ✅ Opens Elder Meal Plan Dashboard
                       _FeatureCard(
                         title: 'Meal Planner',
                         subtitle: 'Healthy meals',
                         icon: Icons.restaurant_menu,
-                        gradient: [primary, secondary.withOpacity(0.95)],
+                        gradient: const [primary, secondary],
                         onTap: () {
                           Navigator.push(
                             context,
@@ -223,7 +226,7 @@ class ElderDashboard extends StatelessWidget {
                         title: 'Therapist',
                         subtitle: 'Mental support',
                         icon: Icons.health_and_safety,
-                        gradient: [primary.withOpacity(0.85), secondary],
+                        gradient: const [primary, secondary],
                         onTap: () {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(content: Text('Therapist coming soon')),
@@ -285,7 +288,6 @@ class _FeatureCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Icon badge
                 Container(
                   width: 52,
                   height: 52,
@@ -306,9 +308,7 @@ class _FeatureCard extends StatelessWidget {
                   ),
                   child: Icon(icon, color: Colors.white, size: 28),
                 ),
-
                 const SizedBox(height: 12),
-
                 Text(
                   title,
                   style: TextStyle(
@@ -317,9 +317,7 @@ class _FeatureCard extends StatelessWidget {
                     color: titleColor,
                   ),
                 ),
-
                 const SizedBox(height: 6),
-
                 Text(
                   subtitle,
                   style: TextStyle(
@@ -328,9 +326,7 @@ class _FeatureCard extends StatelessWidget {
                     height: 1.25,
                   ),
                 ),
-
                 const Spacer(),
-
                 Row(
                   children: [
                     Text(

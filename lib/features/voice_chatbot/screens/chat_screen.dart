@@ -11,6 +11,7 @@ import 'emotions_screen.dart';
 import 'session_screen.dart';
 import 'all_emotion_screen.dart';
 import 'api.dart';
+import 'package:flutter/foundation.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -32,14 +33,19 @@ class _ChatScreenState extends State<ChatScreen> {
 
   String _sessionId = "";
 
-  final String _baseUrl = 'http://127.0.0.1:8000';
+  // ⚠️ Chrome/Web: 127.0.0.1
+  // Android Emulator: 10.0.2.2
+  // Real device: your PC LAN IP, e.g. 192.168.1.5
+  final String _baseUrl = kIsWeb
+      ? 'http://127.0.0.1:8000' // Web
+      : 'http://10.0.2.2:8000'; // Android Emulator
 
-  // ✅ GREEN THEME COLORS
-  static const _green900 = Color(0xFF00A693);
-  static const _green800 = Color(0xFF00A693);
-  static const _green700 = Color(0xFF00A693);
-  static const _green200 = Color(0xFFA7DCCB);
-  static const _mint = Color(0xFFF2FBF7);
+  // ---------- Green theme colors ----------
+  static const _green900 = Color(0xFF0B3D2E); // deep evergreen
+  static const _green800 = Color(0xFF145A45); // dark green
+  static const _green700 = Color(0xFF1B6B52); // primary green
+  static const _green200 = Color(0xFFCFE8D8); // light mint border
+  static const _mint = Color(0xFFF2FBF6); // background
 
   @override
   void initState() {
@@ -97,6 +103,7 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  // ✅ Q&A dialog for elders (quick mood questions)
   Future<void> _openQaDialog() async {
     final TextEditingController qaController = TextEditingController();
 
@@ -142,7 +149,10 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _sendMessage(String text) async {
-    if (_sessionId.isEmpty) return;
+    if (_sessionId.isEmpty) {
+      debugPrint("Session not ready yet");
+      return;
+    }
     if (text.trim().isEmpty) return;
 
     setState(() {
@@ -282,9 +292,9 @@ class _ChatScreenState extends State<ChatScreen> {
       margin: const EdgeInsets.fromLTRB(16, 14, 16, 10),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.92),
+        color: Colors.white.withOpacity(0.90),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: _green200.withOpacity(0.85)),
+        border: Border.all(color: _green200.withOpacity(0.9)),
         boxShadow: [
           BoxShadow(
             blurRadius: 18,
@@ -328,9 +338,9 @@ class _ChatScreenState extends State<ChatScreen> {
       child: Container(
         margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.92),
+          color: Colors.white.withOpacity(0.90),
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: _green200.withOpacity(0.9)),
+          border: Border.all(color: _green200.withOpacity(0.95)),
           boxShadow: [
             BoxShadow(
               blurRadius: 24,
@@ -347,7 +357,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     "Start a conversation.\nTry: “I feel stressed today.”",
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      color: _green800.withOpacity(0.85),
+                      color: _green800.withOpacity(0.88),
                       height: 1.5,
                       fontWeight: FontWeight.w600,
                     ),
@@ -376,9 +386,9 @@ class _ChatScreenState extends State<ChatScreen> {
       child: Container(
         padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.95),
+          color: Colors.white.withOpacity(0.94),
           border: Border(
-            top: BorderSide(color: _green200.withOpacity(0.8)),
+            top: BorderSide(color: _green200.withOpacity(0.85)),
           ),
         ),
         child: Row(
@@ -449,7 +459,7 @@ class _ChatScreenState extends State<ChatScreen> {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              _green900.withOpacity(0.14),
+              _green900.withOpacity(0.16),
               _mint,
             ],
           ),
@@ -538,7 +548,7 @@ class _StyledBubble extends StatelessWidget {
                 bottomRight: Radius.circular(isUser ? 4 : 18),
               ),
               border: Border.all(
-                color: isUser ? Colors.transparent : green200.withOpacity(0.9),
+                color: isUser ? Colors.transparent : green200.withOpacity(0.90),
               ),
             ),
             child: Text(

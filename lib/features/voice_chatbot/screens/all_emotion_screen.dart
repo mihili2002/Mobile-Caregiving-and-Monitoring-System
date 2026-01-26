@@ -27,11 +27,11 @@ class _AllEmotionsScreenState extends State<AllEmotionsScreen>
 
   bool _hasLoaded = false;
 
-  // GREEN THEME
-  static const _green900 = Color(0xFF00A693);
-  static const _green700 = Color(0xFF00A693);
-  static const _green200 = Color(0xFFA7DCCB);
-  static const _mint = Color(0xFFF2FBF7);
+  // ---------- Green theme ----------
+  static const _green900 = Color(0xFF0B3D2E); // deep evergreen
+  static const _green700 = Color(0xFF1B6B52); // primary green
+  static const _green200 = Color(0xFFCFE8D8); // light mint border
+  static const _mint = Color(0xFFF2FBF6); // background
 
   @override
   void initState() {
@@ -241,10 +241,10 @@ class _AllEmotionsScreenState extends State<AllEmotionsScreen>
               alignment: BarChartAlignment.spaceAround,
               groupsSpace: 12,
               titlesData: FlTitlesData(
-                rightTitles: const AxisTitles(
-                    sideTitles: SideTitles(showTitles: false)),
-                topTitles: const AxisTitles(
-                    sideTitles: SideTitles(showTitles: false)),
+                rightTitles:
+                    const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                topTitles:
+                    const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                 leftTitles: AxisTitles(
                   sideTitles: SideTitles(
                     showTitles: true,
@@ -256,9 +256,10 @@ class _AllEmotionsScreenState extends State<AllEmotionsScreen>
                         padding: const EdgeInsets.only(right: 6),
                         child: Text(
                           value.toInt().toString(),
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
+                            color: _green900.withOpacity(0.85),
                           ),
                         ),
                       );
@@ -282,9 +283,10 @@ class _AllEmotionsScreenState extends State<AllEmotionsScreen>
                           angle: label.length > 7 ? -0.35 : 0,
                           child: Text(
                             label,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w700,
+                              color: _green900.withOpacity(0.9),
                             ),
                           ),
                         ),
@@ -356,9 +358,14 @@ class _AllEmotionsScreenState extends State<AllEmotionsScreen>
                       if (value == -3) label = "Anger";
                       return Padding(
                         padding: const EdgeInsets.only(right: 6),
-                        child: Text(label,
-                            style: const TextStyle(
-                                fontSize: 11, fontWeight: FontWeight.w700)),
+                        child: Text(
+                          label,
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: _green900.withOpacity(0.9),
+                          ),
+                        ),
                       );
                     },
                   ),
@@ -418,8 +425,13 @@ class _AllEmotionsScreenState extends State<AllEmotionsScreen>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text("Heatmap (day × emotion)",
-                style: TextStyle(fontWeight: FontWeight.w800)),
+            Text(
+              "Heatmap (day × emotion)",
+              style: TextStyle(
+                fontWeight: FontWeight.w800,
+                color: _green900.withOpacity(0.92),
+              ),
+            ),
             const SizedBox(height: 10),
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
@@ -431,9 +443,13 @@ class _AllEmotionsScreenState extends State<AllEmotionsScreen>
                       const SizedBox(width: 70),
                       ...emotions.map((e) => SizedBox(
                             width: 90,
-                            child: Text(e,
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.w700)),
+                            child: Text(
+                              e,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                color: _green900.withOpacity(0.9),
+                              ),
+                            ),
                           )),
                     ],
                   ),
@@ -447,10 +463,13 @@ class _AllEmotionsScreenState extends State<AllEmotionsScreen>
                         children: [
                           SizedBox(
                             width: 70,
-                            child: Text(label,
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.w800,
-                                    color: _green700)),
+                            child: Text(
+                              label,
+                              style: TextStyle(
+                                color: _green700,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
                           ),
                           ...emotions.map((e) {
                             final c = counts[e] ?? 0;
@@ -511,7 +530,9 @@ class _AllEmotionsScreenState extends State<AllEmotionsScreen>
                 label: Text(
                   emotion.isEmpty ? "unknown" : emotion,
                   style: const TextStyle(
-                      fontWeight: FontWeight.w700, color: Colors.white),
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
                 ),
                 backgroundColor: _emotionColor(emotion),
               ),
@@ -519,13 +540,19 @@ class _AllEmotionsScreenState extends State<AllEmotionsScreen>
               Text(
                 time,
                 style: TextStyle(
-                    color: _green900.withOpacity(0.75),
-                    fontWeight: FontWeight.w600),
+                  color: _green700.withOpacity(0.75),
+                  fontWeight: FontWeight.w600,
+                ),
               ),
               const SizedBox(height: 10),
-              Text(text,
-                  style: const TextStyle(
-                      fontWeight: FontWeight.w600, height: 1.35)),
+              Text(
+                text,
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  height: 1.35,
+                  color: _green900.withOpacity(0.92),
+                ),
+              ),
             ],
           ),
         );
