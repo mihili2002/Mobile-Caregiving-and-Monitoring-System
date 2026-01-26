@@ -7,9 +7,9 @@ import 'dart:io';
 class ScheduleService {
   // Same smart URL logic as RoutineService
   String get baseUrl {
-    if (kIsWeb) return "http://127.0.0.1:5000";
-    if (defaultTargetPlatform == TargetPlatform.android) return "http://10.0.2.2:5000";
-    return "http://192.168.8.115:5000";
+    if (kIsWeb) return "http://127.0.0.1:8000";
+    if (defaultTargetPlatform == TargetPlatform.android) return "http://10.0.2.2:8000";
+    return "http://192.168.8.115:8000";
   }
 
   // 1. Get Schedule for a Date

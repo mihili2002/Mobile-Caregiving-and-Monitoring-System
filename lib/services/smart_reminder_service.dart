@@ -4,7 +4,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 
 class SmartReminderService {
-  final String baseUrl = "http://192.168.1.5:5000"; // Update with your IP
+  final String baseUrl = "http://192.168.1.5:8000"; // Update with your IP
   final FlutterLocalNotificationsPlugin _notifications = FlutterLocalNotificationsPlugin();
 
   // 1. The Master Function: Call this when user clicks "Save Task"
