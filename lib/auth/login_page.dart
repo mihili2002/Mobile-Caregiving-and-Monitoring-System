@@ -10,7 +10,11 @@ import '../ElderDashboardScreen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
+
 import '../pages/doctor/doctor_dashboard_page.dart';
+
+// ✅ FIX: import the actual therapist dashboard file you have
+import '../pages/therapist/therapist_dashboard.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -103,21 +107,34 @@ class _LoginPageState extends State<LoginPage> {
             builder: (_) => ElderDashboard(user: appUser),
           ),
         );
-      } else if (appUser.role == UserRole.doctor) {
+      }
+      // ✅ Doctor Role Navigation (already exists)
+      else if (appUser.role == UserRole.doctor) {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
             builder: (_) => const DoctorDashboardPage(),
           ),
         );
-      } else {
+      }
+      // ✅ FIXED: Therapist Role Navigation (use existing class name)
+      else if (appUser.role == UserRole.therapist) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => TherapistDashboard(user: appUser),
+          ),
+        );
+      }
+
+      // Default fallback
+      else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text("Logged in as ${appUser.role.name}"),
           ),
         );
       }
-
     } catch (e) {
       if (!mounted) return;
       setState(() => error = e.toString());

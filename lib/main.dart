@@ -3,6 +3,8 @@ import 'package:firebase_core/firebase_core.dart';
 
 import 'firebase_options.dart';
 
+import 'auth/auth_gate.dart';
+
 // Auth & Session
 import 'widgets/auth_wrapper.dart';
 import 'widgets/session_wrapper.dart';

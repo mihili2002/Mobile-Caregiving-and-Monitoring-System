@@ -7,6 +7,9 @@ import 'models/user_model.dart';
 // ✅ Your Meal Plan Dashboard
 import 'pages/elder/meal_plans/elder_meal_plan_dashboard.dart';
 
+import 'pages/elder/therapist_support/elder_therapist_support_page.dart';
+
+
 import 'pages/elder/widgets/quick_stats_widget.dart'; // optional
 import './RoutineHome.dart';
 
@@ -225,8 +228,11 @@ class ElderDashboard extends StatelessWidget {
                         icon: Icons.health_and_safety,
                         gradient: [primary.withOpacity(0.85), secondary],
                         onTap: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Therapist coming soon')),
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => ElderTherapistSupportPage(user: user),
+                            ),
                           );
                         },
                       ),

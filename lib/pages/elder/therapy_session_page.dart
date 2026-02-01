@@ -317,4 +317,3 @@ class _TherapySessionPageState extends State<TherapySessionPage> {
     return '$hour:$minute $period';
   }
 }
-
