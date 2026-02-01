@@ -218,9 +218,8 @@ class _VoiceChatbotPageState extends State<VoiceChatbotPage> {
 
               // Construct spoken reply
               String spokenReply = reply;
-              if (isConfirmation) {
-                  spokenReply = "I heard you say: '$text'. $reply";
-              }
+              // Client-side echo removed to avoid redundancy
+              // if (isConfirmation) { ... }
 
               await _voiceService.speak(spokenReply);
               
@@ -262,146 +261,196 @@ class _VoiceChatbotPageState extends State<VoiceChatbotPage> {
         backgroundColor: Colors.teal,
         foregroundColor: Colors.white,
       ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-             // Current Status / Last Reply
-             // Transcript Box
-             Container(
-               margin: const EdgeInsets.symmetric(horizontal: 24),
-               padding: const EdgeInsets.all(16),
-               width: double.infinity,
-               decoration: BoxDecoration(
-                 color: Colors.grey.shade100,
-                 borderRadius: BorderRadius.circular(12),
-                 border: Border.all(color: Colors.grey.shade300),
-               ),
-               child: Text(
-                 _liveWords.isEmpty ? "Your spoken text will appear here..." : _liveWords,
-                 style: const TextStyle(fontSize: 18),
-               ),
-             ),
-             
-             const SizedBox(height: 12),
-             Text(
-               _statusText,
-               textAlign: TextAlign.center,
-               style: const TextStyle(fontSize: 16, color: Colors.blueGrey),
-             ),
-             
-             const SizedBox(height: 20),
-
-             // Task Preview Card (when confirmed)
-             if (_taskPreview != null)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: Card(
-                    elevation: 4,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Row(
+      body: Column(
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                   const SizedBox(height: 20),
+                   // Transcript Box
+                   Container(
+                     padding: const EdgeInsets.all(16),
+                     width: double.infinity,
+                     decoration: BoxDecoration(
+                       color: Colors.grey.shade100,
+                       borderRadius: BorderRadius.circular(12),
+                       border: Border.all(color: Colors.grey.shade300),
+                     ),
+                     child: Text(
+                       _aiReply.isNotEmpty ? "AI: $_aiReply" : (_liveWords.isNotEmpty ? "You: $_liveWords" : "Conversation will appear here..."),
+                       style: TextStyle(
+                          fontSize: 18, 
+                          color: _aiReply.isNotEmpty ? Colors.blue[800] : Colors.black87
+                       ),
+                     ),
+                   ),
+                   
+                   const SizedBox(height: 12),
+                   Text(
+                     _statusText,
+                     textAlign: TextAlign.center,
+                     style: const TextStyle(fontSize: 16, color: Colors.blueGrey),
+                   ),
+                   
+                   const SizedBox(height: 20),
+      
+                   // Task Preview Card (when confirmed)
+                   if (_taskPreview != null)
+                      Card(
+                        elevation: 4,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Icon(Icons.event_note, color: Colors.teal),
-                              SizedBox(width: 8),
-                              Text("Task Preview", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                              const Row(
+                                children: [
+                                  Icon(Icons.event_note, color: Colors.teal),
+                                  SizedBox(width: 8),
+                                  Text("Task Preview", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                                ],
+                              ),
+                              const Divider(),
+                              const SizedBox(height: 8),
+                              Text("Task: ${_taskPreview!['name']}", style: const TextStyle(fontSize: 16)),
+                              const SizedBox(height: 4),
+                              Text("Time: ${_taskPreview!['time']}", style: const TextStyle(fontSize: 16)),
+                              const SizedBox(height: 4),
+                              Text("Day: ${_taskPreview!['day_phrase']}", style: const TextStyle(fontSize: 16)),
                             ],
                           ),
-                          const Divider(),
-                          const SizedBox(height: 8),
-                          Text("Task: ${_taskPreview!['name']}", style: const TextStyle(fontSize: 16)),
-                          const SizedBox(height: 4),
-                          Text("Time: ${_taskPreview!['time']}", style: const TextStyle(fontSize: 16)),
-                          const SizedBox(height: 4),
-                          Text("Day: ${_taskPreview!['day_phrase']}", style: const TextStyle(fontSize: 16)),
-                        ],
+                        ),
                       ),
+      
+                   if (_isConfirmation)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 24),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            ElevatedButton.icon(
+                              onPressed: () => _processVoiceCommand("yes"),
+                              icon: const Icon(Icons.check),
+                              label: const Text("Yes"),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.green,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            ElevatedButton.icon(
+                              onPressed: () => _processVoiceCommand("no"),
+                              icon: const Icon(Icons.close),
+                              label: const Text("No"),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.red,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+      
+                   const SizedBox(height: 40),
+
+                   // Voice button (Restored to Center)
+                   GestureDetector(
+                      onLongPressStart: (_) => _startListening(),
+                      onLongPressEnd: (_) => _stopListening(),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 300),
+                        width: _isListening ? 150 : 120,
+                        height: _isListening ? 150 : 120,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: _isListening ? Colors.redAccent : Colors.teal,
+                          boxShadow: [
+                            BoxShadow(
+                              color: (_isListening ? Colors.redAccent : Colors.teal).withOpacity(0.4),
+                              blurRadius: 20,
+                              spreadRadius: 10,
+                            )
+                          ],
+                        ),
+                        child: Icon(
+                          _isListening ? Icons.mic : Icons.mic_none,
+                          size: 48,
+                          color: Colors.white,
+                        ),
+                      ),
+                   ),
+                   
+                   const SizedBox(height: 20),
+                   if (_isListening) 
+                      const Text("Listening...", style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+                      
+                   const SizedBox(height: 40),
+                   
+                    const Text(
+                      "Tap and hold the mic to speak, or type your message below.",
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.grey, height: 1.5),
                     ),
-                  ),
-                ),
-
-             if (_isConfirmation)
-                Padding(
-                  padding: const EdgeInsets.only(top: 24),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      ElevatedButton.icon(
-                        onPressed: () => _processVoiceCommand("yes"),
-                        icon: const Icon(Icons.check),
-                        label: const Text("Yes"),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.green,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      ElevatedButton.icon(
-                        onPressed: () => _processVoiceCommand("no"),
-                        icon: const Icon(Icons.close),
-                        label: const Text("No"),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.red,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-             const SizedBox(height: 40),
-
-             // Voice button
-             GestureDetector(
-                onLongPressStart: (_) => _startListening(),
-                onLongPressEnd: (_) => _stopListening(),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 300),
-                  width: _isListening ? 150 : 120,
-                  height: _isListening ? 150 : 120,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: _isListening ? Colors.redAccent : Colors.teal,
-                    boxShadow: [
-                      BoxShadow(
-                        color: (_isListening ? Colors.redAccent : Colors.teal).withOpacity(0.4),
-                        blurRadius: 20,
-                        spreadRadius: 10,
-                      )
-                    ],
-                  ),
-                  child: Icon(
-                    _isListening ? Icons.mic : Icons.mic_none,
-                    size: 48,
-                    color: Colors.white,
-                  ),
-                ),
-             ),
-             
-             const SizedBox(height: 20),
-             if (_isListening) 
-                const Text("Listening...", style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
-                
-             const SizedBox(height: 40),
-             
-              const Padding(
-               padding: EdgeInsets.symmetric(horizontal: 32),
-               child: Text(
-                 "Tap and hold to add a task or ask a question.\n\nExamples:\n• 'Remind me to take my medicine at 2 PM'\n• 'Remind me to drink water'",
-                 textAlign: TextAlign.center,
-                 style: TextStyle(color: Colors.grey, height: 1.5),
-               ),
-             )
-          ],
-        ),
+                ],
+              ),
+            ),
+          ),
+          
+          // Bottom Input Bar
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            decoration: BoxDecoration(
+               color: Colors.white,
+               boxShadow: [
+                 BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 5, offset: const Offset(0, -2))
+               ]
+            ),
+            child: SafeArea(
+              child: Row(
+                children: [
+                   Expanded(
+                     child: TextField(
+                       controller: _textController,
+                       decoration: const InputDecoration(
+                         hintText: "Type your message...",
+                         border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(24))),
+                         contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                         filled: true,
+                         fillColor: Color(0xFFF5F5F5)
+                       ),
+                     ),
+                   ),
+                   const SizedBox(width: 8),
+                   IconButton(
+                     onPressed: () {
+                        if (_textController.text.trim().isNotEmpty) {
+                           _processVoiceCommand(_textController.text.trim());
+                        }
+                     }, 
+                     icon: const Icon(Icons.send, color: Colors.teal),
+                     tooltip: "Send",
+                   ),
+                   IconButton(
+                     onPressed: () {
+                        if (_textController.text.trim().isNotEmpty) {
+                           _processVoiceCommand(_textController.text.trim());
+                        }
+                     }, 
+                     icon: const Icon(Icons.send, color: Colors.teal),
+                     tooltip: "Send",
+                   ),
+                ],
+              ),
+            ),
+          )
+        ],
       ),
     );
   }
 }
-
