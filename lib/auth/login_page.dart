@@ -1,16 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
+// ✅ NEW: clipboard + debug logging
+import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart';
+
 import 'auth_service.dart';
 import 'register_page.dart';
 
-// ✅ add these imports
+// ✅ user model for role enum
 import '../models/user_model.dart';
-import '../ElderDashboardScreen.dart';
 
-// ✅ NEW imports for token copy + debug print
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/services.dart';
-import 'package:flutter/foundation.dart';
-import '../pages/doctor/doctor_dashboard_page.dart';
+// ✅ IMPORTANT: go to role routing wrapper after login
+import '../widgets/role_based_wrapper.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -24,6 +26,9 @@ class _LoginPageState extends State<LoginPage> {
   final passwordController = TextEditingController();
   final authService = AuthService();
 
+  // ✅ NEW: role selector (same style as register)
+  String role = 'elder';
+
   String? error;
   bool loading = false;
   bool showPassword = false;
@@ -35,6 +40,42 @@ class _LoginPageState extends State<LoginPage> {
     super.dispose();
   }
 
+  UserRole _parseRole(String value) {
+    switch (value) {
+      case 'elder':
+        return UserRole.elder;
+      case 'caregiver':
+        return UserRole.caregiver;
+      case 'therapist':
+        return UserRole.therapist;
+      case 'doctor':
+        return UserRole.doctor;
+      case 'admin':
+        return UserRole.admin;
+      case 'familyMember':
+        return UserRole.familyMember;
+      default:
+        return UserRole.elder;
+    }
+  }
+
+  String _prettyRole(UserRole r) {
+    switch (r) {
+      case UserRole.admin:
+        return "Admin";
+      case UserRole.elder:
+        return "Elder";
+      case UserRole.caregiver:
+        return "Caregiver";
+      case UserRole.doctor:
+        return "Doctor";
+      case UserRole.therapist:
+        return "Therapist";
+      case UserRole.familyMember:
+        return "Family Member";
+    }
+  }
+
   Future<void> _handleLogin() async {
     FocusScope.of(context).unfocus();
 
@@ -44,9 +85,7 @@ class _LoginPageState extends State<LoginPage> {
     });
 
     try {
-      // ---------------------------------------------------
-      // ✅ 1) Firebase sign-in (get User back)
-      // ---------------------------------------------------
+      // ✅ 1) Firebase sign-in
       final User? user = await authService.signIn(
         usernameController.text.trim(),
         passwordController.text.trim(),
@@ -56,68 +95,51 @@ class _LoginPageState extends State<LoginPage> {
         throw Exception("Login failed (Firebase user is null)");
       }
 
-      // ---------------------------------------------------
-      // ✅ 2) Force refresh token so custom claims appear
-      // ---------------------------------------------------
+      // ✅ 2) Refresh token (optional for claims)
       final tokenResult = await user.getIdTokenResult(true);
 
-      // ✅ DEBUG ONLY: print role claims + token
       if (kDebugMode) {
         debugPrint("✅ Firebase Claims => ${tokenResult.claims}");
         debugPrint("✅ Firebase Token  => ${tokenResult.token}");
       }
 
-      // ---------------------------------------------------
-      // ✅ 3) Copy token to clipboard for Swagger testing
-      // ---------------------------------------------------
+      // ✅ 3) Copy token to clipboard (Swagger testing)
       final token = tokenResult.token;
       if (token != null && token.isNotEmpty) {
         await Clipboard.setData(ClipboardData(text: token));
-
-        if (kDebugMode) {
-          debugPrint("✅ Token copied to clipboard");
-        }
+        if (kDebugMode) debugPrint("✅ Token copied to clipboard");
       }
 
-      // ---------------------------------------------------
       // ✅ 4) Fetch AppUser from Firestore
-      // ---------------------------------------------------
       final AppUser? appUser = await authService.getCurrentAppUser();
 
       if (appUser == null) {
         throw Exception(
           "User profile not found in Firestore. "
-          "You may have registered in Firebase Auth but didn't save the user document.",
+          "Please register again or contact admin.",
+        );
+      }
+
+      // ✅ 5) Compare selected role with saved role
+      final selectedRole = _parseRole(role);
+
+      if (selectedRole != appUser.role) {
+        throw Exception(
+          "Role mismatch!\n\n"
+          "You selected: ${_prettyRole(selectedRole)}\n"
+          "But your account role is: ${_prettyRole(appUser.role)}\n\n"
+          "Please select the correct role and try again.",
         );
       }
 
       if (!mounted) return;
 
-      // ---------------------------------------------------
-      // ✅ 5) Navigate based on role
-      // ---------------------------------------------------
-      if (appUser.role == UserRole.elder) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (_) => ElderDashboard(user: appUser),
-          ),
-        );
-      } else if (appUser.role == UserRole.doctor) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (_) => const DoctorDashboardPage(),
-          ),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Logged in as ${appUser.role.name}"),
-          ),
-        );
-      }
-
+      // ✅ 6) Redirect to RoleBasedWrapper only if role matches
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const RoleBasedWrapper()),
+        (route) => false,
+      );
     } catch (e) {
       if (mounted) setState(() => error = e.toString());
     } finally {
@@ -229,7 +251,7 @@ class _LoginPageState extends State<LoginPage> {
 
                     _SoftField(
                       controller: usernameController,
-                      hintText: 'Username',
+                      hintText: 'Email / Username',
                       icon: Icons.person_outline,
                       enabled: !loading,
                       brown: brown,
@@ -253,6 +275,35 @@ class _LoginPageState extends State<LoginPage> {
                           color: brown.withOpacity(0.7),
                         ),
                       ),
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    // ✅ NEW: Role dropdown (same as register)
+                    DropdownButtonFormField<String>(
+                      value: role,
+                      items: const [
+                        DropdownMenuItem(value: 'elder', child: Text('Elder')),
+                        DropdownMenuItem(value: 'caregiver', child: Text('Caregiver')),
+                        DropdownMenuItem(value: 'therapist', child: Text('Therapist')),
+                        DropdownMenuItem(value: 'doctor', child: Text('Doctor')),
+                        DropdownMenuItem(value: 'familyMember', child: Text('Family Member')),
+                        DropdownMenuItem(value: 'admin', child: Text('Admin')),
+                      ],
+                      onChanged: loading ? null : (v) => setState(() => role = v ?? role),
+                      decoration: InputDecoration(
+                        filled: true,
+                        fillColor: Colors.white.withOpacity(0.9),
+                        hintText: 'Select Role',
+                        prefixIcon: Icon(Icons.badge_outlined, color: brown.withOpacity(0.8)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                      dropdownColor: Colors.white,
+                      iconEnabledColor: brown,
                     ),
 
                     const SizedBox(height: 22),

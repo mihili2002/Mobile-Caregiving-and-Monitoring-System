@@ -1,67 +1,86 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 enum UserRole {
+  admin,
   elder,
   caregiver,
   doctor,
-  admin,
   therapist,
   familyMember,
 }
 
+UserRole userRoleFromString(String? v) {
+  switch ((v ?? '').toLowerCase().trim()) {
+    case 'admin':
+      return UserRole.admin;
+    case 'elder':
+      return UserRole.elder;
+    case 'caregiver':
+      return UserRole.caregiver;
+    case 'doctor':
+      return UserRole.doctor;
+    case 'therapist':
+      return UserRole.therapist;
+    case 'familymember':
+    case 'family_member':
+    case 'family':
+      return UserRole.familyMember;
+    default:
+      return UserRole.elder;
+  }
+}
+
+String userRoleToString(UserRole role) {
+  switch (role) {
+    case UserRole.admin:
+      return 'admin';
+    case UserRole.elder:
+      return 'elder';
+    case UserRole.caregiver:
+      return 'caregiver';
+    case UserRole.doctor:
+      return 'doctor';
+    case UserRole.therapist:
+      return 'therapist';
+    case UserRole.familyMember:
+      return 'familyMember';
+  }
+}
+
 class AppUser {
   final String uid;
-  final String elderId; // ✅ NEW FIELD
   final String email;
   final UserRole role;
-  final String? name;
+  final String name;
 
   AppUser({
     required this.uid,
-    required this.elderId, // ✅ REQUIRED
     required this.email,
     required this.role,
-    this.name,
+    required this.name,
   });
 
-  /// Convert to Firestore map
-  Map<String, dynamic> toMap() {
-    return {
-      'uid': uid,
-      'elderId': elderId, // ✅ stored
-      'email': email,
-      'role': role.toString().split('.').last,
-      'name': name,
-    };
-  }
+  Map<String, dynamic> toMap() => {
+        'uid': uid,
+        'email': email,
+        'role': userRoleToString(role),
+        'name': name,
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
 
-  /// Create from Firestore map
-  factory AppUser.fromMap(Map<String, dynamic> data, String uid) {
+  /// ✅ FIX: allow uidOverride so UserService can pass doc.id safely
+  factory AppUser.fromMap(Map<String, dynamic> map, {String? uidOverride}) {
     return AppUser(
-      uid: uid,
-      elderId: data['elderId'] ?? uid, // ✅ fallback for old users
-      email: data['email'] ?? '',
-      role: _parseRole(data['role']),
-      name: data['name'],
+      uid: uidOverride ?? (map['uid'] ?? '') as String,
+      email: (map['email'] ?? '') as String,
+      role: userRoleFromString(map['role']?.toString()),
+      name: (map['name'] ?? '') as String,
     );
   }
 
-  /// Parse role safely
-  static UserRole _parseRole(String? role) {
-    switch (role?.toLowerCase()) {
-      case 'elder':
-        return UserRole.elder;
-      case 'caregiver':
-        return UserRole.caregiver;
-      case 'doctor':
-        return UserRole.doctor;
-      case 'therapist':
-        return UserRole.therapist;
-      case 'admin':
-        return UserRole.admin;
-      case 'family_member':
-      case 'familymember':
-        return UserRole.familyMember;
-      default:
-        return UserRole.elder; // Default fallback
-    }
+  /// Optional helper
+  factory AppUser.fromDoc(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>? ?? {};
+    return AppUser.fromMap(data, uidOverride: doc.id);
   }
 }

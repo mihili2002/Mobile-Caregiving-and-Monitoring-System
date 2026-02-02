@@ -1,8 +1,8 @@
-
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/user_service.dart';
+import '../../services/elder_profile_service.dart';
 import '../../models/user_model.dart';
 import '../../widgets/role_based_wrapper.dart';
 
@@ -100,6 +100,9 @@ class _ElderOnboardingFlowState extends State<ElderOnboardingFlow> {
       final response = await _userService.createElderProfile(profileData);
 
       if (response != null && mounted) {
+        // Mark as complete locally/in Firestore
+        await ElderProfileService().completeOnboarding(user.uid);
+
         // Cache Predictions Locally
         try {
            final profile = response['profile'];
@@ -202,8 +205,8 @@ class _ElderOnboardingFlowState extends State<ElderOnboardingFlow> {
     return _buildPageContainer(
       title: "Physical Well-being",
       children: [
-        _buildLikertQuestion("Do you find that you are able to get a good night's rest?", _sleepWell, (v) => setState(() => _sleepWell = v)),
-        _buildLikertQuestion("Do you often feel tired during the day?", _tiredDay, (v) => setState(() => _tiredDay = v)),
+        _buildLikertQuestion("I sleep well at night", _sleepWell, (v) => setState(() => _sleepWell = v)),
+        _buildLikertQuestion("I often feel tired during the day", _tiredDay, (v) => setState(() => _tiredDay = v)),
       ]
     );
   }
@@ -212,10 +215,10 @@ class _ElderOnboardingFlowState extends State<ElderOnboardingFlow> {
     return _buildPageContainer(
       title: "Memory & Focus",
       children: [
-        _buildLikertQuestion("Have you noticed that you sometimes forget recent events?", _forgetRecent, (v) => setState(() => _forgetRecent = v)),
-        _buildLikertQuestion("Do you find it difficult to remember your daily tasks?", _diffTasks, (v) => setState(() => _diffTasks = v)),
-        _buildLikertQuestion("Do you occasionally forget to take your medications?", _forgetMeds, (v) => setState(() => _forgetMeds = v)),
-        _buildLikertQuestion("Have you felt that daily tasks have become more challenging recently?", _tasksHarder, (v) => setState(() => _tasksHarder = v)),
+        _buildLikertQuestion("I often forget recent events", _forgetRecent, (v) => setState(() => _forgetRecent = v)),
+        _buildLikertQuestion("I have difficulty remembering tasks", _diffTasks, (v) => setState(() => _diffTasks = v)),
+        _buildLikertQuestion("I forget to take medications", _forgetMeds, (v) => setState(() => _forgetMeds = v)),
+        _buildLikertQuestion("Daily tasks feel harder than before", _tasksHarder, (v) => setState(() => _tasksHarder = v)),
       ]
     );
   }
@@ -224,10 +227,10 @@ class _ElderOnboardingFlowState extends State<ElderOnboardingFlow> {
     return _buildPageContainer(
       title: "Social & Emotional",
       children: [
-        _buildLikertQuestion("Do you sometimes feel lonely or isolated?", _lonely, (v) => setState(() => _lonely = v)),
-        _buildLikertQuestion("Have you been feeling a bit sad or anxious lately?", _sadAnxious, (v) => setState(() => _sadAnxious = v)),
-        _buildLikertQuestion("Do you get the chance to talk with friends or family regularly?", _socialTalk, (v) => setState(() => _socialTalk = v)),
-        _buildLikertQuestion("Are you still able to find joy in your hobbies?", _enjoyHobbies, (v) => setState(() => _enjoyHobbies = v)),
+        _buildLikertQuestion("I often feel lonely", _lonely, (v) => setState(() => _lonely = v)),
+        _buildLikertQuestion("I feel sad or anxious", _sadAnxious, (v) => setState(() => _sadAnxious = v)),
+        _buildLikertQuestion("I talk to friends/family regularly", _socialTalk, (v) => setState(() => _socialTalk = v)),
+        _buildLikertQuestion("I enjoy my hobbies", _enjoyHobbies, (v) => setState(() => _enjoyHobbies = v)),
       ]
     );
   }
@@ -236,9 +239,9 @@ class _ElderOnboardingFlowState extends State<ElderOnboardingFlow> {
     return _buildPageContainer(
       title: "App Preferences",
       children: [
-        _buildLikertQuestion("Do you feel comfortable using mobile applications?", _comfyApp, (v) => setState(() => _comfyApp = v)),
-        _buildLikertQuestion("Do you find that reminders are helpful to you?", _remindHelpful, (v) => setState(() => _remindHelpful = v)),
-        _buildLikertQuestion("Do you think the reminders come at the time you expect?", _remindTime, (v) => setState(() => _remindTime = v)),
+        _buildLikertQuestion("I am comfortable using apps", _comfyApp, (v) => setState(() => _comfyApp = v)),
+        _buildLikertQuestion("Reminders are helpful to me", _remindHelpful, (v) => setState(() => _remindHelpful = v)),
+        _buildLikertQuestion("Reminders come at the right time", _remindTime, (v) => setState(() => _remindTime = v)),
         const SizedBox(height: 20),
         const Text("Preferred Reminder Style", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
         DropdownButton<String>(

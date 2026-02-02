@@ -4,6 +4,9 @@ import 'package:fl_chart/fl_chart.dart';
 import '../../models/risk_history_point.dart';
 import '../../services/risk_history_api.dart';
 
+// ✅ NEW: Plan screen
+import 'personalized_plan_screen.dart';
+
 class RiskHistoryChartScreen extends StatefulWidget {
   final String residentId;
   final int days;
@@ -99,6 +102,7 @@ class _RiskHistoryChartScreenState extends State<RiskHistoryChartScreen> {
                       : Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            // ✅ Metric selector row
                             Row(
                               children: [
                                 const Text("Metric: "),
@@ -116,6 +120,8 @@ class _RiskHistoryChartScreenState extends State<RiskHistoryChartScreen> {
                               ],
                             ),
                             const SizedBox(height: 16),
+
+                            // ✅ Chart
                             Expanded(
                               child: LineChart(
                                 LineChartData(
@@ -124,13 +130,18 @@ class _RiskHistoryChartScreenState extends State<RiskHistoryChartScreen> {
                                   gridData: const FlGridData(show: true),
                                   borderData: FlBorderData(show: true),
                                   titlesData: FlTitlesData(
-                                    rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                                    topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                                    rightTitles: const AxisTitles(
+                                      sideTitles: SideTitles(showTitles: false),
+                                    ),
+                                    topTitles: const AxisTitles(
+                                      sideTitles: SideTitles(showTitles: false),
+                                    ),
                                     leftTitles: AxisTitles(
                                       sideTitles: SideTitles(
                                         showTitles: true,
                                         reservedSize: 40,
-                                        getTitlesWidget: (value, meta) => Text(value.toStringAsFixed(1)),
+                                        getTitlesWidget: (value, meta) =>
+                                            Text(value.toStringAsFixed(1)),
                                       ),
                                     ),
                                     bottomTitles: AxisTitles(
@@ -139,11 +150,16 @@ class _RiskHistoryChartScreenState extends State<RiskHistoryChartScreen> {
                                         interval: (_points.length / 4).clamp(1, 999).toDouble(),
                                         getTitlesWidget: (value, meta) {
                                           final idx = value.toInt();
-                                          if (idx < 0 || idx >= _points.length) return const SizedBox.shrink();
+                                          if (idx < 0 || idx >= _points.length) {
+                                            return const SizedBox.shrink();
+                                          }
                                           final d = _points[idx].createdAt;
                                           return Padding(
                                             padding: const EdgeInsets.only(top: 6),
-                                            child: Text("${d.month}/${d.day}", style: const TextStyle(fontSize: 10)),
+                                            child: Text(
+                                              "${d.month}/${d.day}",
+                                              style: const TextStyle(fontSize: 10),
+                                            ),
                                           );
                                         },
                                       ),
@@ -163,10 +179,55 @@ class _RiskHistoryChartScreenState extends State<RiskHistoryChartScreen> {
                                 ),
                               ),
                             ),
+
                             const SizedBox(height: 12),
+
                             Text(
                               "Points: ${_points.length} (newest: ${_points.last.createdAt.toLocal()})",
                               style: TextStyle(color: Colors.black.withOpacity(0.6)),
+                            ),
+
+                            const SizedBox(height: 12),
+
+                            // ✅ NEW: Buttons for plan
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: OutlinedButton.icon(
+                                    onPressed: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => PersonalizedPlanScreen(
+                                            residentId: widget.residentId,
+                                            mode: PlanMode.viewOnly,
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                    icon: const Icon(Icons.article_outlined),
+                                    label: const Text("View Plan"),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: ElevatedButton.icon(
+                                    onPressed: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => PersonalizedPlanScreen(
+                                            residentId: widget.residentId,
+                                            mode: PlanMode.generateEditable,
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                    icon: const Icon(Icons.auto_fix_high),
+                                    label: const Text("Generate Plan"),
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
                         ),

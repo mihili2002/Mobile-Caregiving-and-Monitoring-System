@@ -3,35 +3,32 @@ import 'features/voice_chatbot/screens/chat_screen.dart';
 import 'pages/elder/daily_routine_page.dart';
 import 'ElderProfilePage.dart';
 import 'models/user_model.dart';
-import 'pages/elder/widgets/quick_stats_widget.dart';
-
-
-// ✅ ADD THIS IMPORT (make sure the path matches your project structure)
-import 'TherapistRiskFormScreen.dart';
-
 
 // ✅ Your Meal Plan Dashboard
 import 'pages/elder/meal_plans/elder_meal_plan_dashboard.dart';
 
-import 'pages/elder/widgets/quick_stats_widget.dart'; // Assuming this exists or will be useful
-// Import other widgets if needed, user had many widgets created in lib/pages/elder/widgets based on summary
-import './RoutineHome.dart';
+// ✅ NEW: Therapist support hub page
+import 'pages/elder/therapist_support/elder_therapist_support_page.dart';
+
 class ElderDashboard extends StatelessWidget {
   final AppUser user;
   const ElderDashboard({Key? key, required this.user}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    // ✅ Match Login/Register design language (brown + soft gradients)
-    const brown = Color(0xFF4E342E);
-    const brownDark = Color(0xFF3E2723);
-    const bgTop = Color(0xFFF7F3F0);
-    const bgBottom = Color(0xFFF2EEF5);
+    final scheme = Theme.of(context).colorScheme;
+
+    final primary = scheme.primary;
+    final secondary = scheme.secondary;
+    final bgTop = Theme.of(context).scaffoldBackgroundColor;
+    final bgBottom = scheme.background;
+
+    final titleColor = Colors.black.withOpacity(0.85);
+    final subtitleColor = Colors.black.withOpacity(0.55);
 
     return Scaffold(
-      
       body: Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
@@ -44,7 +41,7 @@ class ElderDashboard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Top bar
+                // ---------------- Top Bar ----------------
                 Row(
                   children: [
                     Container(
@@ -52,10 +49,10 @@ class ElderDashboard extends StatelessWidget {
                       height: 44,
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(14),
-                        gradient: const LinearGradient(
+                        gradient: LinearGradient(
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
-                          colors: [Color(0xFF6D4C41), Color(0xFF8D6E63)],
+                          colors: [primary, secondary],
                         ),
                         boxShadow: [
                           BoxShadow(
@@ -71,22 +68,22 @@ class ElderDashboard extends StatelessWidget {
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
-                        children: const [
+                        children: [
                           Text(
                             'ElderCare',
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w700,
-                              color: brownDark,
+                              color: titleColor,
                             ),
                           ),
-                          SizedBox(height: 2),
+                          const SizedBox(height: 2),
                           Text(
                             'Elder Dashboard',
                             style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.w800,
-                              color: brownDark,
+                              color: titleColor,
                             ),
                           ),
                         ],
@@ -101,14 +98,14 @@ class ElderDashboard extends StatelessWidget {
                           ),
                         );
                       },
-                      icon: Icon(Icons.settings, color: brownDark.withOpacity(0.85)),
+                      icon: Icon(Icons.settings, color: titleColor),
                     ),
                   ],
                 ),
 
                 const SizedBox(height: 16),
 
-                // Welcome card
+                // ---------------- Welcome Card ----------------
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
@@ -121,6 +118,9 @@ class ElderDashboard extends StatelessWidget {
                         offset: const Offset(0, 10),
                       ),
                     ],
+                    border: Border.all(
+                      color: Colors.black.withOpacity(0.04),
+                    ),
                   ),
                   child: Row(
                     children: [
@@ -128,10 +128,10 @@ class ElderDashboard extends StatelessWidget {
                         width: 46,
                         height: 46,
                         decoration: BoxDecoration(
-                          color: brown.withOpacity(0.10),
+                          color: primary.withOpacity(0.12),
                           borderRadius: BorderRadius.circular(14),
                         ),
-                        child: Icon(Icons.waving_hand, color: brown, size: 26),
+                        child: Icon(Icons.waving_hand, color: primary, size: 26),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
@@ -140,10 +140,10 @@ class ElderDashboard extends StatelessWidget {
                           children: [
                             Text(
                               'Welcome ${user.name ?? 'Back'} 👋',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.w800,
-                                color: brownDark,
+                                color: titleColor,
                               ),
                             ),
                             const SizedBox(height: 4),
@@ -151,7 +151,7 @@ class ElderDashboard extends StatelessWidget {
                               'Choose a service to continue',
                               style: TextStyle(
                                 fontSize: 13,
-                                color: Colors.black.withOpacity(0.55),
+                                color: subtitleColor,
                               ),
                             ),
                           ],
@@ -163,7 +163,7 @@ class ElderDashboard extends StatelessWidget {
 
                 const SizedBox(height: 16),
 
-                // Grid of Feature Cards
+                // ---------------- Grid of Feature Cards ----------------
                 Expanded(
                   child: GridView.count(
                     crossAxisCount: 2,
@@ -175,7 +175,7 @@ class ElderDashboard extends StatelessWidget {
                         title: 'Voice Chatbot',
                         subtitle: 'Talk & ask for help',
                         icon: Icons.mic,
-                        gradient: const [Color(0xFF3E2723), Color(0xFF6D4C41)],
+                        gradient: [primary, secondary],
                         onTap: () {
                           Navigator.push(
                             context,
@@ -188,49 +188,46 @@ class ElderDashboard extends StatelessWidget {
                         title: 'Daily Routine',
                         subtitle: 'Reminders & habits',
                         icon: Icons.schedule,
-                        gradient: const [Color(0xFF4E342E), Color(0xFF8D6E63)],
+                        gradient: [primary.withOpacity(0.95), secondary],
                         onTap: () {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
                               builder: (_) => DailyRoutinePage(
                                 elderId: user.uid,
-                                elderName: user.name, // ✅ FIXED LINE
+                                elderName: user.name,
                               ),
-                            )
+                            ),
                           );
                         },
                       ),
 
-                      // ✅ Meal Planner (NOW opens Elder Meal Plan Dashboard)
                       _FeatureCard(
                         title: 'Meal Planner',
                         subtitle: 'Healthy meals',
                         icon: Icons.restaurant_menu,
-                        gradient: const [Color(0xFF5D4037), Color(0xFFA1887F)],
+                        gradient: [primary, secondary.withOpacity(0.95)],
                         onTap: () {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              // ✅ FIXED: No elderId is needed anymore.
-                              // Backend detects elder via Firebase token.
                               builder: (_) => const ElderMealPlanDashboard(),
                             ),
                           );
                         },
                       ),
 
-                      // ✅ FIXED Therapist Card: now navigates to TherapistRiskFormScreen
+                      // ✅ UPDATED: Therapist now opens Therapist Support Hub
                       _FeatureCard(
                         title: 'Therapist',
                         subtitle: 'Mental support',
                         icon: Icons.health_and_safety,
-                        gradient: const [Color(0xFF3E2723), Color(0xFF8D6E63)],
+                        gradient: [primary.withOpacity(0.85), secondary],
                         onTap: () {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => const TherapistRiskFormScreen(),
+                              builder: (_) => ElderTherapistSupportPage(user: user),
                             ),
                           );
                         },
@@ -264,7 +261,8 @@ class _FeatureCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const brownDark = Color(0xFF3E2723);
+    final titleColor = Colors.black.withOpacity(0.85);
+    final subtitleColor = Colors.black.withOpacity(0.55);
 
     return Material(
       color: Colors.transparent,
@@ -312,10 +310,10 @@ class _FeatureCard extends StatelessWidget {
                 const SizedBox(height: 12),
                 Text(
                   title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w800,
-                    color: brownDark,
+                    color: titleColor,
                   ),
                 ),
                 const SizedBox(height: 6),
@@ -323,7 +321,7 @@ class _FeatureCard extends StatelessWidget {
                   subtitle,
                   style: TextStyle(
                     fontSize: 13,
-                    color: Colors.black.withOpacity(0.55),
+                    color: subtitleColor,
                     height: 1.25,
                   ),
                 ),

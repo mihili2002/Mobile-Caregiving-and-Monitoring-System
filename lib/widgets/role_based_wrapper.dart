@@ -5,6 +5,7 @@ import '../auth/auth_service.dart';
 import '../services/user_service.dart';
 import '../models/user_model.dart';
 import '../auth/login_page.dart';
+
 import '../pages/admin/admin_dashboard.dart';
 import '../ElderDashboardScreen.dart';
 import '../pages/caregiver/caregiver_dashboard.dart';
@@ -13,8 +14,6 @@ import '../pages/home_dashboard.dart';
 import '../services/elder_profile_service.dart';
 import '../pages/elder/onboarding_flow.dart';
 import '../pages/setup_required_page.dart';
-
-// ✅ IMPORTANT: Import Doctor Dashboard
 import '../pages/doctor/doctor_dashboard_page.dart';
 
 class RoleBasedWrapper extends StatefulWidget {
@@ -33,13 +32,17 @@ class _RoleBasedWrapperState extends State<RoleBasedWrapper> {
   @override
   void initState() {
     super.initState();
-
     final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
+    _userFuture = (user != null) ? _loadUserWithRetries(user.uid) : Future.value(null);
+  }
+
+  Future<void> _reload() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    setState(() {
       _userFuture = _loadUserWithRetries(user.uid);
-    } else {
-      _userFuture = Future.value(null);
-    }
+    });
   }
 
   @override
@@ -59,14 +62,14 @@ class _RoleBasedWrapperState extends State<RoleBasedWrapper> {
           );
         }
 
-        final appUser = userSnapshot.data;
-
-        if (appUser == null) {
+        // ✅ Handle Future error (rare but useful)
+        if (userSnapshot.hasError) {
           return SetupRequiredPage(
-            title: 'User Profile Not Found',
+            title: "Something went wrong",
             message:
-                'Your Firebase Auth account exists, but no profile document was found in the "users" collection for this user.\n\n'
-                'Please log out and sign in again. If the problem persists, contact support.',
+                "We couldn't load your user profile.\n\n"
+                "Error: ${userSnapshot.error}\n\n"
+                "Try reloading or logging out.",
             onSetupPressed: () async {
               await _authService.signOut();
               if (!mounted) return;
@@ -78,7 +81,33 @@ class _RoleBasedWrapperState extends State<RoleBasedWrapper> {
           );
         }
 
-        // ✅ Role routing
+        final appUser = userSnapshot.data;
+
+        if (appUser == null) {
+          return SetupRequiredPage(
+            title: 'User Profile Not Found',
+            message:
+                'Your Firebase Auth account exists, but no profile document was found in the "users" collection.\n\n'
+                'If you just registered, wait a second and try again.\n\n'
+                'Otherwise, log out and sign in again. If the problem persists, contact support.',
+            onSetupPressed: () async {
+              // ✅ Instead of instantly logging out, first try reload once
+              await _reload();
+
+              // If still null after reload, sign out
+              final refreshed = await _userFuture;
+              if (refreshed != null) return;
+
+              await _authService.signOut();
+              if (!mounted) return;
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (_) => const LoginPage()),
+                (route) => false,
+              );
+            },
+          );
+        }
+
         switch (appUser.role) {
           case UserRole.admin:
             return AdminDashboard(user: appUser);
@@ -94,6 +123,9 @@ class _RoleBasedWrapperState extends State<RoleBasedWrapper> {
                 }
 
                 final isComplete = snapshot.data ?? false;
+
+                // ✅ If onboarding complete -> ElderDashboard
+                // ✅ else -> ElderOnboardingFlow
                 return isComplete
                     ? ElderDashboard(user: appUser)
                     : ElderOnboardingFlow(user: appUser);
@@ -103,7 +135,6 @@ class _RoleBasedWrapperState extends State<RoleBasedWrapper> {
           case UserRole.caregiver:
             return CaregiverDashboard(user: appUser);
 
-          // ✅ FIXED ROUTE: Doctor now goes to DoctorDashboardPage
           case UserRole.doctor:
             return const DoctorDashboardPage();
 
