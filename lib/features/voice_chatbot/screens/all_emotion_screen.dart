@@ -1,15 +1,21 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
-
 import './api.dart';
 
 class AllEmotionsScreen extends StatefulWidget {
   final String baseUrl;
+
+  /// ✅ OPTIONAL:
+  /// If provided => fetch emotions for that elder/session only.
+  /// If null => fetch all emotions (global).
+  final String? elderUid;
+
   final int days;
+
   const AllEmotionsScreen({
     super.key,
     required this.baseUrl,
+    this.elderUid,
     this.days = 7,
   });
 
@@ -24,7 +30,6 @@ class _AllEmotionsScreenState extends State<AllEmotionsScreen>
   List<Map<String, dynamic>> _items = [];
 
   late TabController _tab;
-
   bool _hasLoaded = false;
 
   // GREEN THEME
@@ -37,7 +42,6 @@ class _AllEmotionsScreenState extends State<AllEmotionsScreen>
   void initState() {
     super.initState();
     _tab = TabController(length: 4, vsync: this);
-
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadOnce());
   }
 
@@ -54,40 +58,40 @@ class _AllEmotionsScreenState extends State<AllEmotionsScreen>
   }
 
   Future<void> _load() async {
+  setState(() {
+    _loading = true;
+    _error = null;
+  });
+
+     try {
+    final api = Api(widget.baseUrl);
+
+    final uid = widget.elderUid?.trim() ?? "";
+
+    final String url = uid.isNotEmpty
+        ? "/chatbot/emotions?elder_uid=${Uri.encodeComponent(uid)}&days=${widget.days}&limit=500"
+        : "/chatbot/emotions?days=${widget.days}&limit=500";
+
+    final data = await api.getJson(url);
+
+    final raw = (data["items"] ?? []) as List<dynamic>;
+    final list = raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+
+    list.sort((a, b) => _parseTime(a).compareTo(_parseTime(b)));
+
+    if (!mounted) return;
     setState(() {
-      _loading = true;
-      _error = null;
+      _items = list;
+      _loading = false;
     });
-
-    try {
-      final api = Api(widget.baseUrl);
-
-      final data = await api.getJson(
-        "/chatbot/emotions?days=${widget.days}&limit=500",
-      );
-
-      final raw = (data["items"] ?? []) as List<dynamic>;
-      final list = raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
-
-      list.sort((a, b) {
-        final ta = _parseTime(a);
-        final tb = _parseTime(b);
-        return ta.compareTo(tb);
-      });
-
-      if (!mounted) return;
-      setState(() {
-        _items = list;
-        _loading = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _error = "Error: $e";
-        _loading = false;
-      });
-    }
+  } catch (e) {
+    if (!mounted) return;
+    setState(() {
+      _error = "Error: $e";
+      _loading = false;
+    });
   }
+}
 
   // ---------- Helpers ----------
   String _safe(dynamic v) => v == null ? "" : v.toString();
@@ -212,7 +216,6 @@ class _AllEmotionsScreenState extends State<AllEmotionsScreen>
     if (counts.isEmpty) return const Center(child: Text("No emotions found"));
 
     final emotions = _sortedEmotions(counts.keys.toSet());
-
     final maxCount = counts.values.fold<int>(0, (m, v) => v > m ? v : m);
     final maxY = (maxCount + 1).toDouble();
     final double interval = (maxCount <= 6) ? 1 : (maxCount <= 20) ? 2 : 5;
@@ -241,10 +244,10 @@ class _AllEmotionsScreenState extends State<AllEmotionsScreen>
               alignment: BarChartAlignment.spaceAround,
               groupsSpace: 12,
               titlesData: FlTitlesData(
-                rightTitles: const AxisTitles(
-                    sideTitles: SideTitles(showTitles: false)),
-                topTitles: const AxisTitles(
-                    sideTitles: SideTitles(showTitles: false)),
+                rightTitles:
+                    const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                topTitles:
+                    const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                 leftTitles: AxisTitles(
                   sideTitles: SideTitles(
                     showTitles: true,
@@ -356,9 +359,13 @@ class _AllEmotionsScreenState extends State<AllEmotionsScreen>
                       if (value == -3) label = "Anger";
                       return Padding(
                         padding: const EdgeInsets.only(right: 6),
-                        child: Text(label,
-                            style: const TextStyle(
-                                fontSize: 11, fontWeight: FontWeight.w700)),
+                        child: Text(
+                          label,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
                       );
                     },
                   ),
@@ -418,8 +425,12 @@ class _AllEmotionsScreenState extends State<AllEmotionsScreen>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text("Heatmap (day × emotion)",
-                style: TextStyle(fontWeight: FontWeight.w800)),
+            Text(
+              (widget.elderUid == null || widget.elderUid!.trim().isEmpty)
+                  ? "Heatmap (day × emotion)"
+                  : "Heatmap (day × emotion) • Elder: ${widget.elderUid}",
+              style: const TextStyle(fontWeight: FontWeight.w800),
+            ),
             const SizedBox(height: 10),
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
@@ -429,12 +440,15 @@ class _AllEmotionsScreenState extends State<AllEmotionsScreen>
                   Row(
                     children: [
                       const SizedBox(width: 70),
-                      ...emotions.map((e) => SizedBox(
-                            width: 90,
-                            child: Text(e,
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.w700)),
-                          )),
+                      ...emotions.map(
+                        (e) => SizedBox(
+                          width: 90,
+                          child: Text(
+                            e,
+                            style: const TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 8),
@@ -447,10 +461,13 @@ class _AllEmotionsScreenState extends State<AllEmotionsScreen>
                         children: [
                           SizedBox(
                             width: 70,
-                            child: Text(label,
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.w800,
-                                    color: _green700)),
+                            child: Text(
+                              label,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w800,
+                                color: _green700,
+                              ),
+                            ),
                           ),
                           ...emotions.map((e) {
                             final c = counts[e] ?? 0;
@@ -466,8 +483,9 @@ class _AllEmotionsScreenState extends State<AllEmotionsScreen>
                               alignment: Alignment.center,
                               child: Text(
                                 c == 0 ? "" : "$c",
-                                style:
-                                    const TextStyle(fontWeight: FontWeight.w800),
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                ),
                               ),
                             );
                           }),
@@ -511,7 +529,9 @@ class _AllEmotionsScreenState extends State<AllEmotionsScreen>
                 label: Text(
                   emotion.isEmpty ? "unknown" : emotion,
                   style: const TextStyle(
-                      fontWeight: FontWeight.w700, color: Colors.white),
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
                 ),
                 backgroundColor: _emotionColor(emotion),
               ),
@@ -519,13 +539,18 @@ class _AllEmotionsScreenState extends State<AllEmotionsScreen>
               Text(
                 time,
                 style: TextStyle(
-                    color: _green900.withOpacity(0.75),
-                    fontWeight: FontWeight.w600),
+                  color: _green900.withOpacity(0.75),
+                  fontWeight: FontWeight.w600,
+                ),
               ),
               const SizedBox(height: 10),
-              Text(text,
-                  style: const TextStyle(
-                      fontWeight: FontWeight.w600, height: 1.35)),
+              Text(
+                text,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  height: 1.35,
+                ),
+              ),
             ],
           ),
         );
@@ -535,11 +560,16 @@ class _AllEmotionsScreenState extends State<AllEmotionsScreen>
 
   @override
   Widget build(BuildContext context) {
+    final uid = widget.elderUid?.trim() ?? "";
+    final title = uid.isEmpty
+        ? "All Emotions (last ${widget.days} days)"
+        : "Emotions • $uid • last ${widget.days} days";
+
     return Scaffold(
       backgroundColor: _mint,
       appBar: AppBar(
         backgroundColor: _green900,
-        title: Text("All Emotions (last ${widget.days} days)"),
+        title: Text(title),
         actions: [
           IconButton(
             tooltip: "Refresh",

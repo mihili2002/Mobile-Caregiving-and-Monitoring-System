@@ -1,21 +1,24 @@
-import 'dart:convert';
+// lib/features/voice_chatbot/screens/chat_screen.dart
+// ✅ UPDATED: session_id is now ALWAYS the elderUid (so caregiver + elder see same emotions)
+// ✅ UPDATED: Removed History + Emotions buttons (and their imports)
+
 import 'package:flutter/material.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
-import 'package:http/http.dart' as http;
 import 'package:flutter_tts/flutter_tts.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../widgets/chat_message.dart';
-
-import 'history_screen.dart';
-import 'emotions_screen.dart';
-import 'session_screen.dart'; // must contain SessionsScreen
+import 'session_screen.dart';
 import 'all_emotion_screen.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'api.dart';
 
 class ChatScreen extends StatefulWidget {
-  const ChatScreen({super.key});
+  // ✅ REQUIRED: elder UID must be passed from Elder dashboard or caregiver dashboard
+  final String elderUid;
+
+  const ChatScreen({
+    super.key,
+    required this.elderUid,
+  });
 
   @override
   State<ChatScreen> createState() => _ChatScreenState();
@@ -32,42 +35,31 @@ class _ChatScreenState extends State<ChatScreen> {
   final FlutterTts _tts = FlutterTts();
   bool _ttsEnabled = true;
 
-  // Persisted session id (shared preferences)
-  String _sessionId = "";
+  // ✅ IMPORTANT: session id = elderUid (same key everywhere)
+  late final String _sessionId;
 
   // ⚠️ Chrome/Web: 127.0.0.1
-  //Android Emulator: 10.0.2.2
+  // Android Emulator: 10.0.2.2
   // Real device: your PC LAN IP, e.g. 192.168.1.5
   final String _baseUrl = 'http://127.0.0.1:8000';
 
-  // ---------- Brown theme colors ----------
-  static const _brown900 = Color(0xFF3E2723);
-  static const _brown800 = Color(0xFF4E342E);
-  static const _brown700 = Color(0xFF5D4037);
-  static const _brown200 = Color(0xFFD7CCC8);
-  static const _cream = Color(0xFFF7F3EF);
+  // ---------- Green theme colors ----------
+  static const _green900 = Color(0xFF1B5E20);
+  static const _green800 = Color(0xFF2E7D32);
+  static const _green700 = Color(0xFF388E3C);
+  static const _green200 = Color(0xFFC8E6C9);
+  static const _mint = Color(0xFFF1F8E9);
 
   @override
   void initState() {
     super.initState();
     _speech = stt.SpeechToText();
     _initTts();
-    _initSession();
-  }
 
-  Future<void> _initSession() async {
-    final prefs = await SharedPreferences.getInstance();
-    final saved = prefs.getString("session_id");
+    // ✅ session is fixed to elderUid
+    _sessionId = widget.elderUid.trim();
 
-    if (saved != null && saved.isNotEmpty) {
-      setState(() => _sessionId = saved);
-    } else {
-      final newId = DateTime.now().millisecondsSinceEpoch.toString();
-      await prefs.setString("session_id", newId);
-      setState(() => _sessionId = newId);
-    }
-
-    debugPrint("SESSION ID: $_sessionId");
+    debugPrint("CHAT SCREEN elderUid/session_id = $_sessionId");
   }
 
   Future<void> _initTts() async {
@@ -105,7 +97,6 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  // ✅ NEW: Q&A dialog for elders (quick mood questions)
   Future<void> _openQaDialog() async {
     final TextEditingController qaController = TextEditingController();
 
@@ -123,7 +114,6 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
           ),
           actions: [
-            // ✅ quick one-tap for elders
             TextButton(
               onPressed: () {
                 Navigator.pop(ctx);
@@ -139,9 +129,7 @@ class _ChatScreenState extends State<ChatScreen> {
               onPressed: () {
                 final q = qaController.text.trim();
                 Navigator.pop(ctx);
-                if (q.isNotEmpty) {
-                  _sendMessage(q); // reuse normal chat flow
-                }
+                if (q.isNotEmpty) _sendMessage(q);
               },
               child: const Text("Ask"),
             ),
@@ -152,48 +140,47 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _sendMessage(String text) async {
-  if (_sessionId.isEmpty) {
-    debugPrint("Session not ready yet");
-    return;
-  }
-  if (text.trim().isEmpty) return;
+    if (_sessionId.isEmpty) {
+      debugPrint("elderUid/session_id is empty");
+      return;
+    }
+    if (text.trim().isEmpty) return;
 
-  setState(() {
-    _messages.add(ChatMessage(text: text, isUser: true));
-    _textController.clear();
-  });
-
-  try {
-    final api = Api(_baseUrl);
-
-    final data = await api.postJson("/chatbot/chat", {
-      "message": text,
-      "session_id": _sessionId,
-    });
-
-    final reply = data["reply"] ?? "No reply";
-    final emotion = data["emotion"] ?? "unknown";
-    final intent = data["intent"] ?? "none";
-
-    if (!mounted) return;
     setState(() {
-      _messages.add(ChatMessage(
-        text: reply,
-        isUser: false,
-        emotion: emotion,
-        intent: intent,
-      ));
+      _messages.add(ChatMessage(text: text, isUser: true));
+      _textController.clear();
     });
 
-    await _speak(reply);
-  } catch (e) {
-    if (!mounted) return;
-    setState(() {
-      _messages.add(ChatMessage(text: "Error: $e", isUser: false));
-    });
+    try {
+      final api = Api(_baseUrl);
+
+      final data = await api.postJson("/chatbot/chat", {
+        "message": text,
+        "session_id": _sessionId, // ✅ always elderUid
+      });
+
+      final reply = data["reply"] ?? "No reply";
+      final emotion = data["emotion"] ?? "unknown";
+      final intent = data["intent"] ?? "none";
+
+      if (!mounted) return;
+      setState(() {
+        _messages.add(ChatMessage(
+          text: reply,
+          isUser: false,
+          emotion: emotion,
+          intent: intent,
+        ));
+      });
+
+      await _speak(reply);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _messages.add(ChatMessage(text: "Error: $e", isUser: false));
+      });
+    }
   }
-}
-
 
   @override
   void dispose() {
@@ -206,20 +193,18 @@ class _ChatScreenState extends State<ChatScreen> {
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
       elevation: 0,
-      backgroundColor: _brown900,
+      backgroundColor: _green900,
       title: const Text(
         'Voice Chatbot',
         style: TextStyle(fontWeight: FontWeight.w700),
       ),
       actions: [
-        // ✅ NEW: Q&A dialog button
         IconButton(
           tooltip: "Q & A",
           icon: const Icon(Icons.question_answer),
           onPressed: _openQaDialog,
         ),
 
-        // ✅ All Sessions
         IconButton(
           tooltip: "All Sessions",
           icon: const Icon(Icons.list_alt),
@@ -233,7 +218,7 @@ class _ChatScreenState extends State<ChatScreen> {
           },
         ),
 
-        // ✅ All Emotions (Weekly)
+        // ✅ Keep only this emotions page (charts screen)
         IconButton(
           tooltip: "All Emotions (Weekly)",
           icon: const Icon(Icons.calendar_month),
@@ -241,55 +226,16 @@ class _ChatScreenState extends State<ChatScreen> {
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) => AllEmotionsScreen(baseUrl: _baseUrl, days: 7),
-              ),
-            );
-          },
-        ),
-
-        // ✅ Chat History for current session
-        IconButton(
-          tooltip: "History",
-          icon: const Icon(Icons.history),
-          onPressed: () {
-            if (_sessionId.isEmpty) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text("Session is not ready yet.")),
-              );
-              return;
-            }
-
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => HistoryScreen(
+                builder: (_) => AllEmotionsScreen(
                   baseUrl: _baseUrl,
-                  sessionId: _sessionId,
+                  elderUid: _sessionId,
+                  days: 7,
                 ),
               ),
             );
           },
         ),
 
-        // ✅ Emotions for current session
-        IconButton(
-          tooltip: "Emotions",
-          icon: const Icon(Icons.emoji_emotions),
-          onPressed: () {
-            if (_sessionId.isEmpty) return;
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => EmotionsScreen(
-                  baseUrl: _baseUrl,
-                  sessionId: _sessionId,
-                ),
-              ),
-            );
-          },
-        ),
-
-        // ✅ TTS toggle
         IconButton(
           tooltip: _ttsEnabled ? "Mute" : "Unmute",
           icon: Icon(_ttsEnabled ? Icons.volume_up : Icons.volume_off),
@@ -305,9 +251,7 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget _buildHeaderHint() {
     final text = _isListening
         ? "Listening… speak now"
-        : (_sessionId.isEmpty
-            ? "Preparing session… please wait"
-            : "Ask anything about caregiving. Tap mic for voice.");
+        : "Ask anything about caregiving. Tap mic for voice.";
 
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 14, 16, 10),
@@ -315,7 +259,7 @@ class _ChatScreenState extends State<ChatScreen> {
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.85),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: _brown200.withOpacity(0.8)),
+        border: Border.all(color: _green200.withOpacity(0.8)),
         boxShadow: [
           BoxShadow(
             blurRadius: 18,
@@ -331,7 +275,7 @@ class _ChatScreenState extends State<ChatScreen> {
             width: 10,
             height: 10,
             decoration: BoxDecoration(
-              color: _isListening ? Colors.redAccent : _brown700,
+              color: _isListening ? Colors.redAccent : _green700,
               shape: BoxShape.circle,
             ),
           ),
@@ -340,7 +284,7 @@ class _ChatScreenState extends State<ChatScreen> {
             child: Text(
               text,
               style: TextStyle(
-                color: _brown900.withOpacity(0.9),
+                color: _green900.withOpacity(0.9),
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -361,7 +305,7 @@ class _ChatScreenState extends State<ChatScreen> {
         decoration: BoxDecoration(
           color: Colors.white.withOpacity(0.88),
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: _brown200.withOpacity(0.9)),
+          border: Border.all(color: _green200.withOpacity(0.9)),
           boxShadow: [
             BoxShadow(
               blurRadius: 24,
@@ -379,7 +323,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     "Start a conversation.\nTry: “I feel stressed today.”",
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      color: _brown800.withOpacity(0.85),
+                      color: _green800.withOpacity(0.85),
                       height: 1.5,
                       fontWeight: FontWeight.w600,
                     ),
@@ -391,9 +335,9 @@ class _ChatScreenState extends State<ChatScreen> {
                 itemCount: _messages.length,
                 itemBuilder: (_, i) => _StyledBubble(
                   msg: _messages[i],
-                  brown900: _brown900,
-                  brown700: _brown700,
-                  brown200: _brown200,
+                  green900: _green900,
+                  green700: _green700,
+                  green200: _green200,
                 ),
               ),
       ),
@@ -401,8 +345,6 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _buildInputBar() {
-    final disabled = _sessionId.isEmpty;
-
     return SafeArea(
       top: false,
       child: Container(
@@ -410,7 +352,7 @@ class _ChatScreenState extends State<ChatScreen> {
         decoration: BoxDecoration(
           color: Colors.white.withOpacity(0.92),
           border: Border(
-            top: BorderSide(color: _brown200.withOpacity(0.8)),
+            top: BorderSide(color: _green200.withOpacity(0.8)),
           ),
         ),
         child: Row(
@@ -418,27 +360,24 @@ class _ChatScreenState extends State<ChatScreen> {
             Expanded(
               child: TextField(
                 controller: _textController,
-                enabled: !disabled,
                 minLines: 1,
                 maxLines: 4,
                 textInputAction: TextInputAction.send,
                 onSubmitted: (_) => _sendMessage(_textController.text),
                 decoration: InputDecoration(
-                  hintText: disabled
-                      ? "Preparing session…"
-                      : (_isListening ? "Listening…" : "Type your message…"),
-                  hintStyle: TextStyle(color: _brown700.withOpacity(0.55)),
+                  hintText: _isListening ? "Listening…" : "Type your message…",
+                  hintStyle: TextStyle(color: _green700.withOpacity(0.55)),
                   filled: true,
-                  fillColor: _cream,
+                  fillColor: _mint,
                   contentPadding:
                       const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide(color: _brown200),
+                    borderSide: BorderSide(color: _green200),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(16),
-                    borderSide: const BorderSide(color: _brown700, width: 1.4),
+                    borderSide: const BorderSide(color: _green700, width: 1.4),
                   ),
                 ),
               ),
@@ -446,22 +385,18 @@ class _ChatScreenState extends State<ChatScreen> {
             const SizedBox(width: 10),
             _RoundIconButton(
               tooltip: "Send",
-              color: disabled ? _brown200 : _brown700,
+              color: _green700,
               icon: Icons.send_rounded,
-              onTap: disabled ? () {} : () => _sendMessage(_textController.text),
+              onTap: () => _sendMessage(_textController.text),
             ),
             const SizedBox(width: 10),
             AnimatedContainer(
               duration: const Duration(milliseconds: 180),
               child: _RoundIconButton(
                 tooltip: _isListening ? "Stop" : "Mic",
-                color: disabled
-                    ? _brown200
-                    : (_isListening ? Colors.redAccent : _brown900),
+                color: _isListening ? Colors.redAccent : _green900,
                 icon: _isListening ? Icons.stop_circle : Icons.mic,
-                onTap: disabled
-                    ? () {}
-                    : (_isListening ? _stopListening : _startListening),
+                onTap: _isListening ? _stopListening : _startListening,
               ),
             ),
           ],
@@ -474,15 +409,15 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: _buildAppBar(),
-      backgroundColor: _cream,
+      backgroundColor: _mint,
       body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              _brown900.withOpacity(0.18),
-              _cream,
+              _green900.withOpacity(0.18),
+              _mint,
             ],
           ),
         ),
@@ -535,23 +470,23 @@ class _RoundIconButton extends StatelessWidget {
 
 class _StyledBubble extends StatelessWidget {
   final ChatMessage msg;
-  final Color brown900;
-  final Color brown700;
-  final Color brown200;
+  final Color green900;
+  final Color green700;
+  final Color green200;
 
   const _StyledBubble({
     required this.msg,
-    required this.brown900,
-    required this.brown700,
-    required this.brown200,
+    required this.green900,
+    required this.green700,
+    required this.green200,
   });
 
   @override
   Widget build(BuildContext context) {
     final isUser = msg.isUser;
 
-    final bubbleColor = isUser ? brown700 : Colors.white;
-    final textColor = isUser ? Colors.white : brown900;
+    final bubbleColor = isUser ? green700 : Colors.white;
+    final textColor = isUser ? Colors.white : green900;
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 7),
@@ -570,7 +505,7 @@ class _StyledBubble extends StatelessWidget {
                 bottomRight: Radius.circular(isUser ? 4 : 18),
               ),
               border: Border.all(
-                color: isUser ? Colors.transparent : brown200.withOpacity(0.85),
+                color: isUser ? Colors.transparent : green200.withOpacity(0.85),
               ),
             ),
             child: Text(

@@ -1,20 +1,19 @@
 import 'package:flutter/material.dart';
-import 'auth_service.dart';
-import 'register_page.dart';
-
-// add these imports
-import '../models/user_model.dart';
-import '../ElderDashboardScreen.dart';
-
-// NEW imports for token copy + debug print
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
 
-import '../pages/doctor/doctor_dashboard_page.dart';
+import 'auth_service.dart';
+import 'register_page.dart';
 
-// ✅ FIX: import the actual therapist dashboard file you have
+import '../models/user_model.dart';
+import '../ElderDashboardScreen.dart';
+
+import '../pages/doctor/doctor_dashboard_page.dart';
 import '../pages/therapist/therapist_dashboard.dart';
+
+// ✅ ADD caregiver dashboard import (update path if needed)
+import '../pages/caregiver/caregiver_dashboard.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -36,6 +35,7 @@ class _LoginPageState extends State<LoginPage> {
   void dispose() {
     usernameController.dispose();
     passwordController.dispose();
+    // optional: authService.dispose(); // only if you want to stop token listener
     super.dispose();
   }
 
@@ -48,9 +48,7 @@ class _LoginPageState extends State<LoginPage> {
     });
 
     try {
-      // ---------------------------------------------------
-      //  1) Firebase sign-in (get User back)
-      // ---------------------------------------------------
+      // 1) Firebase sign-in
       final User? user = await authService.signIn(
         usernameController.text.trim(),
         passwordController.text.trim(),
@@ -60,32 +58,22 @@ class _LoginPageState extends State<LoginPage> {
         throw Exception("Login failed (Firebase user is null)");
       }
 
-      // ---------------------------------------------------
       // 2) Force refresh token so custom claims appear
-      // ---------------------------------------------------
       final tokenResult = await user.getIdTokenResult(true);
 
-      // DEBUG ONLY: print role claims + token
       if (kDebugMode) {
         debugPrint("Firebase Claims => ${tokenResult.claims}");
         debugPrint("Firebase Token  => ${tokenResult.token}");
       }
 
-      // ---------------------------------------------------
-      // 3) Copy token to clipboard for Swagger testing
-      // ---------------------------------------------------
+      // 3) Copy token to clipboard (optional)
       final token = tokenResult.token;
       if (token != null && token.isNotEmpty) {
         await Clipboard.setData(ClipboardData(text: token));
-
-        if (kDebugMode) {
-          debugPrint("Token copied to clipboard");
-        }
+        if (kDebugMode) debugPrint("Token copied to clipboard");
       }
 
-      // ---------------------------------------------------
       // 4) Fetch AppUser from Firestore
-      // ---------------------------------------------------
       final AppUser? appUser = await authService.getCurrentAppUser();
 
       if (appUser == null) {
@@ -97,9 +85,7 @@ class _LoginPageState extends State<LoginPage> {
 
       if (!mounted) return;
 
-      // ---------------------------------------------------
       // 5) Navigate based on role
-      // ---------------------------------------------------
       if (appUser.role == UserRole.elder) {
         Navigator.pushReplacement(
           context,
@@ -107,28 +93,29 @@ class _LoginPageState extends State<LoginPage> {
             builder: (_) => ElderDashboard(user: appUser),
           ),
         );
-      }
-      // ✅ Doctor Role Navigation (already exists)
-      else if (appUser.role == UserRole.doctor) {
+      } else if (appUser.role == UserRole.caregiver) {
+        // ✅ FIX: caregiver now navigates correctly
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => CaregiverDashboard(user: appUser),
+          ),
+        );
+      } else if (appUser.role == UserRole.doctor) {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
             builder: (_) => const DoctorDashboardPage(),
           ),
         );
-      }
-      // ✅ FIXED: Therapist Role Navigation (use existing class name)
-      else if (appUser.role == UserRole.therapist) {
+      } else if (appUser.role == UserRole.therapist) {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
             builder: (_) => TherapistDashboard(user: appUser),
           ),
         );
-      }
-
-      // Default fallback
-      else {
+      } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text("Logged in as ${appUser.role.name}"),
@@ -145,7 +132,6 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
-    // Same palette + feel as RegisterPage
     const brown = Color(0xFF00BBA7);
     const brownDark = Color(0xFF009E8D);
     const bgTop = Color(0xFFF7F3F0);
@@ -173,7 +159,6 @@ class _LoginPageState extends State<LoginPage> {
                   children: [
                     const SizedBox(height: 10),
 
-                    // Logo + App name
                     Column(
                       children: [
                         Container(
