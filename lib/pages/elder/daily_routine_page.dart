@@ -36,6 +36,7 @@ class _DailyRoutinePageState extends State<DailyRoutinePage> with SingleTickerPr
   // Mode
   bool _isPlanningMode = false;
   bool _isLoading = false;
+  bool _hasError = false;
 
   // Data
   DateTime _selectedDate = DateTime.now();
@@ -80,8 +81,6 @@ class _DailyRoutinePageState extends State<DailyRoutinePage> with SingleTickerPr
   }
 
   String _riskTier = "Tier 1"; // Default
-  final Set<String> _remindedKeys = {};
-
   // Fetch Risk Tier
   Future<void> _fetchRiskProfile() async {
      try {
@@ -134,85 +133,6 @@ class _DailyRoutinePageState extends State<DailyRoutinePage> with SingleTickerPr
      }
   }
 
-  void _checkAndSpeakReminders() {
-    if (!_isToday) return; 
-    
-    final now = DateTime.now();
-    final currentMinutes = now.hour * 60 + now.minute;
-    final timeString = "${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}";
-    
-    // Night Cap: 9 PM to 7 AM
-    final bool isNight = now.hour >= 21 || now.hour < 7;
-    
-    // Policy Offsets (in minutes)
-    List<int> offsets = [0];
-    if (_riskTier.contains("Tier 2")) offsets = [0, 15];
-    if (_riskTier.contains("Tier 3") || _riskTier.contains("High")) offsets = [0, 10, 20];
-    
-    for (var task in _dailyTasks) {
-       // Only process if not completed
-       if (task['completed'] == true) continue;
-       
-       // Parse Task Time
-       String tStr = task['time'];
-       if (!tStr.contains(":")) continue;
-       final parts = tStr.split(":");
-       final taskMinutes = int.parse(parts[0]) * 60 + int.parse(parts[1]);
-       
-       // Calculate Difference
-       int diff = currentMinutes - taskMinutes;
-       
-       // Night Cap Check: No followups (diff > 0) at night
-       if (isNight && diff > 0) continue;
-       
-       // Check if this specific difference dictates a reminder
-       if (offsets.contains(diff)) {
-           // Unique Key: TaskID + The Time We Are Reminding At (current time string)
-           final key = "${task['id']}_$timeString";
-           
-           if (!_remindedKeys.contains(key)) {
-              String msg = task['task_name'] ?? "Task";
-              if (diff > 0) msg = "Reminder: You haven't finished $msg yet. It's time.";
-              
-              _voiceService.speakReminder(msg, elderName: widget.elderName);
-              _remindedKeys.add(key);
-              
-              // Visual Alert (Fallback for Web/Desktop or if Audio blocked)
-              if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Row(children: [
-                         const Icon(Icons.alarm, color: Colors.white), 
-                         const SizedBox(width: 12),
-                         Expanded(child: Text(msg))
-                      ]),
-                      backgroundColor: Colors.teal,
-                      duration: const Duration(seconds: 10),
-                      action: SnackBarAction(label: "Dismiss", textColor: Colors.yellow, onPressed: (){}),
-                    )
-                  );
-              }
-
-              // Log
-              _behaviorService.logEvent('REMINDER_SENT', {
-                 "uid": effectiveUid,
-                 "scheduleDocId": _getScheduleDocId(),
-                 "taskId": task['id'],
-                 "type": "REMINDER_SENT",
-                 "at": DateTime.now().toIso8601String(),
-                 "meta": {
-                     "task_name": task['task_name'],
-                     "scheduled_time": task['time'],
-                     "risk_tier": _riskTier,
-                     "is_followup": diff > 0,
-                     "delay_min": diff,
-                     "policy_version": "v1.0"
-                 }
-              });
-           }
-       }
-    }
-  }
 
   // --- LOGIC ---
 
@@ -229,18 +149,30 @@ class _DailyRoutinePageState extends State<DailyRoutinePage> with SingleTickerPr
   }
 
   Future<void> _fetchSchedule() async {
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _hasError = false;
+    });
     
     // 1. Get Scheduled Tasks
     final data = await _scheduleService.getSchedule(effectiveUid, _selectedDate);
-    final tasks = List<dynamic>.from(data?['tasks'] ?? []);
+    
+    if (data == null) {
+      setState(() {
+        _isLoading = false;
+        _hasError = true;
+      });
+      return;
+    }
+
+    final tasks = List<dynamic>.from(data['tasks'] ?? []);
     
     setState(() {
       _dailyTasks = tasks;
     });
 
     // 2. Decide Mode
-    // Enter Planning Mode if tasks are empty AND it is NOT a past date
+    // Only enter Planning Mode if we successfully got data and tasks are empty AND it is NOT a past date
     if (tasks.isEmpty && !_isPast) {
        await _enterPlanningMode();
     } else {
@@ -600,9 +532,11 @@ class _DailyRoutinePageState extends State<DailyRoutinePage> with SingleTickerPr
            Expanded(
              child: _isLoading 
                ? const Center(child: CircularProgressIndicator()) 
-               : _isPlanningMode 
-                   ? _buildPlanningView() 
-                   : _buildReadingView()
+               : _hasError
+                   ? _buildErrorView()
+                   : _isPlanningMode 
+                       ? _buildPlanningView() 
+                       : _buildReadingView()
            )
         ]
       ),
@@ -827,6 +761,27 @@ class _DailyRoutinePageState extends State<DailyRoutinePage> with SingleTickerPr
             ),
           ),
           const SizedBox(height: 40),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildErrorView() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.cloud_off, color: Colors.grey, size: 60),
+          const SizedBox(height: 16),
+          const Text("Connection Error", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          const Text("We couldn't load your schedule.", textAlign: TextAlign.center),
+          const SizedBox(height: 24),
+          ElevatedButton(
+            onPressed: _fetchSchedule,
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white),
+            child: const Text("Retry"),
+          ),
         ],
       ),
     );

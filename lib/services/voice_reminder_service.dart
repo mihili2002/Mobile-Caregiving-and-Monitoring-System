@@ -21,9 +21,11 @@ class VoiceReminderService {
   String _riskTier = "Tier 1";
   StreamSubscription<QuerySnapshot>? _subscription;
   StreamSubscription<RemoteMessage>? _fcmSubscription;
+  Timer? _checkTimer;
   
   // NEW: Track played reminders locally for Web/Mobile sync
   final Map<String, int> _lastPlayedCounts = {};
+  final Set<String> _spokenKeys = {}; // NEW: Prevents duplicate voice announcements
 
   // Restore helper methods
   void updateTasks(List<dynamic> tasks, String tier) {
@@ -33,11 +35,83 @@ class VoiceReminderService {
     
     // Schedule Local Notifications immediately
     _scheduleNotificationsForTasks();
+    
+    // NEW: Start local time-based checking
+    _startChecking();
   }
 
   void updateRiskTier(String tier) {
     _riskTier = tier;
     debugPrint("VoiceReminderService: Updated Risk Tier to $tier");
+    _startChecking();
+  }
+
+  // NEW: Periodic check for reminders
+  void _startChecking() {
+    if (_checkTimer != null) return;
+    
+    debugPrint("VoiceReminderService: Starting periodic check timer...");
+    _checkTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
+      _checkLocalReminders();
+    });
+    
+    // Run once immediately
+    _checkLocalReminders();
+  }
+
+  void _checkLocalReminders() {
+    if (_tasks.isEmpty) return;
+    
+    final now = DateTime.now();
+    final currentMinutes = now.hour * 60 + now.minute;
+    final dateStr = DateFormat('yyyy-MM-dd').format(now);
+    
+    // Only check if it's "today" relative to the service's context if needed
+    // For now, we assume _tasks are for today.
+    
+    List<int> offsets = _getTierOffsets(_riskTier);
+    
+    for (var task in _tasks) {
+      if (task['completed'] == true) continue;
+      
+      String? tStr = task['time'];
+      if (tStr == null || !tStr.contains(":")) continue;
+      
+      try {
+        final parts = tStr.split(":");
+        final taskMinutes = int.parse(parts[0]) * 60 + int.parse(parts[1]);
+        
+        int diff = currentMinutes - taskMinutes;
+        
+        if (offsets.contains(diff)) {
+          // Unique Key: TaskID + Offset
+          final key = "${task['id']}_$diff";
+          
+          if (!_spokenKeys.contains(key)) {
+            String taskName = task['task_name'] ?? "Task";
+            debugPrint("🔊 LOCAL TRIGGER: Speaking reminder for $taskName at diff $diff");
+            
+            String msg = taskName;
+            if (diff > 0) {
+              msg = "Reminder: You haven't finished $taskName yet. It's time.";
+              _voiceService.speak(msg);
+            } else {
+              _voiceService.speakReminder(taskName);
+            }
+            
+            _spokenKeys.add(key);
+          }
+        }
+      } catch (e) {
+        debugPrint("VoiceReminderService: Error parsing task time: $e");
+      }
+    }
+  }
+
+  List<int> _getTierOffsets(String tier) {
+    if (tier.contains("Tier 3") || tier.contains("High")) return [0, 10, 20];
+    if (tier.contains("Tier 2")) return [0, 15];
+    return [0];
   }
 
   // Start listening to Firestore for real-time updates
@@ -174,6 +248,8 @@ class VoiceReminderService {
     _subscription = null;
     _fcmSubscription?.cancel();
     _fcmSubscription = null;
+    _checkTimer?.cancel();
+    _checkTimer = null;
     _audioPlayer.dispose();
   }
 
