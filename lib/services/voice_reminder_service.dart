@@ -20,6 +20,7 @@ class VoiceReminderService {
   List<dynamic> _tasks = [];
   String _riskTier = "Tier 1";
   StreamSubscription<QuerySnapshot>? _subscription;
+  StreamSubscription<DocumentSnapshot>? _profileSubscription; // NEW
   StreamSubscription<RemoteMessage>? _fcmSubscription;
   Timer? _checkTimer;
   
@@ -138,6 +139,22 @@ class VoiceReminderService {
     
     debugPrint("VoiceReminderService: Listening to Firestore for $uid...");
     
+    // 1. Listen for Profile Changes (For Risk Tier)
+    _profileSubscription?.cancel();
+    _profileSubscription = FirebaseFirestore.instance
+        .collection('elder_profiles')
+        .doc(uid)
+        .snapshots()
+        .listen((doc) {
+          if (doc.exists && doc.data() != null) {
+            final data = doc.data() as Map<String, dynamic>;
+            final tier = data['prediction_tier']?.toString() ?? "Tier 1";
+            debugPrint("🔊 FIRESTORE PROFILE SYNC: Found Tier $tier for $uid");
+            updateRiskTier(tier);
+          }
+        }, onError: (e) => debugPrint("VoiceReminderService: Profile Listen Error: $e"));
+
+    // 2. Listen for Schedule Changes
     // Switch to Query-based listening to avoid Permission Denied on non-existent docs
     // Field 'date' is stored as YYYY-MM-DD in ai_routes.py
     final now = DateTime.now();
@@ -174,7 +191,7 @@ class VoiceReminderService {
                 }
               }
 
-              updateTasks(newTasks, _riskTier);
+              updateTasks(newTasks);
           }
        }
     }, onError: (e) {
@@ -250,13 +267,20 @@ class VoiceReminderService {
       
       try {
         if (audioUrl != null && audioUrl.isNotEmpty) {
-          await _audioPlayer.play(UrlSource(audioUrl));
+          // Attempt to play recorded audio from backend
+          // We set a short timeout for the source load to fail fast if backend is down
+          await _audioPlayer.play(UrlSource(audioUrl)).timeout(
+            const Duration(seconds: 2),
+            onTimeout: () => throw TimeoutException("Backend audio server unreachable"),
+          );
         } else {
-          // Fallback to local TTS if no audio URL provided
+          // Fallback to local TTS if no URL
           await _voiceService.speak("Reminder: it is time for $taskName.");
         }
       } catch (e) {
-        debugPrint("Error playing voice reminder: $e");
+        // Silently fallback without noisy stack traces if it's a known connection/format error
+        debugPrint("🔊 TTS FALLBACK: Remote audio at $audioUrl failed to play (Likely Backend Offline). Using local voice.");
+        await _voiceService.speak("Reminder: it is time for $taskName.");
       }
     }
   }
@@ -264,6 +288,8 @@ class VoiceReminderService {
   void stop() {
     _subscription?.cancel();
     _subscription = null;
+    _profileSubscription?.cancel();
+    _profileSubscription = null;
     _fcmSubscription?.cancel();
     _fcmSubscription = null;
     _checkTimer?.cancel();

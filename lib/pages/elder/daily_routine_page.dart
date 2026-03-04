@@ -66,7 +66,6 @@ class _DailyRoutinePageState extends State<DailyRoutinePage> with SingleTickerPr
     final cachedTier = prefs.getString('cached_risk_tier');
     if (cachedTier != null && mounted) {
        setState(() => _riskTier = cachedTier);
-       VoiceReminderService().updateRiskTier(cachedTier);
        debugPrint("DailyRoutinePage: Pre-loaded Risk Tier from Cache: $cachedTier");
     }
   }
@@ -96,17 +95,15 @@ class _DailyRoutinePageState extends State<DailyRoutinePage> with SingleTickerPr
   // Fetch Fresh Risk Tier
   Future<void> _fetchRiskProfile() async {
      try {
-       // Network Fetch
-       final prefs = await SharedPreferences.getInstance();
-       final UserService userService = UserService();
+        final prefs = await SharedPreferences.getInstance();
+        final UserService userService = UserService();
 
-       // 2. Fetch Fresh
-       // Use Service URL Logic
-       final UserService userService = UserService();
-       final baseUrl = userService.baseUrl;
-       
-       final url = Uri.parse("$baseUrl/api/ai/check_profile/$effectiveUid");
-       final response = await http.get(url);
+        // 2. Fetch Fresh
+        // Use Service URL Logic
+        final baseUrl = userService.baseUrl;
+        
+        final url = Uri.parse("$baseUrl/api/ai/check_profile/$effectiveUid");
+        final response = await http.get(url);
         if (response.statusCode == 200) {
            final data = json.decode(response.body);
            debugPrint("Profile Debug: received data: $data");
@@ -128,7 +125,6 @@ class _DailyRoutinePageState extends State<DailyRoutinePage> with SingleTickerPr
                    _riskTier = freshTier;
                 });
                 print("Updated Risk Tier from Network: $_riskTier");
-                VoiceReminderService().updateRiskTier(freshTier); // 👈 SYNC TO SERVICE
                 _scheduleTieredReminders();
              }
           }
@@ -615,8 +611,8 @@ class _DailyRoutinePageState extends State<DailyRoutinePage> with SingleTickerPr
      
      // 3. Call Backend AI
      try {
-         final UserService userService = UserService();
-         final baseUrl = userService.baseUrl;
+          final UserService userService = UserService();
+          final baseUrl = userService.baseUrl;
          
          final res = await http.post(
           Uri.parse('$baseUrl/api/ai/process_voice_command'),
