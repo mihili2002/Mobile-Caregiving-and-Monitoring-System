@@ -18,11 +18,18 @@ import 'features/voice_chatbot/screens/chat_screen.dart';
 // App theme (use YOUR existing theme file path here)
 import 'features/voice_chatbot/theme/app_theme.dart';
 
+import 'services/local_notification_service.dart';
+
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
+  // ✅ Initialize local notifications (requests permissions inside service if you implemented it)
+  await LocalNotificationService.instance.init();
+
   runApp(const MyApp());
 }
 
