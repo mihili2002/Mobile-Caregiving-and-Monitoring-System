@@ -28,7 +28,7 @@ class _VoiceChatbotPageState extends State<VoiceChatbotPage> {
   
   bool _isListening = false;
   bool _isSpeaking = false;
-  String _statusText = "Hold to record your thoughts";
+  String _statusText = "Alex is listening...";
   String _liveWords = "";
   String _finalWords = "";
 
@@ -43,13 +43,35 @@ class _VoiceChatbotPageState extends State<VoiceChatbotPage> {
     _sessionId = const Uuid().v4();
     _initVoice();
     
-    // Auto-prompt logic
-    if (widget.initialPrompt != null) {
-       Future.delayed(const Duration(milliseconds: 500), () async {
-          await _voiceService.init(); // ensure init
-          await _voiceService.speak(widget.initialPrompt!);
-          if (mounted) _startListening();
-       });
+    // Auto-greet logic
+    Future.delayed(const Duration(milliseconds: 500), () async {
+        await _voiceService.init();
+        if (widget.initialPrompt != null) {
+            await _voiceService.speak(widget.initialPrompt!);
+            if (mounted) _startListening();
+        } else {
+            await _fetchGreeting();
+        }
+    });
+  }
+
+  Future<void> _fetchGreeting() async {
+    try {
+      final baseUrl = UserService.getApiUrl(context);
+      final response = await http.get(Uri.parse('$baseUrl/api/ai/greet?uid=${widget.user.uid}'));
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final reply = data['reply'] ?? "Hello! I'm Alex.";
+        if (mounted) {
+          setState(() {
+            _aiReply = reply;
+          });
+          await _voiceService.speak(reply);
+          _startListening();
+        }
+      }
+    } catch (e) {
+      print("Error fetching greeting: $e");
     }
   }
   
@@ -155,7 +177,7 @@ class _VoiceChatbotPageState extends State<VoiceChatbotPage> {
     if (capturedText.isNotEmpty) {
       await _processVoiceCommand(capturedText);
     } else {
-      setState(() => _statusText = "Hold to record your thoughts");
+      setState(() => _statusText = "Alex is waiting for you...");
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("I didn't hear anything. Please try again.")),
@@ -200,13 +222,12 @@ class _VoiceChatbotPageState extends State<VoiceChatbotPage> {
 
               _voiceService.setCompletionHandler(() async {
                   if (!mounted) return;
-                  
-                  setState(() {
-                    _isSpeaking = false;
-                    if (!_isConfirmation) {
-                       _statusText = "Hold to record your thoughts";
-                    }
-                  });
+                                    setState(() {
+                      _isSpeaking = false;
+                      if (!_isConfirmation) {
+                         _statusText = "Alex is listening...";
+                      }
+                    });
 
                   if (action == 'close') {
                       await Future.delayed(const Duration(seconds: 2));
@@ -226,8 +247,8 @@ class _VoiceChatbotPageState extends State<VoiceChatbotPage> {
                if (mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text('AI: $reply'),
-                    backgroundColor: Colors.blue,
+                    content: Text('Alex: $reply'),
+                    backgroundColor: Colors.teal,
                     duration: const Duration(seconds: 5),
                   ),
                 );
@@ -256,7 +277,7 @@ class _VoiceChatbotPageState extends State<VoiceChatbotPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Voice Assistant', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text('Alex - Routine Coach', style: TextStyle(fontWeight: FontWeight.bold)),
         centerTitle: true,
         backgroundColor: Colors.teal,
         foregroundColor: Colors.white,
@@ -279,13 +300,13 @@ class _VoiceChatbotPageState extends State<VoiceChatbotPage> {
                        borderRadius: BorderRadius.circular(12),
                        border: Border.all(color: Colors.grey.shade300),
                      ),
-                     child: Text(
-                       _aiReply.isNotEmpty ? "AI: $_aiReply" : (_liveWords.isNotEmpty ? "You: $_liveWords" : "Conversation will appear here..."),
-                       style: TextStyle(
-                          fontSize: 18, 
-                          color: _aiReply.isNotEmpty ? Colors.blue[800] : Colors.black87
-                       ),
-                     ),
+                      child: Text(
+                        _aiReply.isNotEmpty ? "Alex: $_aiReply" : (_liveWords.isNotEmpty ? "You: $_liveWords" : "Let's talk..."),
+                        style: TextStyle(
+                           fontSize: 18, 
+                           color: _aiReply.isNotEmpty ? Colors.teal[800] : Colors.black87
+                        ),
+                      ),
                    ),
                    
                    const SizedBox(height: 12),
@@ -427,15 +448,6 @@ class _VoiceChatbotPageState extends State<VoiceChatbotPage> {
                      ),
                    ),
                    const SizedBox(width: 8),
-                   IconButton(
-                     onPressed: () {
-                        if (_textController.text.trim().isNotEmpty) {
-                           _processVoiceCommand(_textController.text.trim());
-                        }
-                     }, 
-                     icon: const Icon(Icons.send, color: Colors.teal),
-                     tooltip: "Send",
-                   ),
                    IconButton(
                      onPressed: () {
                         if (_textController.text.trim().isNotEmpty) {
