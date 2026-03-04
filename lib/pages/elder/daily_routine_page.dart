@@ -275,8 +275,17 @@ class _DailyRoutinePageState extends State<DailyRoutinePage> with SingleTickerPr
     if (!mounted) return;
 
     setState(() {
-      // Deep Copy for Mutation
-      _planningCommon = List<Map<String, dynamic>>.from((suggestions['common'] as List? ?? []).map((x) => Map<String, dynamic>.from(x)));
+      // Deep Copy and Deduplicate Common Tasks by name
+      final rawCommon = suggestions['common'] as List? ?? [];
+      final Map<String, Map<String, dynamic>> uniqueCommon = {};
+      for (var x in rawCommon) {
+        final name = (x['task_name'] ?? "").toString().trim().toLowerCase();
+        if (name.isNotEmpty && !uniqueCommon.containsKey(name)) {
+          uniqueCommon[name] = Map<String, dynamic>.from(x);
+        }
+      }
+      _planningCommon = uniqueCommon.values.toList();
+      
       _planningMeds = List<Map<String, dynamic>>.from((suggestions['medications'] as List? ?? []).map((x) => Map<String, dynamic>.from(x)));
       _planningTherapy = List<Map<String, dynamic>>.from((suggestions['therapy'] as List? ?? []).map((x) => Map<String, dynamic>.from(x)));
       
@@ -413,6 +422,13 @@ class _DailyRoutinePageState extends State<DailyRoutinePage> with SingleTickerPr
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  String _getGreeting() {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return "Good Morning!";
+    if (hour < 17) return "Good Afternoon!";
+    return "Good Evening!";
   }
 
   // --- UI ---
@@ -714,7 +730,7 @@ class _DailyRoutinePageState extends State<DailyRoutinePage> with SingleTickerPr
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(_isToday ? "Good Morning! Set up your schedule." : "Planning for $_dateTitle", 
+          Text(_isToday ? "${_getGreeting()} Set up your schedule." : "Planning for $_dateTitle", 
                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.teal)),
           const SizedBox(height: 16),
           

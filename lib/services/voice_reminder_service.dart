@@ -4,6 +4,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'voice_service.dart';
 import 'notification_service.dart';
+import 'user_service.dart'; // 👈 NEW
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:audioplayers/audioplayers.dart';
 
 class VoiceReminderService {
   static final VoiceReminderService _instance = VoiceReminderService._internal();
@@ -11,14 +14,16 @@ class VoiceReminderService {
   VoiceReminderService._internal();
 
   final VoiceService _voiceService = VoiceService();
-  final NotificationService _notificationService = NotificationService(); // Helper
+  final NotificationService _notificationService = NotificationService();
+  final AudioPlayer _audioPlayer = AudioPlayer();
   
   List<dynamic> _tasks = [];
   String _riskTier = "Tier 1";
-  Timer? _timer;
-  final Set<String> _spokenTaskIds = {}; 
-  
   StreamSubscription<QuerySnapshot>? _subscription;
+  StreamSubscription<RemoteMessage>? _fcmSubscription;
+  
+  // NEW: Track played reminders locally for Web/Mobile sync
+  final Map<String, int> _lastPlayedCounts = {};
 
   // Restore helper methods
   void updateTasks(List<dynamic> tasks, String tier) {
@@ -46,8 +51,6 @@ class VoiceReminderService {
     final now = DateTime.now();
     final dateStr = DateFormat('yyyy-MM-dd').format(now);
     
-    // Use QuerySnapshot instead of DocumentSnapshot
-    // We listen to the schedules collection where uid matches and date matches today
     final query = FirebaseFirestore.instance
         .collection('schedules')
         .where('uid', isEqualTo: uid)
@@ -57,32 +60,121 @@ class VoiceReminderService {
     _subscription = query.snapshots().listen((querySnapshot) {
        if (querySnapshot.docs.isNotEmpty) {
           final data = querySnapshot.docs.first.data();
+          final String elderId = data['uid'] ?? uid;
+
           if (data['tasks'] != null) {
               final newTasks = List<dynamic>.from(data['tasks']);
+              
+              // TRIGGER: Check for reminder_count increases (FOR WEB/CHROME DEMO)
+              for (var task in newTasks) {
+                final taskId = task['id']?.toString() ?? "";
+                final currentCount = task['reminder_count'] ?? 0;
+                final lastCount = _lastPlayedCounts[taskId] ?? 0;
+
+                if (currentCount > lastCount) {
+                  debugPrint("🔊 FIRESTORE TRIGGER: Reminder count increased for $taskId ($lastCount -> $currentCount)");
+                  
+                  // Play the reminder manually since FCM might not work on Web
+                  _handleManualReminderTrigger(elderId, task);
+                  
+                  // Update tracking
+                  _lastPlayedCounts[taskId] = currentCount;
+                }
+              }
+
               updateTasks(newTasks, _riskTier);
           }
-       } else {
-          // No schedule yet for today, cleared tasks or empty
-          // updateTasks([], _riskTier); // Optional: clear tasks if day changed?
        }
     }, onError: (e) {
         debugPrint("VoiceReminderService: Firestore Listen Error: $e");
     });
   }
 
-  void start() {
-    if (_timer != null) return;
-    debugPrint("VoiceReminderService: Starting timer...");
-    _timer = Timer.periodic(const Duration(seconds: 15), (timer) {
-      _checkReminders();
+  void _handleManualReminderTrigger(String uid, Map<String, dynamic> task) {
+    final taskName = task['task_name'] ?? task['taskName'] ?? "Task";
+    final category = task['type'] ?? task['category'] ?? "common";
+    final taskId = task['id'] ?? task['taskId'] ?? "";
+    
+    // Construct the same audio URL the backend uses
+    final audioUrl = "http://127.0.0.1:8000/api/audio/$uid/$taskId";
+    
+    debugPrint("🔊 Triggering Local Playback for: $taskName");
+    
+    // Reuse the existing handler
+    final message = RemoteMessage(
+      data: {
+        'type': 'VOICE_REMINDER',
+        'taskName': taskName,
+        'audioUrl': audioUrl,
+        'category': category,
+      }
+    );
+    _handleVoiceReminder(message);
+  }
+
+  void start(String uid) async {
+    debugPrint("VoiceReminderService: Starting service for $uid...");
+    
+    if (kIsWeb) {
+      debugPrint("VoiceReminderService: Web platform detected. Skipping FCM token registration (Mobile only).");
+    } else {
+      // 1. Get FCM Token and update backend (Mobile Only)
+      try {
+        String? token = await FirebaseMessaging.instance.getToken();
+        if (token != null) {
+          debugPrint("VoiceReminderService: FCM Token retrieved: ${token.substring(0, 10)}...");
+          bool success = await UserService().updateFCMToken(uid, token);
+          if (success) {
+            debugPrint("VoiceReminderService: FCM Token registered successfully");
+          } else {
+            debugPrint("VoiceReminderService: FCM Token registration failed");
+          }
+        } else {
+          debugPrint("VoiceReminderService: Could not retrieve FCM Token");
+        }
+      } catch (e) {
+        debugPrint("VoiceReminderService: Error during FCM registration: $e");
+      }
+    }
+
+    // 2. Listen for foreground messages
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      _handleVoiceReminder(message);
+    });
+
+    // 3. Handle background messages
+    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+      _handleVoiceReminder(message);
     });
   }
 
+  void _handleVoiceReminder(RemoteMessage message) async {
+    if (message.data['type'] == 'VOICE_REMINDER') {
+      final taskName = message.data['taskName'];
+      final audioUrl = message.data['audioUrl'];
+      final category = message.data['category'];
+      
+      debugPrint("🔊 Voice Reminder Received: $taskName, Type: $category");
+      
+      try {
+        if (audioUrl != null && audioUrl.isNotEmpty) {
+          await _audioPlayer.play(UrlSource(audioUrl));
+        } else {
+          // Fallback to local TTS if no audio URL provided
+          await _voiceService.speak("Reminder: it is time for $taskName.");
+        }
+      } catch (e) {
+        debugPrint("Error playing voice reminder: $e");
+      }
+    }
+  }
+
   void stop() {
-    _timer?.cancel();
-    _timer = null;
     _subscription?.cancel();
     _subscription = null;
+    _fcmSubscription?.cancel();
+    _fcmSubscription = null;
+    _audioPlayer.dispose();
   }
 
   // NEW: Schedule Local Notifications for reliability
@@ -127,62 +219,4 @@ class VoiceReminderService {
     }
   }
 
-  void _checkReminders() async {
-    final now = DateTime.now();
-    final currentHour = now.hour;
-    final currentMinute = now.minute;
-    final int currentTotalMinutes = currentHour * 60 + currentMinute;
-
-    // Policy Offsets
-    List<int> offsets = [0];
-    if (_riskTier.contains("Tier 3") || _riskTier.contains("High")) {
-      offsets = [0, 10, 20];
-    } else if (_riskTier.contains("Tier 2") || _riskTier.contains("Medium")) {
-      offsets = [0, 15];
-    }
-
-    for (var task in _tasks) {
-      if (task['completed'] == true) continue;
-      
-      final timeStr = task['time']?.toString() ?? "";
-      if (!timeStr.contains(":")) continue;
-
-      try {
-        final parts = timeStr.split(":");
-        final taskHour = int.parse(parts[0]);
-        final taskMinute = int.parse(parts[1]);
-        final int taskTotalMinutes = taskHour * 60 + taskMinute;
-
-        final int diff = currentTotalMinutes - taskTotalMinutes;
-
-        if (offsets.contains(diff)) {
-          final taskId = task['id']?.toString() ?? task['task_name']?.toString() ?? "";
-          final uniqueKey = "${taskId}_${currentTotalMinutes}";
-
-          if (!_spokenTaskIds.contains(uniqueKey)) {
-            _spokenTaskIds.add(uniqueKey);
-            
-            String reminderMsg = task['task_name'] ?? "task";
-            if (diff > 0) {
-               reminderMsg = "Reminder: you haven't finished $reminderMsg yet.";
-            }
-            
-            debugPrint("🔊 Speaking reminder for: $reminderMsg (diff $diff)");
-            await _voiceService.speakReminder(reminderMsg);
-          }
-        }
-      } catch (e) {
-        debugPrint("VoiceReminderService: Error parsing time '$timeStr': $e");
-      }
-    }
-
-    // Cleanup old spoken IDs (keep a window of 30 mins)
-    _spokenTaskIds.removeWhere((key) {
-       try {
-         final parts = key.split("_");
-         final timeMark = int.parse(parts.last);
-         return (currentTotalMinutes - timeMark).abs() > 30;
-       } catch(_) { return true; }
-    });
-  }
 }
