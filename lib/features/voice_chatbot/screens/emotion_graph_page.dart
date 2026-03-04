@@ -1,0 +1,322 @@
+import 'dart:convert';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:fl_chart/fl_chart.dart';
+import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+
+class EmotionGraphPage extends StatefulWidget {
+  final String elderId;
+  final String apiBaseUrl;
+
+  const EmotionGraphPage({
+    super.key,
+    required this.elderId,
+    required this.apiBaseUrl,
+  });
+
+  @override
+  State<EmotionGraphPage> createState() => _EmotionGraphPageState();
+}
+
+class _EmotionGraphPageState extends State<EmotionGraphPage> {
+  bool _loading = true;
+  String? _error;
+
+  // Points for chart
+  List<_EmotionPoint> _points = [];
+
+  // Optional: filter range (simple example)
+  int _days = 7;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    try {
+      final token = await FirebaseAuth.instance.currentUser?.getIdToken(true);
+      if (token == null) throw Exception('Not logged in');
+
+      // Example endpoint (you implement in backend)
+      // You can also pass ?days=7 to filter server-side
+      final uri = Uri.parse(
+        '${widget.apiBaseUrl}/chatbot/journals/emotion-trend'
+        '?elder_uid=${Uri.encodeComponent(widget.elderId)}'
+        '&days=$_days',
+      );
+
+      final res = await http.get(
+        uri,
+        headers: {'Authorization': 'Bearer $token'},
+      );
+
+      if (res.statusCode < 200 || res.statusCode >= 300) {
+        throw Exception('Server error ${res.statusCode}: ${res.body}');
+      }
+
+      final data = jsonDecode(res.body) as Map<String, dynamic>;
+      final items = (data['items'] as List<dynamic>? ?? []);
+
+      final parsed = items.map((e) {
+        final m = e as Map<String, dynamic>;
+        final ts = DateTime.parse(m['created_at'] as String);
+        final emotion = (m['emotion'] ?? 'unknown').toString();
+        final confidence = (m['confidence'] is num) ? (m['confidence'] as num).toDouble() : null;
+        return _EmotionPoint(
+          createdAt: ts,
+          emotion: emotion,
+          confidence: confidence,
+          score: _emotionToScore(emotion),
+        );
+      }).toList();
+
+      // Sort by time
+      parsed.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+
+      setState(() {
+        _points = parsed;
+        _loading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = e.toString();
+        _loading = false;
+      });
+    }
+  }
+
+  // Map emotion labels -> numeric score (adjust to match your model labels)
+  // Higher = happier, lower = sadder
+  double _emotionToScore(String emotion) {
+    final key = emotion.toLowerCase();
+    if (key.contains('happy') || key.contains('excited')) return 2;
+    if (key.contains('neutral') || key.contains('calm')) return 1;
+    if (key.contains('sad') || key.contains('depressed')) return 0;
+    if (key.contains('angry')) return 0.5;
+    if (key.contains('fear') || key.contains('anx')) return 0.5;
+    return 1; // fallback
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final primary = Theme.of(context).colorScheme.primary;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Emotion Fluctuations'),
+      ),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              // Simple range picker
+              Row(
+                children: [
+                  const Text('Range:'),
+                  const SizedBox(width: 12),
+                  DropdownButton<int>(
+                    value: _days,
+                    items: const [
+                      DropdownMenuItem(value: 7, child: Text('Last 7 days')),
+                      DropdownMenuItem(value: 30, child: Text('Last 30 days')),
+                      DropdownMenuItem(value: 90, child: Text('Last 90 days')),
+                    ],
+                    onChanged: (v) {
+                      if (v == null) return;
+                      setState(() => _days = v);
+                      _load();
+                    },
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    tooltip: 'Refresh',
+                    onPressed: _load,
+                    icon: const Icon(Icons.refresh),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 12),
+
+              Expanded(
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.black.withOpacity(0.08)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.04),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: _loading
+                      ? const Center(child: CircularProgressIndicator(strokeWidth: 2.5))
+                      : _error != null
+                          ? _ErrorView(message: _error!, onRetry: _load)
+                          : _points.isEmpty
+                              ? const Center(child: Text('No emotion data found for this range.'))
+                              : _EmotionLineChart(points: _points, primary: primary),
+                ),
+              ),
+
+              const SizedBox(height: 12),
+
+              // Legend / mapping
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Scale: 0 = Sad/Depressed, 1 = Neutral/Calm, 2 = Happy/Excited',
+                  style: TextStyle(color: Colors.black54),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _EmotionLineChart extends StatelessWidget {
+  final List<_EmotionPoint> points;
+  final Color primary;
+
+  const _EmotionLineChart({
+    required this.points,
+    required this.primary,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    // Use index as X (simple). Tooltip will show timestamp + emotion.
+    final spots = <FlSpot>[];
+    for (int i = 0; i < points.length; i++) {
+      spots.add(FlSpot(i.toDouble(), points[i].score));
+    }
+
+    return LineChart(
+      LineChartData(
+        minY: -0.1,
+        maxY: 2.2,
+        gridData: const FlGridData(show: true),
+        borderData: FlBorderData(show: true),
+        titlesData: FlTitlesData(
+          rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          bottomTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 28,
+              interval: (points.length <= 8) ? 1 : (points.length / 6).ceilToDouble(),
+              getTitlesWidget: (value, meta) {
+                final i = value.toInt();
+                if (i < 0 || i >= points.length) return const SizedBox.shrink();
+                final dt = points[i].createdAt;
+                final label = '${dt.month}/${dt.day}';
+                return Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Text(label, style: const TextStyle(fontSize: 11, color: Colors.black54)),
+                );
+              },
+            ),
+          ),
+          leftTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 34,
+              interval: 1,
+              getTitlesWidget: (value, meta) {
+                String label = value.toInt().toString();
+                return Text(label, style: const TextStyle(fontSize: 11, color: Colors.black54));
+              },
+            ),
+          ),
+        ),
+        lineTouchData: LineTouchData(
+          enabled: true,
+          touchTooltipData: LineTouchTooltipData(
+            getTooltipItems: (touchedSpots) {
+              return touchedSpots.map((s) {
+                final i = s.x.toInt();
+                if (i < 0 || i >= points.length) return null;
+                final p = points[i];
+                final dt = p.createdAt;
+                final time = '${dt.year}-${_two(dt.month)}-${_two(dt.day)} ${_two(dt.hour)}:${_two(dt.minute)}';
+                return LineTooltipItem(
+                  '$time\n${p.emotion}\nscore=${p.score.toStringAsFixed(1)}',
+                  const TextStyle(color: Colors.white, fontSize: 12),
+                );
+              }).toList();
+            },
+          ),
+        ),
+        lineBarsData: [
+          LineChartBarData(
+            spots: spots,
+            isCurved: true,
+            barWidth: 3,
+            dotData: const FlDotData(show: true),
+            belowBarData: BarAreaData(show: true),
+            color: primary,
+          ),
+        ],
+      ),
+    );
+  }
+
+  static String _two(int x) => x.toString().padLeft(2, '0');
+}
+
+class _ErrorView extends StatelessWidget {
+  final String message;
+  final VoidCallback onRetry;
+
+  const _ErrorView({required this.message, required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.error_outline, color: Colors.red),
+          const SizedBox(height: 8),
+          Text(message, textAlign: TextAlign.center),
+          const SizedBox(height: 12),
+          ElevatedButton.icon(
+            onPressed: onRetry,
+            icon: const Icon(Icons.refresh),
+            label: const Text('Retry'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _EmotionPoint {
+  final DateTime createdAt;
+  final String emotion;
+  final double? confidence;
+  final double score;
+
+  _EmotionPoint({
+    required this.createdAt,
+    required this.emotion,
+    required this.score,
+    this.confidence,
+  });
+}

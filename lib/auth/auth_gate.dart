@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../main.dart';
+
 import '../widgets/role_based_wrapper.dart';
 import 'login_page.dart';
 
@@ -19,11 +19,11 @@ class AuthGate extends StatelessWidget {
         }
 
         if (snapshot.hasData) {
-          // Show role based wrapper
+          // Logged in -> route by role
           return const RoleBasedWrapper();
         }
 
-        // Show login page when logged out
+        // Logged out
         return const LoginPage();
       },
     );
