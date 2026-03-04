@@ -1,17 +1,23 @@
 import 'package:flutter/material.dart';
-import 'features/voice_chatbot/screens/chat_screen.dart';
+
+// ✅ Correct package import
+import 'package:mobile_caregiving_and_monitoring_system/features/voice_chatbot/screens/chat_screen.dart';
+
 import 'pages/elder/daily_routine_page.dart';
 import 'ElderProfilePage.dart';
 import 'models/user_model.dart';
 
-// ✅ Your Meal Plan Dashboard
+// Meal Plan Dashboard
 import 'pages/elder/meal_plans/elder_meal_plan_dashboard.dart';
 
 import 'pages/elder/therapist_support/elder_therapist_support_page.dart';
 
-
 import 'pages/elder/widgets/quick_stats_widget.dart'; // optional
 import './RoutineHome.dart';
+
+// ✅ NEW IMPORT: Journaling page
+//import 'pages/elder/journaling/journal_record_page.dart';
+import '../../features/voice_chatbot/screens/journal_record_page.dart';
 
 class ElderDashboard extends StatelessWidget {
   final AppUser user;
@@ -19,11 +25,10 @@ class ElderDashboard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // ✅ Use theme colors instead of hardcoded brown
     final scheme = Theme.of(context).colorScheme;
 
-    final primary = scheme.primary; // main green
-    final secondary = scheme.secondary; // green dark
+    final primary = scheme.primary;
+    final secondary = scheme.secondary;
     final bgTop = Theme.of(context).scaffoldBackgroundColor;
     final bgBottom = scheme.background;
 
@@ -45,7 +50,6 @@ class ElderDashboard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // ---------------- Top Bar ----------------
                 Row(
                   children: [
                     Container(
@@ -53,7 +57,7 @@ class ElderDashboard extends StatelessWidget {
                       height: 44,
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(14),
-                        gradient: LinearGradient(
+                        gradient: const LinearGradient(
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                           colors: [Color(0xFF11BFA8), Color(0xFF11BFA8)],
@@ -106,10 +110,8 @@ class ElderDashboard extends StatelessWidget {
                     ),
                   ],
                 ),
-
                 const SizedBox(height: 16),
 
-                // ---------------- Welcome Card ----------------
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
@@ -167,7 +169,6 @@ class ElderDashboard extends StatelessWidget {
 
                 const SizedBox(height: 16),
 
-                // ---------------- Grid of Feature Cards ----------------
                 Expanded(
                   child: GridView.count(
                     crossAxisCount: 2,
@@ -183,7 +184,26 @@ class ElderDashboard extends StatelessWidget {
                         onTap: () {
                           Navigator.push(
                             context,
-                            MaterialPageRoute(builder: (_) => const ChatScreen()),
+                            MaterialPageRoute(
+                              builder: (_) => ChatScreen(elderUid: user.uid),
+                            ),
+                          );
+                        },
+                      ),
+
+                      // ✅ NEW CARD: Record Journal
+                      _FeatureCard(
+                        title: 'Record Journal',
+                        subtitle: 'Record your diary by voice',
+                        icon: Icons.mic_none,
+                        gradient: [primary, secondary],
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  JournalRecordPage(elderId: user.uid),
+                            ),
                           );
                         },
                       ),
@@ -206,7 +226,6 @@ class ElderDashboard extends StatelessWidget {
                         },
                       ),
 
-                      // ✅ Meal Planner (NOW opens Elder Meal Plan Dashboard)
                       _FeatureCard(
                         title: 'Meal Planner',
                         subtitle: 'Healthy meals',
@@ -231,7 +250,8 @@ class ElderDashboard extends StatelessWidget {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => ElderTherapistSupportPage(user: user),
+                              builder: (_) =>
+                                  ElderTherapistSupportPage(user: user),
                             ),
                           );
                         },
@@ -291,7 +311,6 @@ class _FeatureCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Icon badge
                 Container(
                   width: 52,
                   height: 52,
@@ -302,19 +321,10 @@ class _FeatureCard extends StatelessWidget {
                       end: Alignment.bottomRight,
                       colors: gradient,
                     ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.10),
-                        blurRadius: 14,
-                        offset: const Offset(0, 10),
-                      ),
-                    ],
                   ),
                   child: Icon(icon, color: Colors.white, size: 28),
                 ),
-
                 const SizedBox(height: 12),
-
                 Text(
                   title,
                   style: TextStyle(
@@ -323,9 +333,7 @@ class _FeatureCard extends StatelessWidget {
                     color: titleColor,
                   ),
                 ),
-
                 const SizedBox(height: 6),
-
                 Text(
                   subtitle,
                   style: TextStyle(
@@ -334,9 +342,7 @@ class _FeatureCard extends StatelessWidget {
                     height: 1.25,
                   ),
                 ),
-
                 const Spacer(),
-
                 Row(
                   children: [
                     Text(
