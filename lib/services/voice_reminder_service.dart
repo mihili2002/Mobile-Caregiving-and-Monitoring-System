@@ -28,10 +28,9 @@ class VoiceReminderService {
   final Set<String> _spokenKeys = {}; // NEW: Prevents duplicate voice announcements
 
   // Restore helper methods
-  void updateTasks(List<dynamic> tasks, String tier) {
+  void updateTasks(List<dynamic> tasks) {
     _tasks = tasks;
-    _riskTier = tier;
-    debugPrint("VoiceReminderService: Updated with ${tasks.length} tasks and Tier: $tier");
+    debugPrint("VoiceReminderService: Updated with ${tasks.length} tasks (Current Tier: $_riskTier)");
     
     // Schedule Local Notifications immediately
     _scheduleNotificationsForTasks();
@@ -41,8 +40,14 @@ class VoiceReminderService {
   }
 
   void updateRiskTier(String tier) {
+    if (_riskTier == tier) return; // Skip if no change
+    
+    final oldTier = _riskTier;
     _riskTier = tier;
-    debugPrint("VoiceReminderService: Updated Risk Tier to $tier");
+    debugPrint("🔊 RISK TIER SYNC: $oldTier -> $_riskTier");
+    
+    // Trigger check immediately on tier change
+    _checkLocalReminders();
     _startChecking();
   }
 
@@ -50,7 +55,7 @@ class VoiceReminderService {
   void _startChecking() {
     if (_checkTimer != null) return;
     
-    debugPrint("VoiceReminderService: Starting periodic check timer...");
+    debugPrint("VoiceReminderService: Starting periodic check timer (30s interval)...");
     _checkTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
       _checkLocalReminders();
     });
@@ -60,16 +65,15 @@ class VoiceReminderService {
   }
 
   void _checkLocalReminders() {
-    if (_tasks.isEmpty) return;
+    if (_tasks.isEmpty) {
+      debugPrint("VoiceReminderService: No tasks to check.");
+      return;
+    }
     
     final now = DateTime.now();
     final currentMinutes = now.hour * 60 + now.minute;
-    final dateStr = DateFormat('yyyy-MM-dd').format(now);
     
-    // Only check if it's "today" relative to the service's context if needed
-    // For now, we assume _tasks are for today.
-    
-    List<int> offsets = _getTierOffsets(_riskTier);
+    debugPrint("VoiceReminderService: Checking ${_tasks.length} tasks for reminders (Risk Tier: $_riskTier, Time: ${now.hour}:${now.minute})");
     
     for (var task in _tasks) {
       if (task['completed'] == true) continue;
@@ -83,20 +87,40 @@ class VoiceReminderService {
         
         int diff = currentMinutes - taskMinutes;
         
-        if (offsets.contains(diff)) {
-          // Unique Key: TaskID + Offset
+        // 1. Standard/Tier-based triggers
+        bool shouldRemind = false;
+        if (diff < 0) continue; // Future task
+
+        if (_riskTier.contains("Tier 3") || _riskTier.contains("High")) {
+          // Tier 3: Every 2 minutes indefinitely
+          shouldRemind = diff % 2 == 0;
+        } else if (_riskTier.contains("Tier 2")) {
+          // Tier 2: 0, 2, 4, 6, 8 (5 total)
+          shouldRemind = diff % 2 == 0 && diff <= 8;
+        } else {
+          // Default / Tier 1: 0, 2
+          shouldRemind = diff == 0 || diff == 2;
+        }
+
+        // 2. Forgotten Task Logic (All Tiers)
+        if (diff == 30) {
+           shouldRemind = true;
+        }
+
+        if (shouldRemind) {
+          // Unique Key: TaskID + the specific minute we are reminding at
           final key = "${task['id']}_$diff";
           
           if (!_spokenKeys.contains(key)) {
             String taskName = task['task_name'] ?? "Task";
-            debugPrint("🔊 LOCAL TRIGGER: Speaking reminder for $taskName at diff $diff");
+            debugPrint("🔊 TRIGGER: Speaking reminder for $taskName at diff $diff (Tier: $_riskTier)");
             
-            String msg = taskName;
-            if (diff > 0) {
-              msg = "Reminder: You haven't finished $taskName yet. It's time.";
-              _voiceService.speak(msg);
+            if (diff == 30) {
+               _voiceService.speak("Reminder: You haven't finished $taskName yet. Please try to complete it at least now.");
+            } else if (diff > 0) {
+               _voiceService.speak("Reminder: You haven't finished $taskName yet. It's time.");
             } else {
-              _voiceService.speakReminder(taskName);
+               _voiceService.speakReminder(taskName);
             }
             
             _spokenKeys.add(key);
@@ -106,12 +130,6 @@ class VoiceReminderService {
         debugPrint("VoiceReminderService: Error parsing task time: $e");
       }
     }
-  }
-
-  List<int> _getTierOffsets(String tier) {
-    if (tier.contains("Tier 3") || tier.contains("High")) return [0, 10, 20];
-    if (tier.contains("Tier 2")) return [0, 15];
-    return [0];
   }
 
   // Start listening to Firestore for real-time updates

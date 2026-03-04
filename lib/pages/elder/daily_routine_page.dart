@@ -56,7 +56,19 @@ class _DailyRoutinePageState extends State<DailyRoutinePage> with SingleTickerPr
   void initState() {
     super.initState();
     effectiveUid = widget.elderId ?? FirebaseAuth.instance.currentUser!.uid;
+    _loadCachedTier(); // NEW: Load cache early
     _initServices();
+  }
+
+  // Load Tier from cache immediately to avoid "Tier 1" flash in Service
+  Future<void> _loadCachedTier() async {
+    final prefs = await SharedPreferences.getInstance();
+    final cachedTier = prefs.getString('cached_risk_tier');
+    if (cachedTier != null && mounted) {
+       setState(() => _riskTier = cachedTier);
+       VoiceReminderService().updateRiskTier(cachedTier);
+       debugPrint("DailyRoutinePage: Pre-loaded Risk Tier from Cache: $cachedTier");
+    }
   }
 
   Future<void> _initServices() async {
@@ -81,20 +93,12 @@ class _DailyRoutinePageState extends State<DailyRoutinePage> with SingleTickerPr
   }
 
   String _riskTier = "Tier 1"; // Default
-  // Fetch Risk Tier
+  // Fetch Fresh Risk Tier
   Future<void> _fetchRiskProfile() async {
      try {
-       // 1. Try Cache First
+       // Network Fetch
        final prefs = await SharedPreferences.getInstance();
-       final cachedTier = prefs.getString('cached_risk_tier');
-       if (cachedTier != null && mounted) {
-          setState(() {
-             _riskTier = cachedTier;
-          });
-          print("Loaded Cached Risk Tier: $_riskTier");
-          VoiceReminderService().updateRiskTier(_riskTier);
-          _scheduleTieredReminders();
-       }
+       final UserService userService = UserService();
 
        // 2. Fetch Fresh
        // Use Service URL Logic
@@ -124,6 +128,7 @@ class _DailyRoutinePageState extends State<DailyRoutinePage> with SingleTickerPr
                    _riskTier = freshTier;
                 });
                 print("Updated Risk Tier from Network: $_riskTier");
+                VoiceReminderService().updateRiskTier(freshTier); // 👈 SYNC TO SERVICE
                 _scheduleTieredReminders();
              }
           }
@@ -184,7 +189,7 @@ class _DailyRoutinePageState extends State<DailyRoutinePage> with SingleTickerPr
     
      // 3. Update Voice Reminder Service
      if (mounted && _isToday) {
-        VoiceReminderService().updateTasks(tasks, _riskTier);
+        VoiceReminderService().updateTasks(tasks);
      }
 
      // 4. Schedule Notifications for existing tasks
