@@ -17,6 +17,8 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
   String _drugName = '';
   String _dosage = '';
   String _selectedTiming = 'before_breakfast';
+  DateTime _startDate = DateTime.now();
+  DateTime _endDate = DateTime.now().add(const Duration(days: 7));
   bool _isLoading = false;
 
   final Map<String, String> _timingOptions = {
@@ -28,6 +30,28 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
     'after_dinner': 'After Dinner ~ 19:30',
     'bedtime': 'Bedtime ~ 21:00',
   };
+
+  Future<void> _selectDate(BuildContext context, bool isStart) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: isStart ? _startDate : _endDate,
+      firstDate: DateTime(2024),
+      lastDate: DateTime(2101),
+    );
+    if (picked != null) {
+      setState(() {
+        if (isStart) {
+          _startDate = picked;
+          // Ensure end date is not before start date
+          if (_endDate.isBefore(_startDate)) {
+            _endDate = _startDate.add(const Duration(days: 1));
+          }
+        } else {
+          _endDate = picked;
+        }
+      });
+    }
+  }
 
   void _saveForm() async {
     if (!_formKey.currentState!.validate()) return;
@@ -49,6 +73,8 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
       frequency: ["Daily"], // Defaulting to daily for meal-based meds
       times: [proxyTime], // Proxy for AI
       timing: _selectedTiming,
+      startDate: _startDate.toIso8601String().split('T')[0],
+      endDate: _endDate.toIso8601String().split('T')[0],
       isActive: true,
     );
 
@@ -140,6 +166,40 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
             const Text(
               "Note: AI will adjust reminders based on the Elder's actual meal times.",
               style: TextStyle(color: Colors.grey, fontSize: 12),
+            ),
+            const SizedBox(height: 20),
+            const Text("Duration Period", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: InkWell(
+                    onTap: () => _selectDate(context, true),
+                    child: InputDecorator(
+                      decoration: const InputDecoration(
+                        labelText: "Start Date",
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.calendar_today),
+                      ),
+                      child: Text("${_startDate.year}-${_startDate.month.toString().padLeft(2, '0')}-${_startDate.day.toString().padLeft(2, '0')}"),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: InkWell(
+                    onTap: () => _selectDate(context, false),
+                    child: InputDecorator(
+                      decoration: const InputDecoration(
+                        labelText: "End Date",
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.event),
+                      ),
+                      child: Text("${_endDate.year}-${_endDate.month.toString().padLeft(2, '0')}-${_endDate.day.toString().padLeft(2, '0')}"),
+                    ),
+                  ),
+                ),
+              ],
             ),
 
             const SizedBox(height: 30),

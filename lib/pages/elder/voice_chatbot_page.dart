@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+// import 'package:cloud_firestore/cloud_firestore.dart'; // Unused
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:permission_handler/permission_handler.dart';
 import 'package:http/http.dart' as http;
@@ -28,6 +28,7 @@ class _VoiceChatbotPageState extends State<VoiceChatbotPage> {
   
   bool _isListening = false;
   bool _isSpeaking = false;
+  bool _isRecallMode = false; // NEW
   String _statusText = "Alex is listening...";
   String _liveWords = "";
   String _finalWords = "";
@@ -71,7 +72,7 @@ class _VoiceChatbotPageState extends State<VoiceChatbotPage> {
         }
       }
     } catch (e) {
-      print("Error fetching greeting: $e");
+      debugPrint("Error fetching greeting: $e");
     }
   }
   
@@ -80,7 +81,7 @@ class _VoiceChatbotPageState extends State<VoiceChatbotPage> {
 
     bool available = await _speech.initialize(
       onStatus: (status) {
-        print("STT Status: $status");
+        debugPrint("STT Status: $status");
         if (!mounted) return;
 
         // Just update UI state, do NOT call stop here
@@ -91,7 +92,7 @@ class _VoiceChatbotPageState extends State<VoiceChatbotPage> {
         }
       },
       onError: (error) {
-        print("STT Error: $error");
+        debugPrint("STT Error: $error");
         if (!mounted) return;
         setState(() {
           _isListening = false;
@@ -113,16 +114,16 @@ class _VoiceChatbotPageState extends State<VoiceChatbotPage> {
     super.dispose();
   }
 
-
-
-  Future<void> _startListening() async {
+  Future<void> _startListening({bool isRecall = false}) async {
     if (_isSpeaking) return; // don't listen while speaking
 
     var status = await Permission.microphone.request();
     if (status != PermissionStatus.granted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Microphone permission needed')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Microphone permission needed')),
+        );
+      }
       return;
     }
 
@@ -132,7 +133,8 @@ class _VoiceChatbotPageState extends State<VoiceChatbotPage> {
 
     setState(() {
       _isListening = true;
-      _statusText = "Listening...";
+      _isRecallMode = isRecall;
+      _statusText = isRecall ? "Alex is focusing on your memories..." : "Listening...";
       _liveWords = "";
       _finalWords = "";
       _textController.clear();
@@ -172,10 +174,14 @@ class _VoiceChatbotPageState extends State<VoiceChatbotPage> {
         ? _finalWords.trim()
         : _liveWords.trim();
 
-    print("Captured final: '$capturedText'");
+    debugPrint("Captured final: '$capturedText'");
 
     if (capturedText.isNotEmpty) {
-      await _processVoiceCommand(capturedText);
+      if (_isRecallMode) {
+        await _processRecallCommand(capturedText);
+      } else {
+        await _processVoiceCommand(capturedText);
+      }
     } else {
       setState(() => _statusText = "Alex is waiting for you...");
       if (mounted) {
@@ -186,10 +192,63 @@ class _VoiceChatbotPageState extends State<VoiceChatbotPage> {
     }
   }
 
+  Future<void> _processRecallCommand(String text) async {
+    try {
+      setState(() {
+        _isSpeaking = true;
+        _statusText = "Analyzing memories...";
+      });
+      await _speech.stop();
+      
+      final baseUrl = UserService.getApiUrl(context);
+      final response = await http.post(
+        Uri.parse('$baseUrl/api/ai/recall_memory'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+            'uid': widget.user.uid,
+            'text': text,
+            'session_id': "${_sessionId}_recall",
+            'local_time': DateTime.now().toIso8601String(), // NEW
+        })
+      );
+      
+      if (response.statusCode == 200) {
+          final data = jsonDecode(response.body);
+          final reply = data['reply'] ?? "";
+
+          if (mounted) {
+            setState(() {
+              _aiReply = reply;
+              _statusText = "Speaking...";
+              _isConfirmation = false;
+              _taskPreview = null;
+            });
+          }
+
+          _voiceService.setCompletionHandler(() async {
+              if (!mounted) return;
+              setState(() {
+                _isSpeaking = false;
+                _statusText = "Alex is listening...";
+              });
+              _startListening(isRecall: true); // Stay in recall mode loop for companion experience
+          });
+
+          await _voiceService.speak(reply);
+      } else {
+        setState(() => _isSpeaking = false);
+      }
+    } catch (e) {
+      debugPrint("Error processing recall: $e");
+      setState(() => _isSpeaking = false);
+    }
+  }
+
   Future<void> _processVoiceCommand(String text) async {
       try {
           setState(() {
             _isSpeaking = true;
+            _isRecallMode = false;
           });
           await _speech.stop();
           
@@ -200,7 +259,8 @@ class _VoiceChatbotPageState extends State<VoiceChatbotPage> {
             body: jsonEncode({
                 'uid': widget.user.uid,
                 'text': text,
-                'session_id': _sessionId
+                'session_id': _sessionId,
+                'local_time': DateTime.now().toIso8601String(), // NEW
             })
           );
           
@@ -237,12 +297,7 @@ class _VoiceChatbotPageState extends State<VoiceChatbotPage> {
                   }
               });
 
-              // Construct spoken reply
-              String spokenReply = reply;
-              // Client-side echo removed to avoid redundancy
-              // if (isConfirmation) { ... }
-
-              await _voiceService.speak(spokenReply);
+              await _voiceService.speak(reply);
               
                if (mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -257,21 +312,21 @@ class _VoiceChatbotPageState extends State<VoiceChatbotPage> {
             setState(() => _isSpeaking = false);
           }
       } catch (e) {
-          print("Error processing voice: $e");
+          debugPrint("Error processing voice: $e");
           setState(() => _isSpeaking = false);
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
           }
       }
       
-      setState(() {
-          _liveWords = "";
-          _finalWords = "";
-          _textController.clear();
-      });
+      if (mounted) {
+        setState(() {
+            _liveWords = "";
+            _finalWords = "";
+            _textController.clear();
+        });
+      }
   }
-
-
 
   @override
   Widget build(BuildContext context) {
@@ -313,7 +368,11 @@ class _VoiceChatbotPageState extends State<VoiceChatbotPage> {
                    Text(
                      _statusText,
                      textAlign: TextAlign.center,
-                     style: const TextStyle(fontSize: 16, color: Colors.blueGrey),
+                     style: TextStyle(
+                       fontSize: 16, 
+                       color: _isRecallMode ? Colors.purple : Colors.blueGrey,
+                       fontWeight: _isRecallMode ? FontWeight.bold : FontWeight.normal,
+                     ),
                    ),
                    
                    const SizedBox(height: 20),
@@ -324,8 +383,8 @@ class _VoiceChatbotPageState extends State<VoiceChatbotPage> {
                         elevation: 4,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Column(
+                           padding: const EdgeInsets.all(16),
+                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               const Row(
@@ -380,41 +439,80 @@ class _VoiceChatbotPageState extends State<VoiceChatbotPage> {
       
                    const SizedBox(height: 40),
 
-                   // Voice button (Restored to Center)
-                   GestureDetector(
-                      onLongPressStart: (_) => _startListening(),
-                      onLongPressEnd: (_) => _stopListening(),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 300),
-                        width: _isListening ? 150 : 120,
-                        height: _isListening ? 150 : 120,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: _isListening ? Colors.redAccent : Colors.teal,
-                          boxShadow: [
-                            BoxShadow(
-                              color: (_isListening ? Colors.redAccent : Colors.teal).withOpacity(0.4),
-                              blurRadius: 20,
-                              spreadRadius: 10,
-                            )
-                          ],
-                        ),
-                        child: Icon(
-                          _isListening ? Icons.mic : Icons.mic_none,
-                          size: 48,
-                          color: Colors.white,
-                        ),
+                   // Split Microphones
+                   Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      // 1. General Coach Mic
+                      Column(
+                        children: [
+                          GestureDetector(
+                              onLongPressStart: (_) => _startListening(isRecall: false),
+                              onLongPressEnd: (_) => _stopListening(),
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 300),
+                                width: (_isListening && !_isRecallMode) ? 110 : 90,
+                                height: (_isListening && !_isRecallMode) ? 110 : 90,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: (_isListening && !_isRecallMode) ? Colors.redAccent : Colors.teal,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: ((_isListening && !_isRecallMode) ? Colors.redAccent : Colors.teal).withOpacity(0.4),
+                                      blurRadius: 15,
+                                      spreadRadius: 5,
+                                    )
+                                  ],
+                                ),
+                                child: const Icon(Icons.mic, size: 40, color: Colors.white),
+                              ),
+                          ),
+                          const SizedBox(height: 12),
+                          const Text("Alex", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.teal)),
+                        ],
                       ),
+                      
+                      const SizedBox(width: 40),
+
+                      // 2. Memory Recall Mic
+                      Column(
+                        children: [
+                          GestureDetector(
+                              onLongPressStart: (_) => _startListening(isRecall: true),
+                              onLongPressEnd: (_) => _stopListening(),
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 300),
+                                width: (_isListening && _isRecallMode) ? 110 : 90,
+                                height: (_isListening && _isRecallMode) ? 110 : 90,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: (_isListening && _isRecallMode) ? Colors.redAccent : Colors.purple,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: ((_isListening && _isRecallMode) ? Colors.redAccent : Colors.purple).withOpacity(0.4),
+                                      blurRadius: 15,
+                                      spreadRadius: 5,
+                                    )
+                                  ],
+                                ),
+                                child: const Icon(Icons.psychology, size: 40, color: Colors.white),
+                              ),
+                          ),
+                          const SizedBox(height: 12),
+                          const Text("Memory", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.purple)),
+                        ],
+                      ),
+                    ],
                    ),
                    
                    const SizedBox(height: 20),
                    if (_isListening) 
                       const Text("Listening...", style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
                       
-                   const SizedBox(height: 40),
+                   const SizedBox(height: 30),
                    
                     const Text(
-                      "Tap and hold the mic to speak, or type your message below.",
+                      "Hold 'Alex' to plan tasks.\nHold 'Memory' to recall past activities.",
                       textAlign: TextAlign.center,
                       style: TextStyle(color: Colors.grey, height: 1.5),
                     ),
@@ -438,12 +536,12 @@ class _VoiceChatbotPageState extends State<VoiceChatbotPage> {
                    Expanded(
                      child: TextField(
                        controller: _textController,
-                       decoration: const InputDecoration(
+                       decoration: InputDecoration(
                          hintText: "Type your message...",
-                         border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(24))),
-                         contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(24)),
+                         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                          filled: true,
-                         fillColor: Color(0xFFF5F5F5)
+                         fillColor: const Color(0xFFF5F5F5)
                        ),
                      ),
                    ),

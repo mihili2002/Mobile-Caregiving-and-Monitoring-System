@@ -176,6 +176,9 @@ class VoiceReminderService {
               
               // TRIGGER: Check for reminder_count increases (FOR WEB/CHROME DEMO)
               for (var task in newTasks) {
+                // Skip if task is completed - no reminders for finished tasks!
+                if (task['completed'] == true) continue;
+                
                 final taskId = task['id']?.toString() ?? "";
                 final currentCount = task['reminder_count'] ?? 0;
                 final lastCount = _lastPlayedCounts[taskId] ?? 0;

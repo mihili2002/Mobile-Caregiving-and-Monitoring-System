@@ -17,7 +17,9 @@ class ManageEldersPage extends StatefulWidget {
 class _ManageEldersPageState extends State<ManageEldersPage> {
   final _userService = UserService();
   List<AppUser> _elders = [];
+  List<AppUser> _filteredElders = [];
   bool _isLoading = true;
+  final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
@@ -34,6 +36,7 @@ class _ManageEldersPageState extends State<ManageEldersPage> {
       final elders = await _userService.getUsersByRole(UserRole.elder);
       setState(() {
         _elders = elders;
+        _filteredElders = elders;
         _isLoading = false;
       });
     } catch (e) {
@@ -66,6 +69,50 @@ class _ManageEldersPageState extends State<ManageEldersPage> {
         elevation: 0,
         backgroundColor: Colors.blue,
         foregroundColor: Colors.white,
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(60),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: TextField(
+              controller: _searchController,
+              onChanged: (value) {
+                setState(() {
+                  _filteredElders = _elders
+                      .where((elder) =>
+                          (elder.name ?? '')
+                              .toLowerCase()
+                              .contains(value.toLowerCase()) ||
+                          elder.email
+                              .toLowerCase()
+                              .contains(value.toLowerCase()))
+                      .toList();
+                });
+              },
+              decoration: InputDecoration(
+                hintText: 'Search by name or email...',
+                prefixIcon: const Icon(Icons.search, color: Colors.blue),
+                filled: true,
+                fillColor: Colors.white,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(30),
+                  borderSide: BorderSide.none,
+                ),
+                contentPadding: const EdgeInsets.symmetric(vertical: 0),
+                suffixIcon: _searchController.text.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () {
+                          _searchController.clear();
+                          setState(() {
+                            _filteredElders = _elders;
+                          });
+                        },
+                      )
+                    : null,
+              ),
+            ),
+          ),
+        ),
       ),
       body: Container(
         decoration: BoxDecoration(
@@ -104,14 +151,24 @@ class _ManageEldersPageState extends State<ManageEldersPage> {
                     )
                   : RefreshIndicator(
                       onRefresh: _loadElders,
-                      child: ListView.builder(
-                        padding: const EdgeInsets.all(16),
-                        itemCount: _elders.length,
-                        itemBuilder: (context, index) {
-                          final elder = _elders[index];
-                          return _buildElderCard(elder);
-                        },
-                      ),
+                      child: _filteredElders.isEmpty
+                          ? Center(
+                              child: Text(
+                                'No matching elders found',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                            )
+                          : ListView.builder(
+                              padding: const EdgeInsets.all(16),
+                              itemCount: _filteredElders.length,
+                              itemBuilder: (context, index) {
+                                final elder = _filteredElders[index];
+                                return _buildElderCard(elder);
+                              },
+                            ),
                     ),
         ),
       ),
@@ -232,5 +289,10 @@ class _ManageEldersPageState extends State<ManageEldersPage> {
         ),
       ),
     );
+  }
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 }
