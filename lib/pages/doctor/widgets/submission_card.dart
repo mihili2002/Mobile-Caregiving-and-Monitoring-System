@@ -173,7 +173,7 @@ class _SubmissionCardState extends State<SubmissionCard> {
                 child: Text(
                   expanded ? "Show Less" : "Show More",
                   style: const TextStyle(
-                    color: Color(0xFF8B5CF6),
+                    color: Color(0xFF11BFA8),
                     fontWeight: FontWeight.w800,
                   ),
                 ),
@@ -238,11 +238,11 @@ class _SubmissionCardState extends State<SubmissionCard> {
                 TextButton.icon(
                   onPressed: widget.onViewMealPlan,
                   icon: const Icon(Icons.remove_red_eye,
-                      size: 18, color: Color(0xFF8B5CF6)),
+                      size: 18, color: Color(0xFF11BFA8)),
                   label: const Text(
                     "View",
                     style: TextStyle(
-                        color: Color(0xFF8B5CF6),
+                        color: Color(0xFF11BFA8),
                         fontWeight: FontWeight.w800),
                   ),
                 ),
@@ -282,7 +282,7 @@ class _SubmissionCardState extends State<SubmissionCard> {
       width: double.infinity,
       child: ElevatedButton(
         style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFF8B5CF6),
+          backgroundColor: const Color(0xFF11BFA8),
           foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(vertical: 14),
           shape: RoundedRectangleBorder(

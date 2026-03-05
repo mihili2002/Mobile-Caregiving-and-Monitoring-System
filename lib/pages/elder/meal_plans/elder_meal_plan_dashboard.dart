@@ -118,7 +118,7 @@ class _ElderMealPlanDashboardState extends State<ElderMealPlanDashboard> {
                 _actionCard(
                   icon: Icons.description_outlined,
                   iconBg: const Color(0xFFF2E9FF),
-                  iconColor: const Color(0xFF8B5CF6),
+                  iconColor: const Color(0xFF11BFA8),
                   title: "Upload Health Details",
                   subtitle: "Submit your latest health data",
                   onTap: () {
