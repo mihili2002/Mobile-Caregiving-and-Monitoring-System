@@ -19,7 +19,7 @@ import './pages/elder/widgets/dashboard_header.dart';
 //import 'daily_routine_page.dart'; 
 import './pages/elder/daily_routine_page.dart';
 import './pages/elder/voice_chatbot_page.dart';
-import '../../services/voice_reminder_service.dart';
+import 'services/voice_reminder_service.dart';
 
 class RoleProfilePage extends StatefulWidget {
   final AppUser user;
@@ -37,7 +37,8 @@ class _RoleProfilePageState extends State<RoleProfilePage> {
   @override
   void initState() {
     super.initState();
-    _reminderService.start();
+    debugPrint("DEBUG: RoutineHome initState called for ${widget.user.uid}");
+    _reminderService.start(widget.user.uid);
     _reminderService.listen(widget.user.uid);
   }
 

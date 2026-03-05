@@ -36,6 +36,7 @@ class _DailyRoutinePageState extends State<DailyRoutinePage> with SingleTickerPr
   // Mode
   bool _isPlanningMode = false;
   bool _isLoading = false;
+  bool _hasError = false;
 
   // Data
   DateTime _selectedDate = DateTime.now();
@@ -55,7 +56,18 @@ class _DailyRoutinePageState extends State<DailyRoutinePage> with SingleTickerPr
   void initState() {
     super.initState();
     effectiveUid = widget.elderId ?? FirebaseAuth.instance.currentUser!.uid;
+    _loadCachedTier(); // NEW: Load cache early
     _initServices();
+  }
+
+  // Load Tier from cache immediately to avoid "Tier 1" flash in Service
+  Future<void> _loadCachedTier() async {
+    final prefs = await SharedPreferences.getInstance();
+    final cachedTier = prefs.getString('cached_risk_tier');
+    if (cachedTier != null && mounted) {
+       setState(() => _riskTier = cachedTier);
+       debugPrint("DailyRoutinePage: Pre-loaded Risk Tier from Cache: $cachedTier");
+    }
   }
 
   Future<void> _initServices() async {
@@ -80,30 +92,18 @@ class _DailyRoutinePageState extends State<DailyRoutinePage> with SingleTickerPr
   }
 
   String _riskTier = "Tier 1"; // Default
-  final Set<String> _remindedKeys = {};
-
-  // Fetch Risk Tier
+  // Fetch Fresh Risk Tier
   Future<void> _fetchRiskProfile() async {
      try {
-       // 1. Try Cache First
-       final prefs = await SharedPreferences.getInstance();
-       final cachedTier = prefs.getString('cached_risk_tier');
-       if (cachedTier != null && mounted) {
-          setState(() {
-             _riskTier = cachedTier;
-          });
-          print("Loaded Cached Risk Tier: $_riskTier");
-          VoiceReminderService().updateRiskTier(_riskTier);
-          _scheduleTieredReminders();
-       }
+        final prefs = await SharedPreferences.getInstance();
+        final UserService userService = UserService();
 
-       // 2. Fetch Fresh
-       // Use Service URL Logic
-       final UserService userService = UserService();
-       final baseUrl = userService.baseUrl;
-       
-       final url = Uri.parse("$baseUrl/api/ai/check_profile/$effectiveUid");
-       final response = await http.get(url);
+        // 2. Fetch Fresh
+        // Use Service URL Logic
+        final baseUrl = userService.baseUrl;
+        
+        final url = Uri.parse("$baseUrl/api/ai/check_profile/$effectiveUid");
+        final response = await http.get(url);
         if (response.statusCode == 200) {
            final data = json.decode(response.body);
            debugPrint("Profile Debug: received data: $data");
@@ -134,85 +134,6 @@ class _DailyRoutinePageState extends State<DailyRoutinePage> with SingleTickerPr
      }
   }
 
-  void _checkAndSpeakReminders() {
-    if (!_isToday) return; 
-    
-    final now = DateTime.now();
-    final currentMinutes = now.hour * 60 + now.minute;
-    final timeString = "${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}";
-    
-    // Night Cap: 9 PM to 7 AM
-    final bool isNight = now.hour >= 21 || now.hour < 7;
-    
-    // Policy Offsets (in minutes)
-    List<int> offsets = [0];
-    if (_riskTier.contains("Tier 2")) offsets = [0, 15];
-    if (_riskTier.contains("Tier 3") || _riskTier.contains("High")) offsets = [0, 10, 20];
-    
-    for (var task in _dailyTasks) {
-       // Only process if not completed
-       if (task['completed'] == true) continue;
-       
-       // Parse Task Time
-       String tStr = task['time'];
-       if (!tStr.contains(":")) continue;
-       final parts = tStr.split(":");
-       final taskMinutes = int.parse(parts[0]) * 60 + int.parse(parts[1]);
-       
-       // Calculate Difference
-       int diff = currentMinutes - taskMinutes;
-       
-       // Night Cap Check: No followups (diff > 0) at night
-       if (isNight && diff > 0) continue;
-       
-       // Check if this specific difference dictates a reminder
-       if (offsets.contains(diff)) {
-           // Unique Key: TaskID + The Time We Are Reminding At (current time string)
-           final key = "${task['id']}_$timeString";
-           
-           if (!_remindedKeys.contains(key)) {
-              String msg = task['task_name'] ?? "Task";
-              if (diff > 0) msg = "Reminder: You haven't finished $msg yet. It's time.";
-              
-              _voiceService.speakReminder(msg, elderName: widget.elderName);
-              _remindedKeys.add(key);
-              
-              // Visual Alert (Fallback for Web/Desktop or if Audio blocked)
-              if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Row(children: [
-                         const Icon(Icons.alarm, color: Colors.white), 
-                         const SizedBox(width: 12),
-                         Expanded(child: Text(msg))
-                      ]),
-                      backgroundColor: Colors.teal,
-                      duration: const Duration(seconds: 10),
-                      action: SnackBarAction(label: "Dismiss", textColor: Colors.yellow, onPressed: (){}),
-                    )
-                  );
-              }
-
-              // Log
-              _behaviorService.logEvent('REMINDER_SENT', {
-                 "uid": effectiveUid,
-                 "scheduleDocId": _getScheduleDocId(),
-                 "taskId": task['id'],
-                 "type": "REMINDER_SENT",
-                 "at": DateTime.now().toIso8601String(),
-                 "meta": {
-                     "task_name": task['task_name'],
-                     "scheduled_time": task['time'],
-                     "risk_tier": _riskTier,
-                     "is_followup": diff > 0,
-                     "delay_min": diff,
-                     "policy_version": "v1.0"
-                 }
-              });
-           }
-       }
-    }
-  }
 
   // --- LOGIC ---
 
@@ -229,18 +150,30 @@ class _DailyRoutinePageState extends State<DailyRoutinePage> with SingleTickerPr
   }
 
   Future<void> _fetchSchedule() async {
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _hasError = false;
+    });
     
     // 1. Get Scheduled Tasks
     final data = await _scheduleService.getSchedule(effectiveUid, _selectedDate);
-    final tasks = List<dynamic>.from(data?['tasks'] ?? []);
+    
+    if (data == null) {
+      setState(() {
+        _isLoading = false;
+        _hasError = true;
+      });
+      return;
+    }
+
+    final tasks = List<dynamic>.from(data['tasks'] ?? []);
     
     setState(() {
       _dailyTasks = tasks;
     });
 
     // 2. Decide Mode
-    // Enter Planning Mode if tasks are empty AND it is NOT a past date
+    // Only enter Planning Mode if we successfully got data and tasks are empty AND it is NOT a past date
     if (tasks.isEmpty && !_isPast) {
        await _enterPlanningMode();
     } else {
@@ -252,7 +185,7 @@ class _DailyRoutinePageState extends State<DailyRoutinePage> with SingleTickerPr
     
      // 3. Update Voice Reminder Service
      if (mounted && _isToday) {
-        VoiceReminderService().updateTasks(tasks, _riskTier);
+        VoiceReminderService().updateTasks(tasks);
      }
 
      // 4. Schedule Notifications for existing tasks
@@ -275,8 +208,17 @@ class _DailyRoutinePageState extends State<DailyRoutinePage> with SingleTickerPr
     if (!mounted) return;
 
     setState(() {
-      // Deep Copy for Mutation
-      _planningCommon = List<Map<String, dynamic>>.from((suggestions['common'] as List? ?? []).map((x) => Map<String, dynamic>.from(x)));
+      // Deep Copy and Deduplicate Common Tasks by name
+      final rawCommon = suggestions['common'] as List? ?? [];
+      final Map<String, Map<String, dynamic>> uniqueCommon = {};
+      for (var x in rawCommon) {
+        final name = (x['task_name'] ?? "").toString().trim().toLowerCase();
+        if (name.isNotEmpty && !uniqueCommon.containsKey(name)) {
+          uniqueCommon[name] = Map<String, dynamic>.from(x);
+        }
+      }
+      _planningCommon = uniqueCommon.values.toList();
+      
       _planningMeds = List<Map<String, dynamic>>.from((suggestions['medications'] as List? ?? []).map((x) => Map<String, dynamic>.from(x)));
       _planningTherapy = List<Map<String, dynamic>>.from((suggestions['therapy'] as List? ?? []).map((x) => Map<String, dynamic>.from(x)));
       
@@ -413,6 +355,13 @@ class _DailyRoutinePageState extends State<DailyRoutinePage> with SingleTickerPr
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  String _getGreeting() {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return "Good Morning!";
+    if (hour < 17) return "Good Afternoon!";
+    return "Good Evening!";
   }
 
   // --- UI ---
@@ -584,9 +533,11 @@ class _DailyRoutinePageState extends State<DailyRoutinePage> with SingleTickerPr
            Expanded(
              child: _isLoading 
                ? const Center(child: CircularProgressIndicator()) 
-               : _isPlanningMode 
-                   ? _buildPlanningView() 
-                   : _buildReadingView()
+               : _hasError
+                   ? _buildErrorView()
+                   : _isPlanningMode 
+                       ? _buildPlanningView() 
+                       : _buildReadingView()
            )
         ]
       ),
@@ -660,8 +611,8 @@ class _DailyRoutinePageState extends State<DailyRoutinePage> with SingleTickerPr
      
      // 3. Call Backend AI
      try {
-         final UserService userService = UserService();
-         final baseUrl = userService.baseUrl;
+          final UserService userService = UserService();
+          final baseUrl = userService.baseUrl;
          
          final res = await http.post(
           Uri.parse('$baseUrl/api/ai/process_voice_command'),
@@ -714,7 +665,7 @@ class _DailyRoutinePageState extends State<DailyRoutinePage> with SingleTickerPr
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(_isToday ? "Good Morning! Set up your schedule." : "Planning for $_dateTitle", 
+          Text(_isToday ? "${_getGreeting()} Set up your schedule." : "Planning for $_dateTitle", 
                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.teal)),
           const SizedBox(height: 16),
           
@@ -811,6 +762,27 @@ class _DailyRoutinePageState extends State<DailyRoutinePage> with SingleTickerPr
             ),
           ),
           const SizedBox(height: 40),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildErrorView() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.cloud_off, color: Colors.grey, size: 60),
+          const SizedBox(height: 16),
+          const Text("Connection Error", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          const Text("We couldn't load your schedule.", textAlign: TextAlign.center),
+          const SizedBox(height: 24),
+          ElevatedButton(
+            onPressed: _fetchSchedule,
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white),
+            child: const Text("Retry"),
+          ),
         ],
       ),
     );
