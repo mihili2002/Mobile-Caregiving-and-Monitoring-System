@@ -69,7 +69,8 @@ class ScheduleService {
           "uid": uid,
           "date": dateStr,
           "task_id": taskId,
-          "completed": completed
+          "completed": completed,
+          "status": completed ? "completed-confirmed" : "pending"
         }),
       );
 
@@ -177,7 +178,7 @@ class ScheduleService {
     return null;
   }
 
-  Future<void> updateFirestoreTaskStatus(String uid, DateTime date, String taskId, bool completed) async {
+  Future<void> updateFirestoreTaskStatus(String uid, DateTime date, String taskId, bool completed, {String? status}) async {
     final dateStr = date.toIso8601String().split('T')[0];
     final docId = "${uid}_$dateStr";
 
@@ -191,6 +192,7 @@ class ScheduleService {
         for (var task in tasks) {
           if (task['id'] == taskId) {
             task['completed'] = completed;
+            task['status'] = status ?? (completed ? 'completed-confirmed' : 'pending');
             changed = true;
             break;
           }

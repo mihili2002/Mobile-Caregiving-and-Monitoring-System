@@ -863,8 +863,46 @@ class _DailyRoutinePageState extends State<DailyRoutinePage> with SingleTickerPr
 
   Widget _buildTaskTile(Map<String, dynamic> task) {
     final bool isCompleted = task['completed'] == true;
+    final String status = task['status'] ?? (isCompleted ? "completed-confirmed" : "pending");
     final String time = task['time'] ?? "--:--";
     final String subtitle = task['subtitle'] ?? "";
+
+    Color statusColor = Colors.teal;
+    IconData statusIcon = Icons.access_time;
+    String statusLabel = "";
+
+    switch (status) {
+      case 'completed-confirmed':
+        statusColor = Colors.green;
+        statusIcon = Icons.check_circle;
+        statusLabel = "Confirmed";
+        break;
+      case 'completed-likely':
+        statusColor = Colors.green[300]!;
+        statusIcon = Icons.check_circle_outline;
+        statusLabel = "Likely Done";
+        break;
+      case 'missed-likely':
+        statusColor = Colors.orange;
+        statusIcon = Icons.help_outline;
+        statusLabel = "Likely Missed";
+        break;
+      case 'missed-confirmed':
+        statusColor = Colors.red;
+        statusIcon = Icons.cancel;
+        statusLabel = "Missed";
+        break;
+      case 'needs-caregiver-review':
+        statusColor = Colors.purple;
+        statusIcon = Icons.notification_important;
+        statusLabel = "Needs Review";
+        break;
+      case 'pending':
+      default:
+        statusColor = isCompleted ? Colors.green : Colors.teal;
+        statusIcon = isCompleted ? Icons.check : Icons.access_time;
+        break;
+    }
     
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -874,10 +912,10 @@ class _DailyRoutinePageState extends State<DailyRoutinePage> with SingleTickerPr
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         onLongPress: () => _confirmDeleteTask(task),
         leading: CircleAvatar(
-          backgroundColor: isCompleted ? Colors.green[100] : Colors.teal.withOpacity(0.1),
+          backgroundColor: statusColor.withOpacity(0.1),
           child: Icon(
-            isCompleted ? Icons.check : Icons.access_time,
-            color: isCompleted ? Colors.green : Colors.teal,
+            statusIcon,
+            color: statusColor,
           ),
         ),
         title: Text(
@@ -889,9 +927,15 @@ class _DailyRoutinePageState extends State<DailyRoutinePage> with SingleTickerPr
             fontSize: 16
           ),
         ),
-        subtitle: subtitle.isNotEmpty 
-            ? Text(subtitle, style: TextStyle(fontSize: 12, color: Colors.grey[600])) 
-            : null,
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (subtitle.isNotEmpty) 
+               Text(subtitle, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+            if (statusLabel.isNotEmpty)
+               Text(statusLabel, style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: statusColor)),
+          ],
+        ),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [

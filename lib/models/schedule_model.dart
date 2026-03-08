@@ -39,6 +39,7 @@ class ScheduleTask {
   final String time;
   final String type;
   final bool isCompleted;
+  final String status; // New field: completed-confirmed, completed-likely, pending, missed-likely, missed-confirmed, needs-caregiver_review
 
   ScheduleTask({
     required this.taskId,
@@ -47,6 +48,7 @@ class ScheduleTask {
     required this.time,
     required this.type,
     required this.isCompleted,
+    this.status = 'pending',
   });
 
   factory ScheduleTask.fromJson(Map<String, dynamic> json) {
@@ -57,6 +59,7 @@ class ScheduleTask {
       time: json['Time'] ?? '',
       type: json['Type'] ?? 'common',
       isCompleted: json['isCompleted'] ?? false,
+      status: json['status'] ?? (json['isCompleted'] == true ? 'completed-confirmed' : 'pending'),
     );
   }
 
@@ -68,6 +71,7 @@ class ScheduleTask {
       'Time': time,
       'Type': type,
       'isCompleted': isCompleted,
+      'status': status,
     };
   }
 }
