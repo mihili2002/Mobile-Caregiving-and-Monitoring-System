@@ -344,8 +344,6 @@ class _MealPlanDetailPageState extends State<MealPlanDetailPage> {
 
 
     
-  
-
 
     if (_plan != null) {
       await _saveReminders(planId: _plan!.id);
@@ -1018,21 +1016,21 @@ class _MealPlanDetailPageState extends State<MealPlanDetailPage> {
               spacing: 10,
               runSpacing: 10,
               children: [
-                _actionChip(
-                  icon: Icons.alarm,
-                  label: reminder == null
-                      ? "Remind me"
-                      : "Reminder: ${reminder.format(context)}",
-                  onTap: () => _setReminder(mealKey: sectionKey, mealType: title),
-                ),
+                // _actionChip(
+                //   icon: Icons.alarm,
+                //   label: reminder == null
+                //       ? "Remind me"
+                //       : "Reminder: ${reminder.format(context)}",
+                //   onTap: () => _setReminder(mealKey: sectionKey, mealType: title),
+                // ),
 
                 // ✅ NEW: Clear reminder cancels the REAL notification + removes saved time
-                if (reminder != null)
-                  _actionChip(
-                    icon: Icons.notifications_off,
-                    label: "Clear reminder",
-                    onTap: () => _clearReminder(mealKey: sectionKey, mealType: title),
-                  ),
+                // if (reminder != null)
+                //   _actionChip(
+                //     icon: Icons.notifications_off,
+                //     label: "Clear reminder",
+                //     onTap: () => _clearReminder(mealKey: sectionKey, mealType: title),
+                //   ),
 
                 _actionChip(
                   icon: Icons.swap_horiz,
