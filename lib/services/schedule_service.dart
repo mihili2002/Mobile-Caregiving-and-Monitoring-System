@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:io';
 
 class ScheduleService {
@@ -140,6 +140,67 @@ class ScheduleService {
     } catch (e) {
       print("Error updating task: $e");
       return false;
+    }
+  }
+
+  // --- FIRESTORE PERSISTENCE (For History) ---
+
+  Future<void> saveScheduleToFirestore(String uid, DateTime date, List<dynamic> tasks) async {
+    final dateStr = date.toIso8601String().split('T')[0];
+    final docId = "${uid}_$dateStr";
+
+    try {
+      await FirebaseFirestore.instance.collection('schedules').doc(docId).set({
+        'uid': uid,
+        'date': dateStr,
+        'tasks': tasks,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      debugPrint("ScheduleService: Saved schedule to Firestore for $docId");
+    } catch (e) {
+      debugPrint("ScheduleService: Error saving to Firestore: $e");
+    }
+  }
+
+  Future<Map<String, dynamic>?> getScheduleFromFirestore(String uid, DateTime date) async {
+    final dateStr = date.toIso8601String().split('T')[0];
+    final docId = "${uid}_$dateStr";
+
+    try {
+      final doc = await FirebaseFirestore.instance.collection('schedules').doc(docId).get();
+      if (doc.exists) {
+        return doc.data();
+      }
+    } catch (e) {
+      debugPrint("ScheduleService: Error fetching from Firestore: $e");
+    }
+    return null;
+  }
+
+  Future<void> updateFirestoreTaskStatus(String uid, DateTime date, String taskId, bool completed) async {
+    final dateStr = date.toIso8601String().split('T')[0];
+    final docId = "${uid}_$dateStr";
+
+    try {
+      final docRef = FirebaseFirestore.instance.collection('schedules').doc(docId);
+      final doc = await docRef.get();
+      
+      if (doc.exists) {
+        final tasks = List<dynamic>.from(doc.data()?['tasks'] ?? []);
+        bool changed = false;
+        for (var task in tasks) {
+          if (task['id'] == taskId) {
+            task['completed'] = completed;
+            changed = true;
+            break;
+          }
+        }
+        if (changed) {
+          await docRef.update({'tasks': tasks});
+        }
+      }
+    } catch (e) {
+      debugPrint("ScheduleService: Error updating Firestore task status: $e");
     }
   }
 }

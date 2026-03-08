@@ -1,267 +1,327 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
-
-// ✅ Correct package import
 import 'package:mobile_caregiving_and_monitoring_system/features/voice_chatbot/screens/chat_screen.dart';
-
 import 'pages/elder/daily_routine_page.dart';
 import 'ElderProfilePage.dart';
 import 'models/user_model.dart';
-
-// Meal Plan Dashboard
 import 'pages/elder/meal_plans/elder_meal_plan_dashboard.dart';
-
 import 'pages/elder/therapist_support/elder_therapist_support_page.dart';
-
-import 'pages/elder/widgets/quick_stats_widget.dart'; // optional
 import './RoutineHome.dart';
-
-// ✅ NEW IMPORT: Journaling page
-//import 'pages/elder/journaling/journal_record_page.dart';
 import '../../features/voice_chatbot/screens/journal_record_page.dart';
 
-class ElderDashboard extends StatelessWidget {
+class ElderDashboard extends StatefulWidget {
   final AppUser user;
   const ElderDashboard({Key? key, required this.user}) : super(key: key);
 
   @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+  State<ElderDashboard> createState() => _ElderDashboardState();
+}
 
+class _ElderDashboardState extends State<ElderDashboard> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1000),
+    );
+    _controller.forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final primary = scheme.primary;
     final secondary = scheme.secondary;
-    final bgTop = Theme.of(context).scaffoldBackgroundColor;
-    final bgBottom = scheme.background;
-
-    final titleColor = Colors.black.withOpacity(0.85);
-    final subtitleColor = Colors.black.withOpacity(0.55);
 
     return Scaffold(
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [bgTop, bgBottom],
+      body: Stack(
+        children: [
+          // Background
+          Positioned.fill(
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    theme.scaffoldBackgroundColor,
+                    scheme.background,
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+          // Abstract background shape
+          Positioned(
+            top: -100,
+            right: -80,
+            child: Container(
+              width: 300,
+              height: 300,
+              decoration: BoxDecoration(
+                color: primary.withOpacity(0.08),
+                shape: BoxShape.circle,
+              ),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 50, sigmaY: 50),
+                child: Container(color: Colors.transparent),
+              ),
+            ),
+          ),
+
+          SafeArea(
+            child: CustomScrollView(
+              physics: const BouncingScrollPhysics(),
+              slivers: [
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+                  sliver: SliverToBoxAdapter(
+                    child: _buildHeader(context, theme, primary),
+                  ),
+                ),
+                SliverPadding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  sliver: SliverToBoxAdapter(
+                    child: _buildWelcomeCard(theme, primary),
+                  ),
+                ),
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(20, 28, 20, 20),
+                  sliver: SliverGrid(
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      crossAxisSpacing: 16,
+                      mainAxisSpacing: 16,
+                      childAspectRatio: 0.88,
+                    ),
+                    delegate: SliverChildListDelegate([
+                      _buildAnimatedFeatureCard(
+                        0,
+                        title: 'Voice Chatbot',
+                        subtitle: 'Always here to help',
+                        icon: Icons.mic_rounded,
+                        gradient: [primary, primary.withOpacity(0.8)],
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => ChatScreen(elderUid: widget.user.uid)),
+                        ),
+                      ),
+                      _buildAnimatedFeatureCard(
+                        1,
+                        title: 'Journal',
+                        subtitle: 'Capture your thoughts',
+                        icon: Icons.auto_stories_rounded,
+                        gradient: [const Color(0xFF00BBA7), const Color(0xFF009688)],
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => JournalRecordPage(elderId: widget.user.uid)),
+                        ),
+                      ),
+                      _buildAnimatedFeatureCard(
+                        2,
+                        title: 'Daily Routine',
+                        subtitle: 'Track your habits',
+                        icon: Icons.task_alt_rounded,
+                        gradient: [const Color(0xFF4DB6AC), const Color(0xFF009688)],
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => DailyRoutinePage(
+                              elderId: widget.user.uid,
+                              elderName: widget.user.name,
+                            ),
+                          ),
+                        ),
+                      ),
+                      _buildAnimatedFeatureCard(
+                        3,
+                        title: 'Meal Planner',
+                        subtitle: 'Healthy nutrition',
+                        icon: Icons.restaurant_rounded,
+                        gradient: [const Color(0xFF26A69A), const Color(0xFF00897B)],
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const ElderMealPlanDashboard()),
+                        ),
+                      ),
+                      _buildAnimatedFeatureCard(
+                        4,
+                        title: 'Therapist',
+                        subtitle: 'Guidance & support',
+                        icon: Icons.favorite_rounded,
+                        gradient: [primary.withOpacity(0.9), secondary],
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => ElderTherapistSupportPage(user: widget.user)),
+                        ),
+                      ),
+                    ]),
+                  ),
+                ),
+                const SliverToBoxAdapter(child: SizedBox(height: 40)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeader(BuildContext context, ThemeData theme, Color primary) {
+    return Row(
+      children: [
+        Container(
+          width: 50,
+          height: 50,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 15,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Icon(Icons.favorite_rounded, color: primary, size: 28),
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'eldease',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                  color: primary.withOpacity(0.8),
+                  letterSpacing: 0.5,
+                ),
+              ),
+              Text(
+                'Dashboard',
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: Colors.black87,
+                ),
+              ),
+            ],
           ),
         ),
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(18, 14, 18, 18),
+        Material(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          elevation: 2,
+          shadowColor: Colors.black12,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(14),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ElderProfilePage()),
+            ),
+            child: const Padding(
+              padding: EdgeInsets.all(10),
+              child: Icon(Icons.person_rounded, color: Colors.black54),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildWelcomeCard(ThemeData theme, Color primary) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.7),
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: Colors.white, width: 2),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 24,
+            offset: const Offset(0, 12),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: primary.withOpacity(0.12),
+              shape: BoxShape.circle,
+            ),
+            child: Text(
+              '👋',
+              style: const TextStyle(fontSize: 28),
+            ),
+          ),
+          const SizedBox(width: 18),
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(14),
-                        gradient: const LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [Color(0xFF11BFA8), Color(0xFF11BFA8)],
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.10),
-                            blurRadius: 16,
-                            offset: const Offset(0, 10),
-                          ),
-                        ],
-                      ),
-                      child: const Icon(Icons.favorite, color: Colors.white),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'ElderCare',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              color: titleColor,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            'Elder Dashboard',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w800,
-                              color: titleColor,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    IconButton(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const ElderProfilePage(),
-                          ),
-                        );
-                      },
-                      icon: Icon(Icons.settings, color: titleColor),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.92),
-                    borderRadius: BorderRadius.circular(18),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.06),
-                        blurRadius: 18,
-                        offset: const Offset(0, 10),
-                      ),
-                    ],
-                    border: Border.all(
-                      color: Colors.black.withOpacity(0.04),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 46,
-                        height: 46,
-                        decoration: BoxDecoration(
-                          color: primary.withOpacity(0.12),
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: Icon(Icons.waving_hand, color: primary, size: 26),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Welcome ${user.name ?? 'Back'} 👋',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w800,
-                                color: titleColor,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Choose a service to continue',
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: subtitleColor,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
+                Text(
+                  'Hello, ${widget.user.name ?? 'Friend'}',
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w900,
+                    color: Colors.black87,
                   ),
                 ),
-
-                const SizedBox(height: 16),
-
-                Expanded(
-                  child: GridView.count(
-                    crossAxisCount: 2,
-                    crossAxisSpacing: 14,
-                    mainAxisSpacing: 14,
-                    childAspectRatio: 0.95,
-                    children: [
-                      _FeatureCard(
-                        title: 'Voice Chatbot',
-                        subtitle: 'Talk & ask for help',
-                        icon: Icons.mic,
-                        gradient: [primary, secondary],
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => ChatScreen(elderUid: user.uid),
-                            ),
-                          );
-                        },
-                      ),
-
-                      // ✅ NEW CARD: Record Journal
-                      _FeatureCard(
-                        title: 'Record Journal',
-                        subtitle: 'Record your diary by voice',
-                        icon: Icons.mic_none,
-                        gradient: [primary, secondary],
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) =>
-                                  JournalRecordPage(elderId: user.uid),
-                            ),
-                          );
-                        },
-                      ),
-
-                      _FeatureCard(
-                        title: 'Daily Routine',
-                        subtitle: 'Reminders & habits',
-                        icon: Icons.schedule,
-                        gradient: [primary.withOpacity(0.95), secondary],
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => DailyRoutinePage(
-                                elderId: user.uid,
-                                elderName: user.name,
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-
-                      _FeatureCard(
-                        title: 'Meal Planner',
-                        subtitle: 'Healthy meals',
-                        icon: Icons.restaurant_menu,
-                        gradient: [primary, secondary.withOpacity(0.95)],
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const ElderMealPlanDashboard(),
-                            ),
-                          );
-                        },
-                      ),
-
-                      _FeatureCard(
-                        title: 'Therapist',
-                        subtitle: 'Mental support',
-                        icon: Icons.health_and_safety,
-                        gradient: [primary.withOpacity(0.85), secondary],
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) =>
-                                  ElderTherapistSupportPage(user: user),
-                            ),
-                          );
-                        },
-                      ),
-                    ],
-                  ),
+                const SizedBox(height: 4),
+                Text(
+                  'How are you feeling today?',
+                  style: theme.textTheme.bodyMedium,
                 ),
               ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAnimatedFeatureCard(
+    int index, {
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required List<Color> gradient,
+    required VoidCallback onTap,
+  }) {
+    final animation = CurvedAnimation(
+      parent: _controller,
+      curve: Interval(
+        (0.1 * index).clamp(0, 1),
+        (0.1 * index + 0.5).clamp(0, 1),
+        curve: Curves.easeOutQuart,
+      ),
+    );
+
+    return ScaleTransition(
+      scale: animation,
+      child: FadeTransition(
+        opacity: animation,
+        child: _FeatureCard(
+          title: title,
+          subtitle: subtitle,
+          icon: icon,
+          gradient: gradient,
+          onTap: onTap,
         ),
       ),
     );
@@ -285,79 +345,89 @@ class _FeatureCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final titleColor = Colors.black.withOpacity(0.85);
-    final subtitleColor = Colors.black.withOpacity(0.55);
+    final theme = Theme.of(context);
 
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(18),
         onTap: onTap,
+        borderRadius: BorderRadius.circular(28),
         child: Ink(
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.92),
-            borderRadius: BorderRadius.circular(18),
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(28),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.06),
-                blurRadius: 18,
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 20,
                 offset: const Offset(0, 10),
               ),
             ],
-            border: Border.all(color: Colors.black.withOpacity(0.04)),
           ),
-          child: Padding(
-            padding: const EdgeInsets.all(14),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: 52,
-                  height: 52,
+          child: Stack(
+            children: [
+              // Bottom right gradient circle
+              Positioned(
+                bottom: -20,
+                right: -20,
+                child: Container(
+                  width: 80,
+                  height: 80,
                   decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(16),
                     gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: gradient,
+                      colors: [gradient[0].withOpacity(0.1), gradient[1].withOpacity(0.01)],
                     ),
-                  ),
-                  child: Icon(icon, color: Colors.white, size: 28),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                    color: titleColor,
+                    shape: BoxShape.circle,
                   ),
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  subtitle,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: subtitleColor,
-                    height: 1.25,
-                  ),
-                ),
-                const Spacer(),
-                Row(
+              ),
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: gradient,
+                        ),
+                        borderRadius: BorderRadius.circular(18),
+                        boxShadow: [
+                          BoxShadow(
+                            color: gradient[0].withOpacity(0.3),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Icon(icon, color: Colors.white, size: 26),
+                    ),
+                    const Spacer(),
                     Text(
-                      'Open',
-                      style: TextStyle(
-                        color: gradient.first,
-                        fontWeight: FontWeight.w700,
+                      title,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        color: Colors.black87,
+                        fontSize: 16,
                       ),
                     ),
-                    const SizedBox(width: 6),
-                    Icon(Icons.arrow_forward, size: 18, color: gradient.first),
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontSize: 12,
+                        height: 1.2,
+                      ),
+                    ),
                   ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),

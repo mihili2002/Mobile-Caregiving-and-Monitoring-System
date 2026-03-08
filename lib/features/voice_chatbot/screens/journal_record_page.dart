@@ -1,62 +1,55 @@
+import 'dart:convert';
 import 'dart:io' show File;
 import 'dart:typed_data';
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
-import 'package:record/record.dart';
-import 'dart:convert';
-
+import 'package:flutter_tts/flutter_tts.dart';
 import 'package:http/http.dart' as http;
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:record/record.dart';
+
+import 'emotion_graph_page.dart';
 import 'my_diaries_page.dart';
 
-import 'package:flutter_tts/flutter_tts.dart';
-import 'package:path_provider/path_provider.dart';
-import 'emotion_graph_page.dart';
 class JournalRecordPage extends StatefulWidget {
   final String elderId;
-  const JournalRecordPage({super.key, required this.elderId});
+
+  const JournalRecordPage({
+    super.key,
+    required this.elderId,
+  });
 
   @override
   State<JournalRecordPage> createState() => _JournalRecordPageState();
 }
 
-// ─────────────────────────────────────────────
-// App state machine
-// ─────────────────────────────────────────────
 enum _PageMode { journal, question }
 
 enum _RecordingState { idle, recording, processing, speaking, done, error }
 
 class _JournalRecordPageState extends State<JournalRecordPage>
     with SingleTickerProviderStateMixin {
-  // ── core ──────────────────────────────────
-  final Record _recorder = Record();
+  final AudioRecorder _recorder = AudioRecorder();
   final FlutterTts _tts = FlutterTts();
 
   _PageMode _mode = _PageMode.journal;
   _RecordingState _recState = _RecordingState.idle;
 
-  // ── audio file handles ─────────────────────
-  String? _filePath; // mobile
-  String? _webBlobUrl; // web
+  String? _filePath;
+  String? _webBlobUrl;
 
-  // ── Q&A display ───────────────────────────
   String? _questionText;
   String? _answerText;
   String? _errorMessage;
 
-  // ── animation ─────────────────────────────
   late AnimationController _pulseCtrl;
   late Animation<double> _pulseAnim;
 
-  // ── API ───────────────────────────────────
   final String _apiBaseUrl =
       kIsWeb ? 'http://localhost:8000' : 'http://10.0.2.2:8000';
 
-  // ─────────────────────────────────────────
-  // Life-cycle
-  // ─────────────────────────────────────────
   @override
   void initState() {
     super.initState();
@@ -80,9 +73,6 @@ class _JournalRecordPageState extends State<JournalRecordPage>
     super.dispose();
   }
 
-  // ─────────────────────────────────────────
-  // TTS setup
-  // ─────────────────────────────────────────
   Future<void> _setupTts() async {
     await _tts.setSpeechRate(0.42);
     await _tts.setPitch(1.0);
@@ -98,67 +88,93 @@ class _JournalRecordPageState extends State<JournalRecordPage>
   Future<void> _speak(String text) async {
     if (text.trim().isEmpty) return;
     await _tts.stop();
-    setState(() => _recState = _RecordingState.speaking);
+    if (mounted) {
+      setState(() => _recState = _RecordingState.speaking);
+    }
     await _tts.speak(text);
   }
 
   Future<void> _stopSpeaking() async {
     await _tts.stop();
-    if (mounted) setState(() => _recState = _RecordingState.done);
+    if (mounted) {
+      setState(() => _recState = _RecordingState.done);
+    }
   }
 
-  // ─────────────────────────────────────────
-  // Recording
-  // ─────────────────────────────────────────
   Future<void> _startRecording() async {
-    final hasPermission = await _recorder.hasPermission();
-    if (!hasPermission) {
-      _setError('Microphone permission not granted.');
-      return;
-    }
+    try {
+      final hasPermission = await _recorder.hasPermission();
+      if (!hasPermission) {
+        _setError('Microphone permission not granted.');
+        return;
+      }
 
-    await _tts.stop();
-    _clearResults();
+      await _tts.stop();
+      _clearResults();
 
-    if (kIsWeb) {
-      await _recorder.start();
-    } else {
-      final dir = await getApplicationDocumentsDirectory();
       final ts = DateTime.now().millisecondsSinceEpoch;
       final prefix = _mode == _PageMode.question ? 'question' : 'journal';
-      final path = '${dir.path}/${prefix}_${widget.elderId}_$ts.m4a';
 
-      await _recorder.start(
-        path: path,
-        bitRate: 128000,
-        samplingRate: 16000,
-      );
-      _filePath = path;
+      if (kIsWeb) {
+        // Current record API requires a path argument.
+        // On web, stop() typically returns a blob URL/string result.
+        final webPath = '${prefix}_${widget.elderId}_$ts.webm';
+
+        await _recorder.start(
+          const RecordConfig(
+            encoder: AudioEncoder.wav,
+            sampleRate: 16000,
+            numChannels: 1,
+          ),
+          path: webPath,
+        );
+      } else {
+        final dir = await getApplicationDocumentsDirectory();
+        final path = '${dir.path}/${prefix}_${widget.elderId}_$ts.m4a';
+
+        await _recorder.start(
+          const RecordConfig(
+            encoder: AudioEncoder.aacLc,
+            bitRate: 128000,
+            sampleRate: 16000,
+            numChannels: 1,
+          ),
+          path: path,
+        );
+
+        _filePath = path;
+      }
+
+      if (mounted) {
+        setState(() => _recState = _RecordingState.recording);
+      }
+    } catch (e) {
+      _setError('Failed to start recording: $e');
     }
-
-    setState(() => _recState = _RecordingState.recording);
   }
 
   Future<void> _stopRecording() async {
-    final result = await _recorder.stop();
+    try {
+      final result = await _recorder.stop();
 
-    if (kIsWeb) {
-      _webBlobUrl = result;
-    } else {
-      _filePath = result;
-    }
+      if (kIsWeb) {
+        _webBlobUrl = result;
+      } else {
+        _filePath = result;
+      }
 
-    setState(() => _recState = _RecordingState.idle);
+      if (mounted) {
+        setState(() => _recState = _RecordingState.idle);
+      }
 
-    // In question mode, immediately submit after stopping
-    if (_mode == _PageMode.question) {
-      await _askFromJournals();
+      if (_mode == _PageMode.question) {
+        await _askFromJournals();
+      }
+    } catch (e) {
+      _setError('Failed to stop recording: $e');
     }
   }
 
-  // ─────────────────────────────────────────
-  // Upload helper
-  // ─────────────────────────────────────────
   Future<Map<String, dynamic>> _upload({
     required String endpoint,
     File? mobileFile,
@@ -166,24 +182,37 @@ class _JournalRecordPageState extends State<JournalRecordPage>
     String filename = 'audio.webm',
     Map<String, String>? fields,
   }) async {
-    final token =
-        await FirebaseAuth.instance.currentUser?.getIdToken(true);
-    if (token == null) throw Exception('Not logged in');
+    final token = await FirebaseAuth.instance.currentUser?.getIdToken(true);
+    if (token == null) {
+      throw Exception('Not logged in');
+    }
 
     final uri = Uri.parse('$_apiBaseUrl$endpoint');
     final req = http.MultipartRequest('POST', uri);
     req.headers['Authorization'] = 'Bearer $token';
 
-    if (fields != null) req.fields.addAll(fields);
+    if (fields != null) {
+      req.fields.addAll(fields);
+    }
 
     if (kIsWeb) {
-      if (webBytes == null) throw Exception('No audio data (web)');
+      if (webBytes == null) {
+        throw Exception('No audio data (web)');
+      }
       req.files.add(
-          http.MultipartFile.fromBytes('audio', webBytes, filename: filename));
+        http.MultipartFile.fromBytes(
+          'audio',
+          webBytes,
+          filename: filename,
+        ),
+      );
     } else {
-      if (mobileFile == null) throw Exception('No audio file (mobile)');
-      req.files
-          .add(await http.MultipartFile.fromPath('audio', mobileFile.path));
+      if (mobileFile == null) {
+        throw Exception('No audio file (mobile)');
+      }
+      req.files.add(
+        await http.MultipartFile.fromPath('audio', mobileFile.path),
+      );
     }
 
     final res = await req.send();
@@ -204,10 +233,9 @@ class _JournalRecordPageState extends State<JournalRecordPage>
     return res.bodyBytes;
   }
 
-  // ─────────────────────────────────────────
-  // QUESTION MODE — core action
-  // ─────────────────────────────────────────
   Future<void> _askFromJournals() async {
+    if (!mounted) return;
+
     setState(() {
       _recState = _RecordingState.processing;
       _errorMessage = null;
@@ -222,6 +250,7 @@ class _JournalRecordPageState extends State<JournalRecordPage>
           _setError('No recording found. Please record again.');
           return;
         }
+
         final bytes = await _blobToBytes(_webBlobUrl!);
         result = await _upload(
           endpoint: '/chatbot/journals/ask',
@@ -234,11 +263,13 @@ class _JournalRecordPageState extends State<JournalRecordPage>
           _setError('No recording found. Please record again.');
           return;
         }
+
         final f = File(_filePath!);
         if (!await f.exists()) {
           _setError('Audio file missing. Please record again.');
           return;
         }
+
         result = await _upload(
           endpoint: '/chatbot/journals/ask',
           mobileFile: f,
@@ -249,14 +280,17 @@ class _JournalRecordPageState extends State<JournalRecordPage>
       final questionText = (result['question_text'] ?? '').toString().trim();
       final replyText = (result['reply_text'] ?? '').toString().trim();
 
+      if (!mounted) return;
+
       setState(() {
         _questionText = questionText.isEmpty ? null : questionText;
-        _answerText = replyText.isEmpty ? 'No answer found in journals.' : replyText;
+        _answerText =
+            replyText.isEmpty ? 'No answer found in journals.' : replyText;
       });
 
-      print("SERVER RESPONSE FULL: $result");
-      print("QUESTION TEXT: $questionText");
-      print("REPLY TEXT: $replyText");
+      debugPrint('SERVER RESPONSE FULL: $result');
+      debugPrint('QUESTION TEXT: $questionText');
+      debugPrint('REPLY TEXT: $replyText');
 
       await _speak(_answerText!);
     } catch (e) {
@@ -264,10 +298,9 @@ class _JournalRecordPageState extends State<JournalRecordPage>
     }
   }
 
-  // ─────────────────────────────────────────
-  // JOURNAL MODE — save
-  // ─────────────────────────────────────────
   Future<void> _saveJournal() async {
+    if (!mounted) return;
+
     setState(() {
       _recState = _RecordingState.processing;
       _errorMessage = null;
@@ -282,6 +315,7 @@ class _JournalRecordPageState extends State<JournalRecordPage>
           _setError('Nothing to save. Please record first.');
           return;
         }
+
         final bytes = await _blobToBytes(_webBlobUrl!);
         result = await _upload(
           endpoint: '/chatbot/journals/upload',
@@ -293,16 +327,22 @@ class _JournalRecordPageState extends State<JournalRecordPage>
           _setError('Nothing to save. Please record first.');
           return;
         }
+
         final f = File(_filePath!);
         if (!await f.exists()) {
           _setError('Audio file not found. Please record again.');
           return;
         }
+
         result = await _upload(
           endpoint: '/chatbot/journals/upload',
           mobileFile: f,
         );
       }
+
+      debugPrint('SAVE RESPONSE: $result');
+
+      if (!mounted) return;
 
       setState(() {
         _recState = _RecordingState.done;
@@ -310,7 +350,6 @@ class _JournalRecordPageState extends State<JournalRecordPage>
         _webBlobUrl = null;
       });
 
-      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Journal saved successfully ✅'),
@@ -322,16 +361,12 @@ class _JournalRecordPageState extends State<JournalRecordPage>
     }
   }
 
-  // ─────────────────────────────────────────
-  // Helpers
-  // ─────────────────────────────────────────
   void _setError(String msg) {
-    if (mounted) {
-      setState(() {
-        _recState = _RecordingState.error;
-        _errorMessage = msg;
-      });
-    }
+    if (!mounted) return;
+    setState(() {
+      _recState = _RecordingState.error;
+      _errorMessage = msg;
+    });
   }
 
   void _clearResults() {
@@ -345,18 +380,16 @@ class _JournalRecordPageState extends State<JournalRecordPage>
   void _resetPage() {
     _tts.stop();
     _clearResults();
-    setState(() => _recState = _RecordingState.idle);
+    if (mounted) {
+      setState(() => _recState = _RecordingState.idle);
+    }
   }
 
   bool get _isRecording => _recState == _RecordingState.recording;
   bool get _isProcessing => _recState == _RecordingState.processing;
   bool get _isSpeaking => _recState == _RecordingState.speaking;
-  bool get _hasRecording =>
-      (kIsWeb ? _webBlobUrl : _filePath) != null;
+  bool get _hasRecording => (kIsWeb ? _webBlobUrl : _filePath) != null;
 
-  // ─────────────────────────────────────────
-  // BUILD
-  // ─────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
@@ -381,7 +414,6 @@ class _JournalRecordPageState extends State<JournalRecordPage>
             icon: const Icon(Icons.menu_book_outlined),
             tooltip: 'My Diaries',
           ),
-
           IconButton(
             onPressed: () => Navigator.of(context).push(
               MaterialPageRoute(
@@ -401,7 +433,6 @@ class _JournalRecordPageState extends State<JournalRecordPage>
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           child: Column(
             children: [
-              // ── Mode Switcher ──────────────────────
               _ModeSwitcher(
                 mode: _mode,
                 enabled: !_isRecording && !_isProcessing,
@@ -410,10 +441,7 @@ class _JournalRecordPageState extends State<JournalRecordPage>
                   setState(() => _mode = m);
                 },
               ),
-
               const SizedBox(height: 24),
-
-              // ── Status / Result Card ───────────────
               Expanded(
                 child: _StatusCard(
                   mode: _mode,
@@ -422,16 +450,12 @@ class _JournalRecordPageState extends State<JournalRecordPage>
                   answerText: _answerText,
                   errorMessage: _errorMessage,
                   hasRecording: _hasRecording,
-                  onReplay: _answerText != null
-                      ? () => _speak(_answerText!)
-                      : null,
+                  onReplay:
+                      _answerText != null ? () => _speak(_answerText!) : null,
                   onStopSpeaking: _isSpeaking ? _stopSpeaking : null,
                 ),
               ),
-
               const SizedBox(height: 24),
-
-              // ── Mic Button ────────────────────────
               _MicButton(
                 isRecording: _isRecording,
                 isProcessing: _isProcessing,
@@ -443,10 +467,7 @@ class _JournalRecordPageState extends State<JournalRecordPage>
                     ? null
                     : (_isRecording ? _stopRecording : _startRecording),
               ),
-
               const SizedBox(height: 8),
-
-              // ── Hint text ─────────────────────────
               Text(
                 _micHint,
                 textAlign: TextAlign.center,
@@ -456,10 +477,7 @@ class _JournalRecordPageState extends State<JournalRecordPage>
                   height: 1.4,
                 ),
               ),
-
               const SizedBox(height: 20),
-
-              // ── Bottom action row ─────────────────
               _BottomActions(
                 mode: _mode,
                 recState: _recState,
@@ -498,10 +516,6 @@ class _JournalRecordPageState extends State<JournalRecordPage>
         : 'Tap the mic to start recording your journal.';
   }
 }
-
-// ══════════════════════════════════════════════
-// WIDGETS
-// ══════════════════════════════════════════════
 
 class _ModeSwitcher extends StatelessWidget {
   final _PageMode mode;
@@ -562,9 +576,8 @@ class _ModeTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = selected
-        ? Theme.of(context).colorScheme.primary
-        : Colors.black45;
+    final color =
+        selected ? Theme.of(context).colorScheme.primary : Colors.black45;
 
     return Expanded(
       child: GestureDetector(
@@ -600,7 +613,6 @@ class _ModeTab extends StatelessWidget {
   }
 }
 
-// ── Status / Answer card ──────────────────────
 class _StatusCard extends StatelessWidget {
   final _PageMode mode;
   final _RecordingState recState;
@@ -651,25 +663,32 @@ class _StatusCard extends StatelessWidget {
   Widget _cardContent(BuildContext context) {
     final primary = Theme.of(context).colorScheme.primary;
 
-    // ── Error ──
     if (recState == _RecordingState.error && errorMessage != null) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(children: [
-            const Icon(Icons.error_outline, color: Colors.red, size: 20),
-            const SizedBox(width: 8),
-            const Text('Something went wrong',
+          Row(
+            children: const [
+              Icon(Icons.error_outline, color: Colors.red, size: 20),
+              SizedBox(width: 8),
+              Text(
+                'Something went wrong',
                 style: TextStyle(
-                    fontWeight: FontWeight.w600, color: Colors.red)),
-          ]),
+                  fontWeight: FontWeight.w600,
+                  color: Colors.red,
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 8),
-          Text(errorMessage!, style: const TextStyle(fontSize: 14, height: 1.4)),
+          Text(
+            errorMessage!,
+            style: const TextStyle(fontSize: 14, height: 1.4),
+          ),
         ],
       );
     }
 
-    // ── Processing ──
     if (recState == _RecordingState.processing) {
       return const Center(
         child: Column(
@@ -677,16 +696,17 @@ class _StatusCard extends StatelessWidget {
             SizedBox(height: 16),
             CircularProgressIndicator(strokeWidth: 2.5),
             SizedBox(height: 16),
-            Text('Searching through your journals…',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 15, color: Colors.black54)),
+            Text(
+              'Searching through your journals…',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 15, color: Colors.black54),
+            ),
             SizedBox(height: 16),
           ],
         ),
       );
     }
 
-    // ── Q&A result ──
     if (answerText != null) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -702,9 +722,10 @@ class _StatusCard extends StatelessWidget {
                   child: Text(
                     questionText!,
                     style: const TextStyle(
-                        fontSize: 14,
-                        color: Colors.black54,
-                        fontStyle: FontStyle.italic),
+                      fontSize: 14,
+                      color: Colors.black54,
+                      fontStyle: FontStyle.italic,
+                    ),
                   ),
                 ),
               ],
@@ -720,7 +741,10 @@ class _StatusCard extends StatelessWidget {
                 child: Text(
                   answerText!,
                   style: const TextStyle(
-                      fontSize: 16, height: 1.55, fontWeight: FontWeight.w500),
+                    fontSize: 16,
+                    height: 1.55,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ),
             ],
@@ -734,7 +758,8 @@ class _StatusCard extends StatelessWidget {
                   icon: const Icon(Icons.stop_circle_outlined, size: 18),
                   label: const Text('Stop'),
                   style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.red),
+                    foregroundColor: Colors.red,
+                  ),
                 ),
               if (onReplay != null && onStopSpeaking == null)
                 OutlinedButton.icon(
@@ -748,7 +773,6 @@ class _StatusCard extends StatelessWidget {
       );
     }
 
-    // ── Recording active ──
     if (recState == _RecordingState.recording) {
       return Center(
         child: Column(
@@ -769,7 +793,6 @@ class _StatusCard extends StatelessWidget {
       );
     }
 
-    // ── Default: idle / done ──
     return Center(
       child: Column(
         children: [
@@ -788,7 +811,10 @@ class _StatusCard extends StatelessWidget {
                 : 'Record a new journal entry.\nTap the mic below to start.',
             textAlign: TextAlign.center,
             style: const TextStyle(
-                fontSize: 15, height: 1.55, color: Colors.black54),
+              fontSize: 15,
+              height: 1.55,
+              color: Colors.black54,
+            ),
           ),
           const SizedBox(height: 16),
         ],
@@ -797,7 +823,6 @@ class _StatusCard extends StatelessWidget {
   }
 }
 
-// ── Mic button ────────────────────────────────
 class _MicButton extends StatelessWidget {
   final bool isRecording;
   final bool isProcessing;
@@ -826,14 +851,14 @@ class _MicButton extends StatelessWidget {
       bgColor = Colors.red;
       icon = Icons.stop;
     } else if (isProcessing) {
-      bgColor = Colors.grey.shade400;
+      bgColor = Colors.grey;
       icon = Icons.hourglass_top;
     } else if (isSpeaking) {
-      bgColor = Colors.orange.shade600;
+      bgColor = Colors.orange;
       icon = Icons.volume_up;
     }
 
-    Widget btn = GestureDetector(
+    final btn = GestureDetector(
       onTap: onTap,
       child: Container(
         width: 130,
@@ -866,7 +891,6 @@ class _MicButton extends StatelessWidget {
   }
 }
 
-// ── Bottom action row ─────────────────────────
 class _BottomActions extends StatelessWidget {
   final _PageMode mode;
   final _RecordingState recState;
@@ -886,7 +910,6 @@ class _BottomActions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // In question mode the answer auto-plays; only show Reset or Cancel
     if (mode == _PageMode.question) {
       return Row(
         children: [
@@ -910,7 +933,6 @@ class _BottomActions extends StatelessWidget {
       );
     }
 
-    // Journal mode
     return Row(
       children: [
         Expanded(
