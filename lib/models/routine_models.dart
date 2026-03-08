@@ -168,4 +168,42 @@ class Medication {
       aiInsights: RoutineAIInsights.fromJson(json),
     );
   }
+
+  // --- Helper Logic ---
+
+  /// True if the medication duration has ended before today
+  bool get isOverdue {
+    if (endDate == null || endDate!.isEmpty) return false;
+    try {
+      final end = DateTime.parse(endDate!);
+      final today = DateTime.now();
+      final todayDate = DateTime(today.year, today.month, today.day);
+      return end.isBefore(todayDate);
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /// True if the medication is valid (active and duration has started but not ended) for a specific date
+  bool isActiveOn(DateTime date) {
+    if (isActive == false) return false;
+
+    final checkDate = DateTime(date.year, date.month, date.day);
+
+    try {
+      if (startDate != null && startDate!.isNotEmpty) {
+        final start = DateTime.parse(startDate!);
+        if (checkDate.isBefore(DateTime(start.year, start.month, start.day))) return false;
+      }
+
+      if (endDate != null && endDate!.isNotEmpty) {
+        final end = DateTime.parse(endDate!);
+        if (checkDate.isAfter(DateTime(end.year, end.month, end.day))) return false;
+      }
+    } catch (e) {
+      // If parsing fails, fall back to showing if isActive is true
+    }
+
+    return true;
+  }
 }

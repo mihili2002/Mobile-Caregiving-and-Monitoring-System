@@ -6,6 +6,7 @@ import '../widgets/chat_message.dart';
 import 'session_screen.dart';
 import 'all_emotion_screen.dart';
 import 'api.dart';
+import '../../../services/routine_understanding_service.dart';
 
 class ChatScreen extends StatefulWidget {
   // elder UID must be passed from Elder dashboard or caregiver dashboard
@@ -33,6 +34,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   // session id = elderUid
   late final String _sessionId;
+  final RoutineUnderstandingService _routineService = RoutineUnderstandingService();
 
   // Chrome/Web: 127.0.0.1
   // Android Emulator: 10.0.2.2
@@ -168,6 +170,9 @@ class _ChatScreenState extends State<ChatScreen> {
           intent: intent,
         ));
       });
+
+      // Passive conversational evidence extraction
+      await _routineService.processSpeechInput(_sessionId, text, backendIntent: intent);
 
       await _speak(reply);
     } catch (e) {

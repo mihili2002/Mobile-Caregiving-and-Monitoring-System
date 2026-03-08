@@ -62,8 +62,25 @@ class UserService {
       );
       return null;
     } catch (e) {
-      debugPrint("Error creating profile: $e");
+      debugPrint("Error in createElderProfile: $e");
       return null;
+    }
+  }
+
+  Future<bool> updateFCMToken(String uid, String token) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/api/ai/update_fcm_token'),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({
+          "uid": uid,
+          "fcm_token": token,
+        }),
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      debugPrint("Error updating FCM token: $e");
+      return false;
     }
   }
 
