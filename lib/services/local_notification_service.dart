@@ -13,7 +13,7 @@ class LocalNotificationService {
     // init timezone database
     tzdata.initializeTimeZones();
 
-    debugPrint("✅ LocalNotificationService initialized");
+    debugPrint("LocalNotificationService initialized");
 
     const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
     const initSettings = InitializationSettings(android: androidInit);
@@ -21,14 +21,14 @@ class LocalNotificationService {
 
     await _plugin.initialize(initSettings);
 
-    debugPrint("✅ FlutterLocalNotificationsPlugin initialized");
+    debugPrint("FlutterLocalNotificationsPlugin initialized");
 
     // Android 13+ permission
     await _plugin
         .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
         ?.requestNotificationsPermission();
 
-        debugPrint("✅ Notification permission requested (Android 13+)");
+        debugPrint("Notification permission requested (Android 13+)");
 
 
   }
@@ -41,7 +41,7 @@ class LocalNotificationService {
     required int minute,
   }) async {
 
-    // ✅ DEBUG PRINTS
+    //DEBUG PRINTS
     debugPrint("---------------------------------------------------");
     debugPrint("📌 scheduleDaily() CALLED");
     debugPrint("Notification ID: $id");
@@ -73,7 +73,7 @@ class LocalNotificationService {
 
     const details = NotificationDetails(android: androidDetails);
 
-    debugPrint("✅ Calling zonedSchedule() now...");
+    debugPrint("Calling zonedSchedule() now...");
 
     await _plugin.zonedSchedule(
       id,
@@ -86,7 +86,7 @@ class LocalNotificationService {
       matchDateTimeComponents: DateTimeComponents.time, // repeats daily at same time
     );
 
-    debugPrint("✅ Notification Scheduled Successfully!");
+    debugPrint("Notification Scheduled Successfully!");
     debugPrint("Scheduled Final Time: $scheduled");
     debugPrint("---------------------------------------------------");
 
@@ -97,6 +97,6 @@ class LocalNotificationService {
   Future<void> cancel(int id) async {
     debugPrint("❌ Cancelling notification ID: $id");
     await _plugin.cancel(id);
-    debugPrint("✅ Notification cancelled");
+    debugPrint("Notification cancelled");
   }
 }
