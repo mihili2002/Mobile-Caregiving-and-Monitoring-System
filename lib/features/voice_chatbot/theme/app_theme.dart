@@ -4,14 +4,13 @@ class AppTheme {
   // Your login/register palette
   static const Color brown = Color(0xFF00BBA7);
   static const Color brownDark = Color(0xFF009E8D);
-  static const Color brownLight = Color(0xFF2FE6D2);
+  static const Color brownLight = Color(0xFFB2EBF2); // Softer secondary color
 
-  static const Color bgTop = Color(0xFFE9FBF8);
-  static const Color bgBottom = Color(0xFFF4FFFD);
+  static const Color bgTop = Color(0xFFF0F9F8);
+  static const Color bgBottom = Color(0xFFE0F2F1);
 
   static ThemeData lightTheme = ThemeData(
     useMaterial3: true,
-
     scaffoldBackgroundColor: bgTop,
 
     colorScheme: ColorScheme.fromSeed(
@@ -22,95 +21,106 @@ class AppTheme {
       background: bgTop,
     ),
 
-    // AppBar matches screenshots
     appBarTheme: const AppBarTheme(
       backgroundColor: brownDark,
       foregroundColor: Colors.white,
       centerTitle: true,
       elevation: 0,
+      titleTextStyle: TextStyle(
+        fontSize: 20,
+        fontWeight: FontWeight.w700,
+        color: Colors.white,
+      ),
     ),
 
-    // Global card design
     cardTheme: CardThemeData(
-      elevation: 4,
-      color: Colors.white.withOpacity(0.95),
-      shadowColor: Colors.black.withOpacity(0.12),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      elevation: 0,
+      color: Colors.white.withOpacity(0.8),
+      shadowColor: Colors.black.withOpacity(0.05),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(24),
+        side: BorderSide(color: Colors.white.withOpacity(0.4), width: 1),
+      ),
       margin: const EdgeInsets.symmetric(vertical: 10),
     ),
 
-    // Global inputs (same as Login/Register soft inputs)
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: Colors.white.withOpacity(0.90),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      fillColor: Colors.white.withOpacity(0.7),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+      hintStyle: TextStyle(color: Colors.black38, fontSize: 15),
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(18),
         borderSide: BorderSide.none,
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
-        borderSide: BorderSide(color: Colors.black12),
+        borderRadius: BorderRadius.circular(18),
+        borderSide: BorderSide(color: Colors.white.withOpacity(0.5), width: 1),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
-        borderSide: BorderSide(color: brownDark.withOpacity(0.6), width: 1.5),
+        borderRadius: BorderRadius.circular(18),
+        borderSide: BorderSide(color: brownDark.withOpacity(0.4), width: 1.5),
       ),
       labelStyle: TextStyle(
-        color: Colors.black.withOpacity(0.55),
+        color: Colors.black.withOpacity(0.6),
         fontWeight: FontWeight.w600,
       ),
     ),
 
-    // Elevated buttons match your login/register button
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
         backgroundColor: brownDark,
         foregroundColor: Colors.white,
-        elevation: 8,
-        shadowColor: brownDark.withOpacity(0.35),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+        elevation: 4,
+        shadowColor: brownDark.withOpacity(0.25),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        padding: const EdgeInsets.symmetric(vertical: 18),
+        textStyle: const TextStyle(
+          fontWeight: FontWeight.w700,
+          fontSize: 16,
+          letterSpacing: 0.5,
+        ),
       ),
     ),
 
-    // Outlined buttons match
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
         foregroundColor: brownDark,
-        side: BorderSide(color: brownDark.withOpacity(0.35)),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        padding: const EdgeInsets.symmetric(vertical: 14),
+        side: BorderSide(color: brownDark.withOpacity(0.2)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        padding: const EdgeInsets.symmetric(vertical: 16),
         textStyle: const TextStyle(fontWeight: FontWeight.w700),
       ),
     ),
 
-    // ChoiceChips for PatientHealthDetailsScreen
     chipTheme: ChipThemeData(
-      backgroundColor: Colors.white,
-      selectedColor: brownDark.withOpacity(0.12),
-      labelStyle: const TextStyle(fontWeight: FontWeight.w600),
+      backgroundColor: Colors.white.withOpacity(0.7),
+      selectedColor: brownDark.withOpacity(0.15),
+      labelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-      side: BorderSide(color: Colors.black.withOpacity(0.06)),
-    ),
-
-    // Switch styling
-    switchTheme: SwitchThemeData(
-      thumbColor: WidgetStateProperty.resolveWith((states) {
-        if (states.contains(WidgetState.selected)) return brownDark;
-        return Colors.grey.shade400;
-      }),
-      trackColor: WidgetStateProperty.resolveWith((states) {
-        if (states.contains(WidgetState.selected)) return brownDark.withOpacity(0.35);
-        return Colors.grey.shade300;
-      }),
+      side: BorderSide(color: Colors.black.withOpacity(0.04)),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
     ),
 
     textTheme: const TextTheme(
-      bodyMedium: TextStyle(fontSize: 16),
-      bodyLarge: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-      titleMedium: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+      headlineLarge: TextStyle(
+        fontSize: 32,
+        fontWeight: FontWeight.w800,
+        color: Colors.black87,
+        letterSpacing: -0.5,
+      ),
+      headlineMedium: TextStyle(
+        fontSize: 28,
+        fontWeight: FontWeight.w700,
+        color: Colors.black87,
+      ),
+      titleLarge: TextStyle(
+        fontSize: 22,
+        fontWeight: FontWeight.w700,
+        color: Colors.black87,
+      ),
+      bodyLarge: TextStyle(fontSize: 17, color: Colors.black87, height: 1.5),
+      bodyMedium: TextStyle(fontSize: 15, color: Colors.black54, height: 1.4),
     ),
   );
 }

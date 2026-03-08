@@ -4,6 +4,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'voice_service.dart';
 import 'notification_service.dart';
+import 'routine_understanding_service.dart';
+import 'schedule_service.dart';
 import 'user_service.dart'; // 👈 NEW
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:audioplayers/audioplayers.dart';
@@ -15,6 +17,8 @@ class VoiceReminderService {
 
   final VoiceService _voiceService = VoiceService();
   final NotificationService _notificationService = NotificationService();
+  final RoutineUnderstandingService _routineService = RoutineUnderstandingService();
+  final ScheduleService _scheduleService = ScheduleService();
   final AudioPlayer _audioPlayer = AudioPlayer();
   
   List<dynamic> _tasks = [];
@@ -103,7 +107,24 @@ class VoiceReminderService {
           shouldRemind = diff == 0 || diff == 2;
         }
 
-        // 2. Forgotten Task Logic (All Tiers)
+        // 2. Verification Mode Trigger
+        // After 10 mins if not completed, ask a verification question
+        if (diff == 10) {
+           String taskName = task['task_name'] ?? "Task";
+           _voiceService.speak(_routineService.getVerificationQuestion(taskName));
+           // Mark as pending if not already marked
+           if (task['status'] == 'pending') {
+             _scheduleService.updateFirestoreTaskStatus(
+               task['uid'] ?? "", 
+               now, 
+               task['id']?.toString() ?? "", 
+               false, 
+               status: 'pending' // Still pending, but we've asked
+             );
+           }
+        }
+
+        // 3. Forgotten Task Logic (All Tiers)
         if (diff == 30) {
            shouldRemind = true;
         }

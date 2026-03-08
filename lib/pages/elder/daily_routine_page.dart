@@ -12,12 +12,14 @@ import '../../services/user_service.dart';
 import 'voice_chatbot_page.dart';
 import '../../services/voice_reminder_service.dart';
 import 'dart:async';
+import 'schedule_history_page.dart';
 
 class DailyRoutinePage extends StatefulWidget {
   final String? elderId;
   final String? elderName;
+  final DateTime? initialDate;
 
-  const DailyRoutinePage({super.key, this.elderId, this.elderName});
+  const DailyRoutinePage({super.key, this.elderId, this.elderName, this.initialDate});
 
   @override
   State<DailyRoutinePage> createState() => _DailyRoutinePageState();
@@ -39,7 +41,7 @@ class _DailyRoutinePageState extends State<DailyRoutinePage> with SingleTickerPr
   bool _hasError = false;
 
   // Data
-  DateTime _selectedDate = DateTime.now();
+  late DateTime _selectedDate;
   List<dynamic> _dailyTasks = [];
   
   // Planning State (Mutable Lists for Logic)
@@ -55,6 +57,7 @@ class _DailyRoutinePageState extends State<DailyRoutinePage> with SingleTickerPr
   @override
   void initState() {
     super.initState();
+    _selectedDate = widget.initialDate ?? DateTime.now();
     effectiveUid = widget.elderId ?? FirebaseAuth.instance.currentUser!.uid;
     _loadCachedTier(); // NEW: Load cache early
     _initServices();
@@ -155,9 +158,18 @@ class _DailyRoutinePageState extends State<DailyRoutinePage> with SingleTickerPr
       _hasError = false;
     });
     
-    // 1. Get Scheduled Tasks
-    final data = await _scheduleService.getSchedule(effectiveUid, _selectedDate);
+    // 1. Get Scheduled Tasks from API
+    var data = await _scheduleService.getSchedule(effectiveUid, _selectedDate);
     
+    // FALLBACK: If API returns null/error and it's a past date, try Firestore
+    if (data == null && _isPast) {
+      debugPrint("DailyRoutinePage: API failed for past date, checking Firestore...");
+      final firestoreData = await _scheduleService.getScheduleFromFirestore(effectiveUid, _selectedDate);
+      if (firestoreData != null) {
+        data = firestoreData;
+      }
+    }
+
     if (data == null) {
       setState(() {
         _isLoading = false;
@@ -282,58 +294,63 @@ class _DailyRoutinePageState extends State<DailyRoutinePage> with SingleTickerPr
   Future<void> _savePlan() async {
     setState(() => _isLoading = true);
     try {
+      final List<Map<String, dynamic>> allTasksForFirestore = [];
+
       // 1. Common Tasks
       for (var c in _planningCommon) {
          if (_selectedCommonIds.contains(c['id'].toString())) {
-             await _scheduleService.addTask(effectiveUid, _selectedDate, {
+             final task = {
                 "task_name": c['task_name'],
                 "time": c['default_time'], 
                 "type": "common",
                 "completed": false,
                 "id": "${effectiveUid}_common_${c['id']}_${DateTime.now().microsecondsSinceEpoch}",
-                
-                // Behavior Fields (Refactored)
                 "scheduledAt": _combineDateAndTime(_selectedDate, c['default_time']),
                 "graceMinutes": 30,
                 "status": "scheduled"
-             });
+             };
+             await _scheduleService.addTask(effectiveUid, _selectedDate, task);
+             allTasksForFirestore.add(task);
          }
       }
       
       // 2. Medications (Mandatory)
       for (var m in _planningMeds) {
-          await _scheduleService.addTask(effectiveUid, _selectedDate, {
+          final task = {
              "task_name": "${m['drug_name']} ${m['dosage'] ?? ''}".trim(),
              "time": m['time'], 
              "type": "medication",
              "completed": false,
              "subtitle": m['timing_label'],
              "id": "${effectiveUid}_med_${m['id']}_${DateTime.now().microsecondsSinceEpoch}",
-             
-             // Behavior Fields (Refactored)
              "scheduledAt": _combineDateAndTime(_selectedDate, m['time']),
              "graceMinutes": 60,
              "status": "scheduled"
-          });
+          };
+          await _scheduleService.addTask(effectiveUid, _selectedDate, task);
+          allTasksForFirestore.add(task);
       }
       
       // 3. Therapy (Mandatory)
       for (var t in _planningTherapy) {
-         await _scheduleService.addTask(effectiveUid, _selectedDate, {
+         final task = {
             "task_name": t['activity_name'],
             "time": t['time'],
             "type": "therapy",
             "completed": false,
             "subtitle": t['duration'],
             "id": "${effectiveUid}_therapy_${t['id']}_${DateTime.now().microsecondsSinceEpoch}",
-            
-            // Behavior Fields (Refactored)
             "scheduledAt": _combineDateAndTime(_selectedDate, t['time']),
             "graceMinutes": 15,
             "status": "scheduled"
-         });
+         };
+         await _scheduleService.addTask(effectiveUid, _selectedDate, task);
+         allTasksForFirestore.add(task);
       }
       
+      // NEW: Persist the entire plan to Firestore for history
+      await _scheduleService.saveScheduleToFirestore(effectiveUid, _selectedDate, allTasksForFirestore);
+
       if (mounted) {
          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Daily Plan Created!")));
          
@@ -460,6 +477,18 @@ class _DailyRoutinePageState extends State<DailyRoutinePage> with SingleTickerPr
         title: Text(_isPlanningMode ? "Plan Your Day" : (widget.elderName != null ? "${widget.elderName}'s Routine" : "My Routine")),
         backgroundColor: Colors.teal,
         foregroundColor: Colors.white,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.history),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ScheduleHistoryPage()),
+              );
+            },
+            tooltip: "View History",
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -834,8 +863,46 @@ class _DailyRoutinePageState extends State<DailyRoutinePage> with SingleTickerPr
 
   Widget _buildTaskTile(Map<String, dynamic> task) {
     final bool isCompleted = task['completed'] == true;
+    final String status = task['status'] ?? (isCompleted ? "completed-confirmed" : "pending");
     final String time = task['time'] ?? "--:--";
     final String subtitle = task['subtitle'] ?? "";
+
+    Color statusColor = Colors.teal;
+    IconData statusIcon = Icons.access_time;
+    String statusLabel = "";
+
+    switch (status) {
+      case 'completed-confirmed':
+        statusColor = Colors.green;
+        statusIcon = Icons.check_circle;
+        statusLabel = "Confirmed";
+        break;
+      case 'completed-likely':
+        statusColor = Colors.green[300]!;
+        statusIcon = Icons.check_circle_outline;
+        statusLabel = "Likely Done";
+        break;
+      case 'missed-likely':
+        statusColor = Colors.orange;
+        statusIcon = Icons.help_outline;
+        statusLabel = "Likely Missed";
+        break;
+      case 'missed-confirmed':
+        statusColor = Colors.red;
+        statusIcon = Icons.cancel;
+        statusLabel = "Missed";
+        break;
+      case 'needs-caregiver-review':
+        statusColor = Colors.purple;
+        statusIcon = Icons.notification_important;
+        statusLabel = "Needs Review";
+        break;
+      case 'pending':
+      default:
+        statusColor = isCompleted ? Colors.green : Colors.teal;
+        statusIcon = isCompleted ? Icons.check : Icons.access_time;
+        break;
+    }
     
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -845,10 +912,10 @@ class _DailyRoutinePageState extends State<DailyRoutinePage> with SingleTickerPr
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         onLongPress: () => _confirmDeleteTask(task),
         leading: CircleAvatar(
-          backgroundColor: isCompleted ? Colors.green[100] : Colors.teal.withOpacity(0.1),
+          backgroundColor: statusColor.withOpacity(0.1),
           child: Icon(
-            isCompleted ? Icons.check : Icons.access_time,
-            color: isCompleted ? Colors.green : Colors.teal,
+            statusIcon,
+            color: statusColor,
           ),
         ),
         title: Text(
@@ -860,9 +927,15 @@ class _DailyRoutinePageState extends State<DailyRoutinePage> with SingleTickerPr
             fontSize: 16
           ),
         ),
-        subtitle: subtitle.isNotEmpty 
-            ? Text(subtitle, style: TextStyle(fontSize: 12, color: Colors.grey[600])) 
-            : null,
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (subtitle.isNotEmpty) 
+               Text(subtitle, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+            if (statusLabel.isNotEmpty)
+               Text(statusLabel, style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: statusColor)),
+          ],
+        ),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -1007,6 +1080,9 @@ class _DailyRoutinePageState extends State<DailyRoutinePage> with SingleTickerPr
         t['completed'] = !currentStatus;
      });
      
+     // Update Firestore for history consistency
+     await _scheduleService.updateFirestoreTaskStatus(effectiveUid, _selectedDate, taskId, !currentStatus);
+
      if (!currentStatus) { 
         // Marking as COMPLETED -> Use new Backend Endpoint (logs event automatically)
         await _scheduleService.completeTask(effectiveUid, _selectedDate, taskId);
