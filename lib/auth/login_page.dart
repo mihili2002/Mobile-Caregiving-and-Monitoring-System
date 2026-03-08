@@ -94,7 +94,7 @@ class _LoginPageState extends State<LoginPage> {
           ),
         );
       } else if (appUser.role == UserRole.caregiver) {
-        // ✅ FIX: caregiver now navigates correctly
+        //  FIX: caregiver now navigates correctly
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(

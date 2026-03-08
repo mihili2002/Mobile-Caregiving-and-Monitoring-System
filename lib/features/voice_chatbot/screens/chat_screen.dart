@@ -1,7 +1,3 @@
-// lib/features/voice_chatbot/screens/chat_screen.dart
-// ✅ UPDATED: session_id is now ALWAYS the elderUid (so caregiver + elder see same emotions)
-// ✅ UPDATED: Removed History + Emotions buttons (and their imports)
-
 import 'package:flutter/material.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:flutter_tts/flutter_tts.dart';
@@ -12,7 +8,7 @@ import 'all_emotion_screen.dart';
 import 'api.dart';
 
 class ChatScreen extends StatefulWidget {
-  // ✅ REQUIRED: elder UID must be passed from Elder dashboard or caregiver dashboard
+  // elder UID must be passed from Elder dashboard or caregiver dashboard
   final String elderUid;
 
   const ChatScreen({
@@ -35,20 +31,20 @@ class _ChatScreenState extends State<ChatScreen> {
   final FlutterTts _tts = FlutterTts();
   bool _ttsEnabled = true;
 
-  // ✅ IMPORTANT: session id = elderUid (same key everywhere)
+  // session id = elderUid
   late final String _sessionId;
 
-  // ⚠️ Chrome/Web: 127.0.0.1
+  // Chrome/Web: 127.0.0.1
   // Android Emulator: 10.0.2.2
   // Real device: your PC LAN IP, e.g. 192.168.1.5
   final String _baseUrl = 'http://127.0.0.1:8000';
 
-  // ---------- Green theme colors ----------
-  static const _green900 = Color(0xFF1B5E20);
-  static const _green800 = Color(0xFF2E7D32);
-  static const _green700 = Color(0xFF388E3C);
-  static const _green200 = Color(0xFFC8E6C9);
-  static const _mint = Color(0xFFF1F8E9);
+  // ---------- Teal theme colors ----------
+  static const _teal900 = Color(0xFF00695C);
+  static const _teal800 = Color(0xFF00897B);
+  static const _teal700 = Color(0xFF00A693); // main theme color
+  static const _teal200 = Color(0xFFB2DFDB);
+  static const _mint = Color(0xFFE0F2F1);
 
   @override
   void initState() {
@@ -56,7 +52,6 @@ class _ChatScreenState extends State<ChatScreen> {
     _speech = stt.SpeechToText();
     _initTts();
 
-    // ✅ session is fixed to elderUid
     _sessionId = widget.elderUid.trim();
 
     debugPrint("CHAT SCREEN elderUid/session_id = $_sessionId");
@@ -83,8 +78,9 @@ class _ChatScreenState extends State<ChatScreen> {
     });
 
     _speech.listen(
-      onResult: (result) =>
-          setState(() => _recognizedText = result.recognizedWords),
+      onResult: (result) {
+        setState(() => _recognizedText = result.recognizedWords);
+      },
     );
   }
 
@@ -156,7 +152,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
       final data = await api.postJson("/chatbot/chat", {
         "message": text,
-        "session_id": _sessionId, // ✅ always elderUid
+        "session_id": _sessionId,
       });
 
       final reply = data["reply"] ?? "No reply";
@@ -193,7 +189,7 @@ class _ChatScreenState extends State<ChatScreen> {
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
       elevation: 0,
-      backgroundColor: _green900,
+      backgroundColor: _teal900,
       title: const Text(
         'Voice Chatbot',
         style: TextStyle(fontWeight: FontWeight.w700),
@@ -204,7 +200,6 @@ class _ChatScreenState extends State<ChatScreen> {
           icon: const Icon(Icons.question_answer),
           onPressed: _openQaDialog,
         ),
-
         IconButton(
           tooltip: "All Sessions",
           icon: const Icon(Icons.list_alt),
@@ -217,8 +212,6 @@ class _ChatScreenState extends State<ChatScreen> {
             );
           },
         ),
-
-        // ✅ Keep only this emotions page (charts screen)
         IconButton(
           tooltip: "All Emotions (Weekly)",
           icon: const Icon(Icons.calendar_month),
@@ -235,7 +228,6 @@ class _ChatScreenState extends State<ChatScreen> {
             );
           },
         ),
-
         IconButton(
           tooltip: _ttsEnabled ? "Mute" : "Unmute",
           icon: Icon(_ttsEnabled ? Icons.volume_up : Icons.volume_off),
@@ -259,7 +251,7 @@ class _ChatScreenState extends State<ChatScreen> {
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.85),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: _green200.withOpacity(0.8)),
+        border: Border.all(color: _teal200.withOpacity(0.8)),
         boxShadow: [
           BoxShadow(
             blurRadius: 18,
@@ -275,7 +267,7 @@ class _ChatScreenState extends State<ChatScreen> {
             width: 10,
             height: 10,
             decoration: BoxDecoration(
-              color: _isListening ? Colors.redAccent : _green700,
+              color: _isListening ? Colors.redAccent : _teal700,
               shape: BoxShape.circle,
             ),
           ),
@@ -284,7 +276,7 @@ class _ChatScreenState extends State<ChatScreen> {
             child: Text(
               text,
               style: TextStyle(
-                color: _green900.withOpacity(0.9),
+                color: _teal900.withOpacity(0.9),
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -305,7 +297,7 @@ class _ChatScreenState extends State<ChatScreen> {
         decoration: BoxDecoration(
           color: Colors.white.withOpacity(0.88),
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: _green200.withOpacity(0.9)),
+          border: Border.all(color: _teal200.withOpacity(0.9)),
           boxShadow: [
             BoxShadow(
               blurRadius: 24,
@@ -323,7 +315,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     "Start a conversation.\nTry: “I feel stressed today.”",
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      color: _green800.withOpacity(0.85),
+                      color: _teal800.withOpacity(0.85),
                       height: 1.5,
                       fontWeight: FontWeight.w600,
                     ),
@@ -335,9 +327,9 @@ class _ChatScreenState extends State<ChatScreen> {
                 itemCount: _messages.length,
                 itemBuilder: (_, i) => _StyledBubble(
                   msg: _messages[i],
-                  green900: _green900,
-                  green700: _green700,
-                  green200: _green200,
+                  teal900: _teal900,
+                  teal700: _teal700,
+                  teal200: _teal200,
                 ),
               ),
       ),
@@ -352,7 +344,7 @@ class _ChatScreenState extends State<ChatScreen> {
         decoration: BoxDecoration(
           color: Colors.white.withOpacity(0.92),
           border: Border(
-            top: BorderSide(color: _green200.withOpacity(0.8)),
+            top: BorderSide(color: _teal200.withOpacity(0.8)),
           ),
         ),
         child: Row(
@@ -366,18 +358,20 @@ class _ChatScreenState extends State<ChatScreen> {
                 onSubmitted: (_) => _sendMessage(_textController.text),
                 decoration: InputDecoration(
                   hintText: _isListening ? "Listening…" : "Type your message…",
-                  hintStyle: TextStyle(color: _green700.withOpacity(0.55)),
+                  hintStyle: TextStyle(color: _teal700.withOpacity(0.55)),
                   filled: true,
                   fillColor: _mint,
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 12,
+                  ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide(color: _green200),
+                    borderSide: BorderSide(color: _teal200),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(16),
-                    borderSide: const BorderSide(color: _green700, width: 1.4),
+                    borderSide: const BorderSide(color: _teal700, width: 1.4),
                   ),
                 ),
               ),
@@ -385,7 +379,7 @@ class _ChatScreenState extends State<ChatScreen> {
             const SizedBox(width: 10),
             _RoundIconButton(
               tooltip: "Send",
-              color: _green700,
+              color: _teal700,
               icon: Icons.send_rounded,
               onTap: () => _sendMessage(_textController.text),
             ),
@@ -394,7 +388,7 @@ class _ChatScreenState extends State<ChatScreen> {
               duration: const Duration(milliseconds: 180),
               child: _RoundIconButton(
                 tooltip: _isListening ? "Stop" : "Mic",
-                color: _isListening ? Colors.redAccent : _green900,
+                color: _isListening ? Colors.redAccent : _teal900,
                 icon: _isListening ? Icons.stop_circle : Icons.mic,
                 onTap: _isListening ? _stopListening : _startListening,
               ),
@@ -416,7 +410,7 @@ class _ChatScreenState extends State<ChatScreen> {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              _green900.withOpacity(0.18),
+              _teal900.withOpacity(0.18),
               _mint,
             ],
           ),
@@ -458,9 +452,9 @@ class _RoundIconButton extends StatelessWidget {
         onTap: onTap,
         child: Tooltip(
           message: tooltip,
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Icon(icon, color: Colors.white),
+          child: const Padding(
+            padding: EdgeInsets.all(12),
+            child: Icon(Icons.circle, color: Colors.transparent),
           ),
         ),
       ),
@@ -470,23 +464,23 @@ class _RoundIconButton extends StatelessWidget {
 
 class _StyledBubble extends StatelessWidget {
   final ChatMessage msg;
-  final Color green900;
-  final Color green700;
-  final Color green200;
+  final Color teal900;
+  final Color teal700;
+  final Color teal200;
 
   const _StyledBubble({
     required this.msg,
-    required this.green900,
-    required this.green700,
-    required this.green200,
+    required this.teal900,
+    required this.teal700,
+    required this.teal200,
   });
 
   @override
   Widget build(BuildContext context) {
     final isUser = msg.isUser;
 
-    final bubbleColor = isUser ? green700 : Colors.white;
-    final textColor = isUser ? Colors.white : green900;
+    final bubbleColor = isUser ? teal700 : Colors.white;
+    final textColor = isUser ? Colors.white : teal900;
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 7),
@@ -505,7 +499,7 @@ class _StyledBubble extends StatelessWidget {
                 bottomRight: Radius.circular(isUser ? 4 : 18),
               ),
               border: Border.all(
-                color: isUser ? Colors.transparent : green200.withOpacity(0.85),
+                color: isUser ? Colors.transparent : teal200.withOpacity(0.85),
               ),
             ),
             child: Text(
