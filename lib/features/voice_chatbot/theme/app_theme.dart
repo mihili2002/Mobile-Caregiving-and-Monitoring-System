@@ -10,7 +10,7 @@ class AppTheme {
   static const Color bgBottom = Color(0xFFE0F2F1);
 
   static ThemeData lightTheme = ThemeData(
-    useMaterial3: true,
+    useMaterial3: false,
     scaffoldBackgroundColor: bgTop,
 
     colorScheme: ColorScheme.fromSeed(
