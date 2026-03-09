@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'dart:convert';
+
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:firebase_auth/firebase_auth.dart';
 
 import 'history_qa_screen.dart';
 
@@ -24,8 +26,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
   String _error = "";
   List<Map<String, dynamic>> _messages = [];
 
-  static const _brown900 = Color(0xFF3E2723);
-  static const _cream = Color(0xFFF7F3EF);
+  static const green = Color(0xFF00BBA7);
+  static const greenDark = Color(0xFF009E8D);
+  static const mintBg = Color(0xFFF2FBF7);
+  static const botBubble = Colors.white;
+  static const elderBubble = Color(0xFFDDF7F3);
 
   @override
   void initState() {
@@ -33,7 +38,15 @@ class _HistoryScreenState extends State<HistoryScreen> {
     _loadHistory();
   }
 
+  bool _isBot(String sender) => sender.toLowerCase() == "bot";
+
+  String _labelForSender(String sender) {
+    return _isBot(sender) ? "Bot" : "Elder";
+  }
+
   Future<void> _loadHistory() async {
+    if (!mounted) return;
+
     setState(() {
       _loading = true;
       _error = "";
@@ -42,6 +55,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
+        if (!mounted) return;
         setState(() {
           _error = "Not logged in";
           _loading = false;
@@ -52,17 +66,23 @@ class _HistoryScreenState extends State<HistoryScreen> {
       final token = await user.getIdToken();
 
       final uri = Uri.parse(
-        "${widget.baseUrl}/chatbot/history/${widget.sessionId}?days=0",
+        "${widget.baseUrl}/chatbot/sessions/${widget.sessionId}/messages?limit=500",
       );
+
+      debugPrint("Loading history: $uri");
 
       final res = await http.get(
         uri,
-        headers: {"Authorization": "Bearer $token"},
-      );
+        headers: {
+          "Authorization": "Bearer $token",
+        },
+      ).timeout(const Duration(seconds: 15));
+
+      debugPrint("History status: ${res.statusCode}");
 
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body);
-        final raw = (data["messages"] as List?) ?? [];
+        final raw = (data["items"] as List?) ?? [];
 
         final parsed = <Map<String, dynamic>>[];
         for (final m in raw) {
@@ -71,35 +91,230 @@ class _HistoryScreenState extends State<HistoryScreen> {
           }
         }
 
+        if (!mounted) return;
         setState(() {
           _messages = parsed;
           _loading = false;
         });
       } else {
+        if (!mounted) return;
         setState(() {
           _error = "Failed to load history (${res.statusCode})";
           _loading = false;
         });
       }
-    } catch (e) {
+    } on TimeoutException {
+      if (!mounted) return;
       setState(() {
-        _error = "Error: $e";
+        _error = "History request timed out";
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = "Error loading history: $e";
         _loading = false;
       });
     }
   }
 
+  String _formatDateTime(String raw) {
+    if (raw.trim().isEmpty) return "";
+
+    try {
+      final dt = DateTime.parse(raw).toLocal();
+
+      final day = dt.day.toString().padLeft(2, '0');
+      final month = dt.month.toString().padLeft(2, '0');
+      final year = dt.year.toString();
+
+      int hour = dt.hour;
+      final minute = dt.minute.toString().padLeft(2, '0');
+      final ampm = hour >= 12 ? "PM" : "AM";
+
+      hour = hour % 12;
+      if (hour == 0) hour = 12;
+
+      return "$day/$month/$year  $hour:$minute $ampm";
+    } catch (_) {
+      return raw;
+    }
+  }
+
+  Widget _buildMetaChip(String text) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontSize: 11,
+          color: Colors.grey.shade700,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMessageBubble(Map<String, dynamic> m) {
+    final sender = (m["sender"] ?? "").toString();
+    final text = (m["text"] ?? "").toString().trim();
+    final emotion = (m["emotion"] ?? "").toString().trim();
+    final intent = (m["intent"] ?? "").toString().trim();
+    final rawTs = ((m["createdAtIso"] ?? m["displayTime"] ?? "")).toString();
+    final ts = _formatDateTime(rawTs);
+
+    final isBot = _isBot(sender);
+    final label = _labelForSender(sender);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Align(
+        alignment: isBot ? Alignment.centerLeft : Alignment.centerRight,
+        child: Column(
+          crossAxisAlignment:
+              isBot ? CrossAxisAlignment.start : CrossAxisAlignment.end,
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: isBot ? Colors.white : greenDark.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: isBot ? greenDark : greenDark,
+                  ),
+                ),
+              ),
+            ),
+            Container(
+              margin: const EdgeInsets.only(top: 4),
+              padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
+              constraints: BoxConstraints(
+                maxWidth: MediaQuery.of(context).size.width * 0.80,
+              ),
+              decoration: BoxDecoration(
+                color: isBot ? botBubble : elderBubble,
+                borderRadius: BorderRadius.only(
+                  topLeft: const Radius.circular(18),
+                  topRight: const Radius.circular(18),
+                  bottomLeft: Radius.circular(isBot ? 6 : 18),
+                  bottomRight: Radius.circular(isBot ? 18 : 6),
+                ),
+                border: Border.all(
+                  color: isBot
+                      ? Colors.grey.shade200
+                      : greenDark.withOpacity(0.18),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.04),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment:
+                    isBot ? CrossAxisAlignment.start : CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    text.isEmpty ? "-" : text,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      height: 1.45,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    alignment:
+                        isBot ? WrapAlignment.start : WrapAlignment.end,
+                    children: [
+                      if (ts.isNotEmpty) _buildMetaChip(ts),
+                      if (emotion.isNotEmpty) _buildMetaChip("Emotion: $emotion"),
+                      if (intent.isNotEmpty) _buildMetaChip("Intent: $intent"),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBody() {
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_error.isNotEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Text(
+            _error,
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 15),
+          ),
+        ),
+      );
+    }
+
+    if (_messages.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.chat_bubble_outline, size: 42, color: Colors.grey.shade500),
+            const SizedBox(height: 12),
+            Text(
+              "No messages found",
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.grey.shade700,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(12, 14, 12, 24),
+      itemCount: _messages.length,
+      itemBuilder: (_, i) => _buildMessageBubble(_messages[i]),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _cream,
+      backgroundColor: mintBg,
       appBar: AppBar(
-        backgroundColor: _brown900,
-        title: Text("History: ${widget.sessionId}"),
+        elevation: 0,
+        backgroundColor: greenDark,
+        title: const Text("Chat History"),
+        centerTitle: true,
         actions: [
-          IconButton(icon: const Icon(Icons.refresh), onPressed: _loadHistory),
-
-          // ✅ NEW: Q&A button
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _loadHistory,
+          ),
           IconButton(
             icon: const Icon(Icons.question_answer),
             onPressed: () {
@@ -116,84 +331,24 @@ class _HistoryScreenState extends State<HistoryScreen> {
           ),
         ],
       ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : _error.isNotEmpty
-              ? Center(child: Text(_error))
-              : ListView.builder(
-                  padding: const EdgeInsets.all(12),
-                  itemCount: _messages.length,
-                  itemBuilder: (_, i) {
-                    final m = _messages[i];
-
-                    final sender = (m["sender"] ?? "").toString();
-                    final text = (m["text"] ?? "").toString();
-                    final emotion = (m["emotion"] ?? "").toString();
-                    final intent = (m["intent"] ?? "").toString();
-                    final ts = (m["createdAtIso"] ?? "").toString();
-
-                    final isUser = sender == "user";
-
-                    return Align(
-                      alignment:
-                          isUser ? Alignment.centerRight : Alignment.centerLeft,
-                      child: Container(
-                        margin: const EdgeInsets.symmetric(vertical: 6),
-                        padding: const EdgeInsets.all(12),
-                        constraints: BoxConstraints(
-                          maxWidth:
-                              MediaQuery.of(context).size.width * 0.78,
-                        ),
-                        decoration: BoxDecoration(
-                          color: isUser ? Colors.brown.shade200 : Colors.white,
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: isUser
-                              ? CrossAxisAlignment.end
-                              : CrossAxisAlignment.start,
-                          children: [
-                            Text(text, style: const TextStyle(fontSize: 15)),
-                            const SizedBox(height: 6),
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                if (ts.isNotEmpty)
-                                  Text(
-                                    ts,
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: Colors.grey.shade700,
-                                    ),
-                                  ),
-                                if (emotion.isNotEmpty && isUser) ...[
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    "emotion: $emotion",
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: Colors.grey.shade700,
-                                    ),
-                                  ),
-                                ],
-                                if (intent.isNotEmpty && !isUser) ...[
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    "intent: $intent",
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: Colors.grey.shade700,
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
-                ),
+      body: Column(
+        children: [
+          Container(
+            width: double.infinity,
+            color: greenDark,
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+            child: Text(
+              "Session: ${widget.sessionId}",
+              style: const TextStyle(
+                color: Colors.white70,
+                fontSize: 12,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          Expanded(child: _buildBody()),
+        ],
+      ),
     );
   }
 }

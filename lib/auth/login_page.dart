@@ -100,6 +100,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
           MaterialPageRoute(builder: (_) => ElderDashboard(user: appUser)),
         );
       } else if (appUser.role == UserRole.caregiver) {
+        //  FIX: caregiver now navigates correctly
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => CaregiverDashboard(user: appUser)),
