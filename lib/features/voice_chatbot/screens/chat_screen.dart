@@ -43,12 +43,12 @@ class _ChatScreenState extends State<ChatScreen> {
   // Real device: your PC LAN IP, e.g. 192.168.1.5
   final String _baseUrl = 'http://127.0.0.1:8000';
 
-  // ---------- Green theme colors ----------
-  static const _green900 = Color(0xFF1B5E20);
-  static const _green800 = Color(0xFF2E7D32);
-  static const _green700 = Color(0xFF388E3C);
-  static const _green200 = Color(0xFFC8E6C9);
-  static const _mint = Color(0xFFF1F8E9);
+  // ---------- Teal theme colors ----------
+  static const _teal900 = Color(0xFF007A6E);
+  static const _teal800 = Color(0xFF00897B);
+  static const _teal700 = Color(0xFF009688);
+  static const _teal200 = Color(0xFFB2EBF2);
+  static const _softBg = Color(0xFFF0F9F8);
 
   @override
   void initState() {
@@ -193,7 +193,7 @@ class _ChatScreenState extends State<ChatScreen> {
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
       elevation: 0,
-      backgroundColor: _green900,
+      backgroundColor: _teal800,
       title: const Text(
         'Voice Chatbot',
         style: TextStyle(fontWeight: FontWeight.w700),
@@ -259,7 +259,7 @@ class _ChatScreenState extends State<ChatScreen> {
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.85),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: _green200.withOpacity(0.8)),
+        border: Border.all(color: _teal200.withOpacity(0.8)),
         boxShadow: [
           BoxShadow(
             blurRadius: 18,
@@ -275,7 +275,7 @@ class _ChatScreenState extends State<ChatScreen> {
             width: 10,
             height: 10,
             decoration: BoxDecoration(
-              color: _isListening ? Colors.redAccent : _green700,
+              color: _isListening ? Colors.redAccent : _teal700,
               shape: BoxShape.circle,
             ),
           ),
@@ -284,7 +284,7 @@ class _ChatScreenState extends State<ChatScreen> {
             child: Text(
               text,
               style: TextStyle(
-                color: _green900.withOpacity(0.9),
+                color: _teal900.withOpacity(0.9),
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -305,7 +305,7 @@ class _ChatScreenState extends State<ChatScreen> {
         decoration: BoxDecoration(
           color: Colors.white.withOpacity(0.88),
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: _green200.withOpacity(0.9)),
+          border: Border.all(color: _teal200.withOpacity(0.9)),
           boxShadow: [
             BoxShadow(
               blurRadius: 24,
@@ -323,7 +323,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     "Start a conversation.\nTry: “I feel stressed today.”",
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      color: _green800.withOpacity(0.85),
+                      color: _teal800.withOpacity(0.85),
                       height: 1.5,
                       fontWeight: FontWeight.w600,
                     ),
@@ -335,9 +335,9 @@ class _ChatScreenState extends State<ChatScreen> {
                 itemCount: _messages.length,
                 itemBuilder: (_, i) => _StyledBubble(
                   msg: _messages[i],
-                  green900: _green900,
-                  green700: _green700,
-                  green200: _green200,
+                  green900: _teal900,
+                  green700: _teal700,
+                  green200: _teal200,
                 ),
               ),
       ),
@@ -352,7 +352,7 @@ class _ChatScreenState extends State<ChatScreen> {
         decoration: BoxDecoration(
           color: Colors.white.withOpacity(0.92),
           border: Border(
-            top: BorderSide(color: _green200.withOpacity(0.8)),
+            top: BorderSide(color: _teal200.withOpacity(0.8)),
           ),
         ),
         child: Row(
@@ -366,18 +366,18 @@ class _ChatScreenState extends State<ChatScreen> {
                 onSubmitted: (_) => _sendMessage(_textController.text),
                 decoration: InputDecoration(
                   hintText: _isListening ? "Listening…" : "Type your message…",
-                  hintStyle: TextStyle(color: _green700.withOpacity(0.55)),
+                  hintStyle: TextStyle(color: _teal700.withOpacity(0.55)),
                   filled: true,
-                  fillColor: _mint,
+                  fillColor: _softBg,
                   contentPadding:
                       const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide(color: _green200),
+                    borderSide: BorderSide(color: _teal200),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(16),
-                    borderSide: const BorderSide(color: _green700, width: 1.4),
+                    borderSide: const BorderSide(color: _teal700, width: 1.4),
                   ),
                 ),
               ),
@@ -385,7 +385,7 @@ class _ChatScreenState extends State<ChatScreen> {
             const SizedBox(width: 10),
             _RoundIconButton(
               tooltip: "Send",
-              color: _green700,
+              color: _teal700,
               icon: Icons.send_rounded,
               onTap: () => _sendMessage(_textController.text),
             ),
@@ -394,7 +394,7 @@ class _ChatScreenState extends State<ChatScreen> {
               duration: const Duration(milliseconds: 180),
               child: _RoundIconButton(
                 tooltip: _isListening ? "Stop" : "Mic",
-                color: _isListening ? Colors.redAccent : _green900,
+                color: _isListening ? Colors.redAccent : _teal900,
                 icon: _isListening ? Icons.stop_circle : Icons.mic,
                 onTap: _isListening ? _stopListening : _startListening,
               ),
@@ -409,15 +409,15 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: _buildAppBar(),
-      backgroundColor: _mint,
+      backgroundColor: _softBg,
       body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              _green900.withOpacity(0.18),
-              _mint,
+              _teal900.withOpacity(0.18),
+              _softBg,
             ],
           ),
         ),
