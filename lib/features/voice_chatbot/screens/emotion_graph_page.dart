@@ -62,17 +62,19 @@ class _EmotionGraphPageState extends State<EmotionGraphPage> {
 
       final parsed = items.map((e) {
         final m = e as Map<String, dynamic>;
-        final ts = DateTime.parse(m['created_at'] as String);
-        final emotion = (m['emotion'] ?? 'unknown').toString();
+        final ts = DateTime.parse(m['created_at'] as String).toLocal();
+        final rawEmotion = (m['emotion'] ?? '').toString();
+        final normalizedEmotion = _normalizeEmotionKey(rawEmotion);
         final confidence = (m['confidence'] is num)
             ? (m['confidence'] as num).toDouble()
             : null;
 
         return _EmotionPoint(
           createdAt: ts,
-          emotion: emotion,
+          emotionKey: normalizedEmotion,
+          emotionLabel: _emotionLabel(normalizedEmotion),
           confidence: confidence,
-          score: _emotionToScore(emotion),
+          score: _emotionScore(normalizedEmotion),
         );
       }).toList();
 
@@ -92,16 +94,68 @@ class _EmotionGraphPageState extends State<EmotionGraphPage> {
     }
   }
 
-  double _emotionToScore(String emotion) {
-    final key = emotion.toLowerCase();
+  String _normalizeEmotionKey(String emotion) {
+    final key = emotion.trim().toUpperCase();
 
-    if (key.contains('happy') || key.contains('excited')) return 2.0;
-    if (key.contains('neutral') || key.contains('calm')) return 1.0;
-    if (key.contains('sad') || key.contains('depressed')) return 0.0;
-    if (key.contains('angry')) return 0.0;
-    if (key.contains('fear') || key.contains('anx')) return 0.0;
+    if (key == 'Q1' ||
+        key.contains('HAPPY') ||
+        key.contains('EXCITED') ||
+        key.contains('POSITIVE')) {
+      return 'happy';
+    }
 
-    return 1.0;
+    if (key == 'Q4' ||
+        key.contains('CALM') ||
+        key.contains('RELAXED')) {
+      return 'calm';
+    }
+
+    if (key == 'Q2' ||
+        key.contains('ANGRY') ||
+        key.contains('FEARFUL') ||
+        key.contains('FEAR') ||
+        key.contains('ANX')) {
+      return 'angry';
+    }
+
+    if (key == 'Q3' ||
+        key.contains('SAD') ||
+        key.contains('DEPRESSED') ||
+        key.contains('NEGATIVE')) {
+      return 'sad';
+    }
+
+    return 'calm';
+  }
+
+  double _emotionScore(String emotionKey) {
+    switch (emotionKey) {
+      case 'sad':
+        return 0.0;
+      case 'angry':
+        return 1.0;
+      case 'calm':
+        return 2.0;
+      case 'happy':
+        return 3.0;
+      default:
+        return 2.0;
+    }
+  }
+
+  String _emotionLabel(String emotionKey) {
+    switch (emotionKey) {
+      case 'sad':
+        return 'Sad / Depressed';
+      case 'angry':
+        return 'Angry / Fearful';
+      case 'calm':
+        return 'Calm / Relaxed';
+      case 'happy':
+        return 'Happy / Excited';
+      default:
+        return 'Calm / Relaxed';
+    }
   }
 
   List<_EmotionPoint> _aggregateByDay(List<_EmotionPoint> raw) {
@@ -121,8 +175,21 @@ class _EmotionGraphPageState extends State<EmotionGraphPage> {
 
     for (final key in keys) {
       final items = grouped[key]!;
-      final avgScore =
-          items.map((e) => e.score).reduce((a, b) => a + b) / items.length;
+
+      final counts = <String, int>{};
+      for (final item in items) {
+        counts[item.emotionKey] = (counts[item.emotionKey] ?? 0) + 1;
+      }
+
+      String dominantEmotionKey = items.first.emotionKey;
+      int maxCount = 0;
+
+      counts.forEach((emotionKey, count) {
+        if (count > maxCount) {
+          maxCount = count;
+          dominantEmotionKey = emotionKey;
+        }
+      });
 
       final avgConfidenceValues = items
           .where((e) => e.confidence != null)
@@ -143,20 +210,15 @@ class _EmotionGraphPageState extends State<EmotionGraphPage> {
       result.add(
         _EmotionPoint(
           createdAt: date,
-          emotion: _scoreToLabel(avgScore),
+          emotionKey: dominantEmotionKey,
+          emotionLabel: _emotionLabel(dominantEmotionKey),
           confidence: avgConfidence,
-          score: avgScore,
+          score: _emotionScore(dominantEmotionKey),
         ),
       );
     }
 
     return result;
-  }
-
-  String _scoreToLabel(double score) {
-    if (score >= 1.5) return 'Happy';
-    if (score >= 0.5) return 'Neutral';
-    return 'Sad';
   }
 
   @override
@@ -236,7 +298,7 @@ class _EmotionGraphPageState extends State<EmotionGraphPage> {
               const Align(
                 alignment: Alignment.centerLeft,
                 child: Text(
-                  'Daily average mood: Sad = 0, Neutral = 1, Happy = 2',
+                  'Daily emotion score: Sad/Depressed = 0, Angry/Fearful = 1, Calm/Relaxed = 2, Happy/Excited = 3',
                   style: TextStyle(color: Colors.black54),
                 ),
               ),
@@ -270,7 +332,7 @@ class _EmotionLineChart extends StatelessWidget {
     return LineChart(
       LineChartData(
         minY: -0.2,
-        maxY: 2.2,
+        maxY: 3.2,
         minX: 0,
         maxX: (points.length - 1).toDouble(),
         clipData: const FlClipData.all(),
@@ -302,7 +364,7 @@ class _EmotionLineChart extends StatelessWidget {
             axisNameWidget: const Padding(
               padding: EdgeInsets.only(bottom: 8),
               child: Text(
-                'Mood',
+                'Emotion',
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
@@ -311,13 +373,14 @@ class _EmotionLineChart extends StatelessWidget {
             ),
             sideTitles: SideTitles(
               showTitles: true,
-              reservedSize: 52,
+              reservedSize: 110,
               interval: 1,
               getTitlesWidget: (value, meta) {
                 String label = '';
-                if ((value - 0).abs() < 0.1) label = 'Sad';
-                if ((value - 1).abs() < 0.1) label = 'Neutral';
-                if ((value - 2).abs() < 0.1) label = 'Happy';
+                if ((value - 0).abs() < 0.1) label = 'Sad / Depressed';
+                if ((value - 1).abs() < 0.1) label = 'Angry / Fearful';
+                if ((value - 2).abs() < 0.1) label = 'Calm / Relaxed';
+                if ((value - 3).abs() < 0.1) label = 'Happy / Excited';
 
                 if (label.isEmpty) return const SizedBox.shrink();
 
@@ -392,7 +455,7 @@ class _EmotionLineChart extends StatelessWidget {
                     : '';
 
                 return LineTooltipItem(
-                  '$date\nMood: ${p.emotion}\nScore: ${p.score.toStringAsFixed(1)}$confidenceText',
+                  '$date\nEmotion: ${p.emotionLabel}\nScore: ${p.score.toStringAsFixed(1)}$confidenceText',
                   const TextStyle(
                     color: Colors.white,
                     fontSize: 12,
@@ -483,13 +546,15 @@ class _ErrorView extends StatelessWidget {
 
 class _EmotionPoint {
   final DateTime createdAt;
-  final String emotion;
+  final String emotionKey;
+  final String emotionLabel;
   final double? confidence;
   final double score;
 
   _EmotionPoint({
     required this.createdAt,
-    required this.emotion,
+    required this.emotionKey,
+    required this.emotionLabel,
     required this.score,
     this.confidence,
   });
