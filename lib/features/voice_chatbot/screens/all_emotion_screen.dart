@@ -32,11 +32,11 @@ class _AllEmotionsScreenState extends State<AllEmotionsScreen>
   late TabController _tab;
   bool _hasLoaded = false;
 
-  // GREEN THEME
-  static const _green900 = Color(0xFF00A693);
-  static const _green700 = Color(0xFF00A693);
-  static const _green200 = Color(0xFFA7DCCB);
-  static const _mint = Color(0xFFF2FBF7);
+  // TEAL THEME
+  static const _teal900 = Color(0xFF007A6E);
+  static const _teal700 = Color(0xFF009688);
+  static const _teal200 = Color(0xFFB2EBF2);
+  static const _softBg = Color(0xFFF0F9F8);
 
   @override
   void initState() {
@@ -227,7 +227,7 @@ class _AllEmotionsScreenState extends State<AllEmotionsScreen>
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: _green200),
+          border: Border.all(color: _teal200),
         ),
         child: SizedBox(
           height: 260,
@@ -334,7 +334,7 @@ class _AllEmotionsScreenState extends State<AllEmotionsScreen>
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: _green200),
+          border: Border.all(color: _teal200),
         ),
         child: SizedBox(
           height: 260,
@@ -379,7 +379,7 @@ class _AllEmotionsScreenState extends State<AllEmotionsScreen>
                   isCurved: true,
                   dotData: const FlDotData(show: true),
                   barWidth: 3,
-                  color: _green700,
+                  color: _teal700,
                 ),
               ],
             ),
@@ -420,7 +420,7 @@ class _AllEmotionsScreenState extends State<AllEmotionsScreen>
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: _green200),
+          border: Border.all(color: _teal200),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -465,7 +465,7 @@ class _AllEmotionsScreenState extends State<AllEmotionsScreen>
                               label,
                               style: const TextStyle(
                                 fontWeight: FontWeight.w800,
-                                color: _green700,
+                                color: _teal700,
                               ),
                             ),
                           ),
@@ -478,7 +478,7 @@ class _AllEmotionsScreenState extends State<AllEmotionsScreen>
                               decoration: BoxDecoration(
                                 color: cellColor(e, c),
                                 borderRadius: BorderRadius.circular(6),
-                                border: Border.all(color: _green200),
+                                border: Border.all(color: _teal200),
                               ),
                               alignment: Alignment.center,
                               child: Text(
@@ -520,7 +520,7 @@ class _AllEmotionsScreenState extends State<AllEmotionsScreen>
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: _green200),
+            border: Border.all(color: _teal200),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -539,7 +539,7 @@ class _AllEmotionsScreenState extends State<AllEmotionsScreen>
               Text(
                 time,
                 style: TextStyle(
-                  color: _green900.withOpacity(0.75),
+                  color: _teal900.withOpacity(0.75),
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -566,9 +566,9 @@ class _AllEmotionsScreenState extends State<AllEmotionsScreen>
         : "Emotions • $uid • last ${widget.days} days";
 
     return Scaffold(
-      backgroundColor: _mint,
+      backgroundColor: _softBg,
       appBar: AppBar(
-        backgroundColor: _green900,
+        backgroundColor: _teal900,
         title: Text(title),
         actions: [
           IconButton(

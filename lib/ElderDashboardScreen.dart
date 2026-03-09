@@ -405,7 +405,7 @@ class _FeatureCard extends StatelessWidget {
                       ),
                       child: Icon(icon, color: Colors.white, size: 26),
                     ),
-                    const Spacer(),
+                    const SizedBox(height: 16),
                     Text(
                       title,
                       style: theme.textTheme.titleMedium?.copyWith(
