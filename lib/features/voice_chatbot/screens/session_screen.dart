@@ -1,8 +1,11 @@
 import 'dart:convert';
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'history_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+
+import 'history_screen.dart';
 
 class SessionsScreen extends StatefulWidget {
   final String baseUrl;
@@ -18,7 +21,6 @@ class _SessionsScreenState extends State<SessionsScreen> {
   List<Map<String, dynamic>> _sessions = [];
 
   static const _green900 = Color(0xFF00A693);
-  static const _green200 = Color(0xFFA7DCCB);
   static const _mint = Color(0xFFF2FBF7);
 
   @override
@@ -28,6 +30,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
   }
 
   Future<void> _loadSessions() async {
+    if (!mounted) return;
     setState(() {
       _loading = true;
       _error = "";
@@ -36,6 +39,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
+        if (!mounted) return;
         setState(() {
           _error = "Not logged in";
           _loading = false;
@@ -44,17 +48,22 @@ class _SessionsScreenState extends State<SessionsScreen> {
       }
 
       final token = await user.getIdToken();
-      final uri =
-          Uri.parse("${widget.baseUrl}/chatbot/sessions?limit=50");
+      final uri = Uri.parse("${widget.baseUrl}/chatbot/sessions?limit=50");
 
-      final res = await http.get(
-        uri,
-        headers: {"Authorization": "Bearer $token"},
-      );
+      debugPrint("Calling sessions API: $uri");
+      debugPrint("Base URL: ${widget.baseUrl}");
+
+      final res = await http
+          .get(uri, headers: {"Authorization": "Bearer $token"})
+          .timeout(const Duration(seconds: 15));
+
+      debugPrint("Status: ${res.statusCode}");
+      debugPrint("Body: ${res.body}");
 
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body);
-        final raw = (data["items"] as List?) ?? [];
+
+        final raw = (data is Map ? data["items"] : null) as List? ?? [];
 
         final parsed = <Map<String, dynamic>>[];
         for (final s in raw) {
@@ -63,19 +72,28 @@ class _SessionsScreenState extends State<SessionsScreen> {
           }
         }
 
+        if (!mounted) return;
         setState(() {
           _sessions = parsed;
           _loading = false;
         });
       } else {
+        if (!mounted) return;
         setState(() {
-          _error = "Failed (${res.statusCode})";
+          _error = "Failed (${res.statusCode})\nURL: $uri\nBody: ${res.body}";
           _loading = false;
         });
       }
-    } catch (e) {
+    } on TimeoutException catch (e) {
+      if (!mounted) return;
       setState(() {
-        _error = "Error: $e";
+        _error = "Request timed out: $e\nURL: ${widget.baseUrl}/chatbot/sessions?limit=50";
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = "Error loading sessions: $e\nURL: ${widget.baseUrl}/chatbot/sessions?limit=50";
         _loading = false;
       });
     }
@@ -89,16 +107,14 @@ class _SessionsScreenState extends State<SessionsScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text("Delete session?"),
-        content: const Text(
-            "This will permanently delete this chat session."),
+        content: const Text("This will permanently delete this chat session."),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
             child: const Text("Cancel"),
           ),
           ElevatedButton(
-            style:
-                ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text("Delete"),
           ),
@@ -108,27 +124,44 @@ class _SessionsScreenState extends State<SessionsScreen> {
 
     if (confirm != true) return;
 
-    final token = await user.getIdToken();
-    final uri = Uri.parse(
-        "${widget.baseUrl}/chatbot/sessions/$sessionId");
+    try {
+      final token = await user.getIdToken();
+      final uri = Uri.parse("${widget.baseUrl}/chatbot/sessions/$sessionId");
 
-    final res = await http.delete(
-      uri,
-      headers: {"Authorization": "Bearer $token"},
-    );
+      debugPrint("Deleting session: $uri");
 
-    if (res.statusCode == 200) {
-      setState(() {
-        _sessions.removeWhere(
-            (s) => s["session_id"] == sessionId);
-      });
+      final res = await http
+          .delete(uri, headers: {"Authorization": "Bearer $token"})
+          .timeout(const Duration(seconds: 15));
 
+      debugPrint("Delete status: ${res.statusCode}");
+      debugPrint("Delete body: ${res.body}");
+
+      if (res.statusCode == 200) {
+        if (!mounted) return;
+        setState(() {
+          _sessions.removeWhere((s) => (s["session_id"] ?? "").toString() == sessionId);
+        });
+
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Session deleted")),
+        );
+      } else {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Delete failed (${res.statusCode})")),
+        );
+      }
+    } on TimeoutException catch (_) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Session deleted")),
+        const SnackBar(content: Text("Delete timed out")),
       );
-    } else {
+    } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Delete failed (${res.statusCode})")),
+        SnackBar(content: Text("Delete error: $e")),
       );
     }
   }
@@ -144,14 +177,23 @@ class _SessionsScreenState extends State<SessionsScreen> {
         title: const Text("All Chat Sessions"),
         actions: [
           IconButton(
-              icon: const Icon(Icons.refresh),
-              onPressed: _loadSessions),
+            icon: const Icon(Icons.refresh),
+            onPressed: _loadSessions,
+          ),
         ],
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error.isNotEmpty
-              ? Center(child: Text(_error))
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Text(
+                      _error,
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                )
               : _sessions.isEmpty
                   ? const Center(child: Text("No sessions yet"))
                   : ListView.builder(
@@ -166,9 +208,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
                           child: ListTile(
                             title: Text("Session: $id"),
                             subtitle: Text(
-                              lastMsg.isNotEmpty
-                                  ? lastMsg
-                                  : "Tap to view history",
+                              lastMsg.isNotEmpty ? lastMsg : "Tap to view history",
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -176,26 +216,26 @@ class _SessionsScreenState extends State<SessionsScreen> {
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 IconButton(
-                                  icon:
-                                      const Icon(Icons.delete_outline),
+                                  icon: const Icon(Icons.delete_outline),
                                   color: Colors.red,
-                                  onPressed: () =>
-                                      _deleteSession(id),
+                                  onPressed: id.isEmpty ? null : () => _deleteSession(id),
                                 ),
                                 const Icon(Icons.chevron_right),
                               ],
                             ),
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => HistoryScreen(
-                                    baseUrl: widget.baseUrl,
-                                    sessionId: id,
-                                  ),
-                                ),
-                              );
-                            },
+                            onTap: id.isEmpty
+                                ? null
+                                : () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => HistoryScreen(
+                                          baseUrl: widget.baseUrl,
+                                          sessionId: id,
+                                        ),
+                                      ),
+                                    );
+                                  },
                           ),
                         );
                       },
