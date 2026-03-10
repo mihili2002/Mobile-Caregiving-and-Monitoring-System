@@ -1,8 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../../services/therapy_plan_service.dart';
-
 
 enum PlanMode {
   viewOnly,
@@ -11,11 +9,13 @@ enum PlanMode {
 
 class PersonalizedPlanScreen extends StatefulWidget {
   final String residentId;
+  final String elderEmail; // ⭐ NEW
   final PlanMode mode;
 
   const PersonalizedPlanScreen({
     super.key,
     required this.residentId,
+    required this.elderEmail, // ⭐ NEW
     required this.mode,
   });
 
@@ -43,8 +43,12 @@ class _PersonalizedPlanScreenState extends State<PersonalizedPlanScreen> {
 
   Future<void> _loadPlan() async {
     try {
-      final result =
-          await TherapyPlanService.generatePlan(widget.residentId);
+
+      // ⭐ SEND ELDER EMAIL TO BACKEND
+      final result = await TherapyPlanService.generatePlan(
+        widget.residentId,
+        elderEmail: widget.elderEmail,
+      );
 
       final plan = result["plan"];
 
@@ -121,15 +125,6 @@ class _PersonalizedPlanScreenState extends State<PersonalizedPlanScreen> {
         SnackBar(content: Text("Approval failed: $e")),
       );
     }
-  }
-
-  Future<void> _downloadPdf() async {
-    if (_currentPlanId == null) return;
-
-    final url =
-        TherapyPlanService.getPdfUrl(_currentPlanId!);
-
-    await launchUrl(Uri.parse(url));
   }
 
   Widget _buildDomainCard(Map domain) {
@@ -237,17 +232,6 @@ class _PersonalizedPlanScreenState extends State<PersonalizedPlanScreen> {
                             ),
                           ),
                         ],
-                      ),
-
-                    const SizedBox(height: 12),
-
-                    if (_isApproved)
-                      ElevatedButton.icon(
-                        onPressed: _downloadPdf,
-                        icon:
-                            const Icon(Icons.picture_as_pdf),
-                        label: const Text(
-                            "Download Clinical Report"),
                       ),
                   ],
                 ),

@@ -4,7 +4,7 @@ import 'package:fl_chart/fl_chart.dart';
 import '../../models/risk_history_point.dart';
 import '../../services/risk_history_api.dart';
 
-// ✅ NEW: Plan screen
+// Plan screen
 import 'personalized_plan_screen.dart';
 
 class RiskHistoryChartScreen extends StatefulWidget {
@@ -26,7 +26,7 @@ class _RiskHistoryChartScreenState extends State<RiskHistoryChartScreen> {
   String? _error;
   List<RiskHistoryPoint> _points = [];
 
-  String _metric = "Depression"; // Depression / Anxiety / Insomnia / Emotional
+  String _metric = "Depression";
 
   @override
   void initState() {
@@ -45,6 +45,7 @@ class _RiskHistoryChartScreenState extends State<RiskHistoryChartScreen> {
         residentId: widget.residentId,
         days: widget.days,
       );
+
       setState(() {
         _points = points;
         _loading = false;
@@ -73,6 +74,7 @@ class _RiskHistoryChartScreenState extends State<RiskHistoryChartScreen> {
 
   @override
   Widget build(BuildContext context) {
+
     return Scaffold(
       appBar: AppBar(
         title: Text("Risk Trend (${widget.days} days)"),
@@ -83,11 +85,14 @@ class _RiskHistoryChartScreenState extends State<RiskHistoryChartScreen> {
           )
         ],
       ),
+
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(16),
+
           child: _loading
               ? const Center(child: CircularProgressIndicator())
+
               : _error != null
                   ? Center(
                       child: Text(
@@ -95,47 +100,70 @@ class _RiskHistoryChartScreenState extends State<RiskHistoryChartScreen> {
                         style: const TextStyle(color: Colors.red),
                       ),
                     )
+
                   : _points.isEmpty
                       ? const Center(
                           child: Text("No history data yet. Submit more assessments."),
                         )
+
                       : Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // ✅ Metric selector row
+
+                            // Metric selector
                             Row(
                               children: [
                                 const Text("Metric: "),
                                 const SizedBox(width: 10),
+
                                 DropdownButton<String>(
                                   value: _metric,
                                   items: const [
-                                    DropdownMenuItem(value: "Depression", child: Text("Depression")),
-                                    DropdownMenuItem(value: "Anxiety", child: Text("Anxiety")),
-                                    DropdownMenuItem(value: "Insomnia", child: Text("Insomnia")),
-                                    DropdownMenuItem(value: "Emotional", child: Text("Emotional Wellbeing")),
+                                    DropdownMenuItem(
+                                      value: "Depression",
+                                      child: Text("Depression"),
+                                    ),
+                                    DropdownMenuItem(
+                                      value: "Anxiety",
+                                      child: Text("Anxiety"),
+                                    ),
+                                    DropdownMenuItem(
+                                      value: "Insomnia",
+                                      child: Text("Insomnia"),
+                                    ),
+                                    DropdownMenuItem(
+                                      value: "Emotional",
+                                      child: Text("Emotional Wellbeing"),
+                                    ),
                                   ],
-                                  onChanged: (v) => setState(() => _metric = v ?? _metric),
+                                  onChanged: (v) =>
+                                      setState(() => _metric = v ?? _metric),
                                 ),
                               ],
                             ),
+
                             const SizedBox(height: 16),
 
-                            // ✅ Chart
+                            // Chart
                             Expanded(
                               child: LineChart(
                                 LineChartData(
                                   minY: 0,
                                   maxY: 1,
+
                                   gridData: const FlGridData(show: true),
                                   borderData: FlBorderData(show: true),
+
                                   titlesData: FlTitlesData(
+
                                     rightTitles: const AxisTitles(
                                       sideTitles: SideTitles(showTitles: false),
                                     ),
+
                                     topTitles: const AxisTitles(
                                       sideTitles: SideTitles(showTitles: false),
                                     ),
+
                                     leftTitles: AxisTitles(
                                       sideTitles: SideTitles(
                                         showTitles: true,
@@ -144,16 +172,24 @@ class _RiskHistoryChartScreenState extends State<RiskHistoryChartScreen> {
                                             Text(value.toStringAsFixed(1)),
                                       ),
                                     ),
+
                                     bottomTitles: AxisTitles(
                                       sideTitles: SideTitles(
                                         showTitles: true,
-                                        interval: (_points.length / 4).clamp(1, 999).toDouble(),
+                                        interval: (_points.length / 4)
+                                            .clamp(1, 999)
+                                            .toDouble(),
+
                                         getTitlesWidget: (value, meta) {
+
                                           final idx = value.toInt();
+
                                           if (idx < 0 || idx >= _points.length) {
                                             return const SizedBox.shrink();
                                           }
+
                                           final d = _points[idx].createdAt;
+
                                           return Padding(
                                             padding: const EdgeInsets.only(top: 6),
                                             child: Text(
@@ -165,16 +201,20 @@ class _RiskHistoryChartScreenState extends State<RiskHistoryChartScreen> {
                                       ),
                                     ),
                                   ),
+
                                   lineBarsData: [
+
                                     LineChartBarData(
                                       isCurved: true,
                                       barWidth: 3,
                                       dotData: const FlDotData(show: true),
+
                                       spots: List.generate(_points.length, (i) {
                                         final v = _valueFor(_points[i]);
                                         return FlSpot(i.toDouble(), v);
                                       }),
                                     ),
+
                                   ],
                                 ),
                               ),
@@ -184,22 +224,28 @@ class _RiskHistoryChartScreenState extends State<RiskHistoryChartScreen> {
 
                             Text(
                               "Points: ${_points.length} (newest: ${_points.last.createdAt.toLocal()})",
-                              style: TextStyle(color: Colors.black.withOpacity(0.6)),
+                              style: TextStyle(
+                                color: Colors.black.withOpacity(0.6),
+                              ),
                             ),
 
                             const SizedBox(height: 12),
 
-                            // ✅ NEW: Buttons for plan
+                            // Buttons
                             Row(
                               children: [
+
                                 Expanded(
                                   child: OutlinedButton.icon(
                                     onPressed: () {
+
                                       Navigator.push(
                                         context,
                                         MaterialPageRoute(
                                           builder: (_) => PersonalizedPlanScreen(
                                             residentId: widget.residentId,
+                                            elderEmail:
+                                                "${widget.residentId}@gmail.com",
                                             mode: PlanMode.viewOnly,
                                           ),
                                         ),
@@ -209,15 +255,20 @@ class _RiskHistoryChartScreenState extends State<RiskHistoryChartScreen> {
                                     label: const Text("View Plan"),
                                   ),
                                 ),
+
                                 const SizedBox(width: 12),
+
                                 Expanded(
                                   child: ElevatedButton.icon(
                                     onPressed: () {
+
                                       Navigator.push(
                                         context,
                                         MaterialPageRoute(
                                           builder: (_) => PersonalizedPlanScreen(
                                             residentId: widget.residentId,
+                                            elderEmail:
+                                                "${widget.residentId}@gmail.com",
                                             mode: PlanMode.generateEditable,
                                           ),
                                         ),

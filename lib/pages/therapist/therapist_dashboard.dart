@@ -2,13 +2,13 @@ import 'package:flutter/material.dart';
 import '../../models/user_model.dart';
 import '../../TherapistRiskFormScreen.dart';
 
-// ✅ Chart screen
+// Chart screen
 import 'risk_history_chart_screen.dart';
 
-// ✅ Plan screen
+// Plan screen
 import 'personalized_plan_screen.dart';
 
-// ✅ NEW: Upcoming sessions page
+// Upcoming sessions page
 import 'upcoming_sessions_screen.dart';
 
 class TherapistDashboard extends StatefulWidget {
@@ -32,12 +32,14 @@ class _TherapistDashboardState extends State<TherapistDashboard> {
 
   void _selectResident() {
     final id = _residentIdController.text.trim();
+
     if (id.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Please enter Resident ID")),
       );
       return;
     }
+
     setState(() => _selectedResidentId = id);
 
     ScaffoldMessenger.of(context).showSnackBar(
@@ -52,7 +54,7 @@ class _TherapistDashboardState extends State<TherapistDashboard> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Therapist Dashboard"),
+        title: const Text("Mental Health Doctor Dashboard"),
         backgroundColor: brownDark,
       ),
       body: SafeArea(
@@ -60,24 +62,32 @@ class _TherapistDashboardState extends State<TherapistDashboard> {
           padding: const EdgeInsets.all(16),
           child: ListView(
             children: [
+
               Text(
                 "Welcome ${widget.user.name}",
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
+
               const SizedBox(height: 14),
 
-              // ✅ Resident ID entry box
+              // Resident lookup
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(14),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+
                       const Text(
                         "Resident Lookup",
                         style: TextStyle(fontWeight: FontWeight.w800),
                       ),
+
                       const SizedBox(height: 10),
+
                       TextField(
                         controller: _residentIdController,
                         decoration: const InputDecoration(
@@ -86,7 +96,9 @@ class _TherapistDashboardState extends State<TherapistDashboard> {
                           prefixIcon: Icon(Icons.badge_outlined),
                         ),
                       ),
+
                       const SizedBox(height: 12),
+
                       SizedBox(
                         height: 46,
                         width: double.infinity,
@@ -103,27 +115,36 @@ class _TherapistDashboardState extends State<TherapistDashboard> {
 
               const SizedBox(height: 12),
 
-              // ✅ Show selected resident info
+              // Selected resident info
               if (residentId != null)
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     color: Colors.green.withOpacity(0.08),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.green.withOpacity(0.25)),
+                    border: Border.all(
+                      color: Colors.green.withOpacity(0.25),
+                    ),
                   ),
                   child: Row(
                     children: [
+
                       const Icon(Icons.verified, color: Colors.green),
+
                       const SizedBox(width: 10),
+
                       Expanded(
                         child: Text(
                           "Selected Resident: $residentId",
-                          style: const TextStyle(fontWeight: FontWeight.w700),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
+
                       TextButton(
-                        onPressed: () => setState(() => _selectedResidentId = null),
+                        onPressed: () =>
+                            setState(() => _selectedResidentId = null),
                         child: const Text("Clear"),
                       ),
                     ],
@@ -132,17 +153,21 @@ class _TherapistDashboardState extends State<TherapistDashboard> {
 
               const SizedBox(height: 12),
 
-              // ✅ Open risk form
+              // Therapist Risk Form
               Card(
                 child: ListTile(
                   leading: const Icon(Icons.assignment),
-                  title: const Text("Open Therapist Risk Form"),
-                  subtitle: const Text("Fill the assessment and predict risk"),
+                  title: const Text("Open Risk Form"),
+                  subtitle: const Text(
+                      "Fill the assessment and predict risk"),
                   trailing: const Icon(Icons.arrow_forward_ios, size: 16),
                   onTap: () {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => const TherapistRiskFormScreen()),
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            const TherapistRiskFormScreen(),
+                      ),
                     );
                   },
                 ),
@@ -150,7 +175,7 @@ class _TherapistDashboardState extends State<TherapistDashboard> {
 
               const SizedBox(height: 12),
 
-              // ✅ View prediction graph (requires residentId)
+              // Risk history graph
               Card(
                 child: ListTile(
                   leading: const Icon(Icons.show_chart),
@@ -158,12 +183,16 @@ class _TherapistDashboardState extends State<TherapistDashboard> {
                   subtitle: const Text("See 30-day risk trends"),
                   trailing: const Icon(Icons.arrow_forward_ios, size: 16),
                   onTap: () {
+
                     if (residentId == null) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text("Load a Resident ID first")),
+                        const SnackBar(
+                            content:
+                                Text("Load a Resident ID first")),
                       );
                       return;
                     }
+
                     Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -179,25 +208,32 @@ class _TherapistDashboardState extends State<TherapistDashboard> {
 
               const SizedBox(height: 12),
 
-              // ✅ View current plan (requires residentId)
+              // View Personalized Plan
               Card(
                 child: ListTile(
                   leading: const Icon(Icons.article_outlined),
                   title: const Text("View Current Personalized Plan"),
-                  subtitle: const Text(""),
-                  trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                  trailing:
+                      const Icon(Icons.arrow_forward_ios, size: 16),
                   onTap: () {
+
                     if (residentId == null) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text("Load a Resident ID first")),
+                        const SnackBar(
+                          content:
+                              Text("Load a Resident ID first"),
+                        ),
                       );
                       return;
                     }
+
                     Navigator.push(
                       context,
                       MaterialPageRoute(
                         builder: (_) => PersonalizedPlanScreen(
                           residentId: residentId,
+                          elderEmail:
+                              "$residentId@gmail.com", // FIXED
                           mode: PlanMode.viewOnly,
                         ),
                       ),
@@ -208,18 +244,21 @@ class _TherapistDashboardState extends State<TherapistDashboard> {
 
               const SizedBox(height: 12),
 
-              // ✅ NEW: View upcoming sessions (no resident required)
+              // Upcoming sessions
               Card(
                 child: ListTile(
                   leading: const Icon(Icons.event_available),
                   title: const Text("View Upcoming Sessions"),
-                  subtitle: const Text("See your upcoming meetings with elders "),
+                  subtitle: const Text(
+                      "See your upcoming meetings with elders"),
                   trailing: const Icon(Icons.arrow_forward_ios, size: 16),
                   onTap: () {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => UpcomingSessionsScreen(therapist: widget.user),
+                        builder: (_) =>
+                            UpcomingSessionsScreen(
+                                therapist: widget.user),
                       ),
                     );
                   },
