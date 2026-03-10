@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../../services/therapy_plan_service.dart';
+import '../../auth/auth_service.dart';
+import '../../auth/login_page.dart';
 
 enum PlanMode {
   viewOnly,
@@ -170,15 +172,75 @@ class _PersonalizedPlanScreenState extends State<PersonalizedPlanScreen> {
         widget.mode == PlanMode.generateEditable;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Personalized Plan"),
-      ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: ListView(
+      backgroundColor: const Color(0xFFF6F3FF),
+      body: SafeArea(
+        child: Column(
+          children: [
+            // ---------------- HEADER ----------------
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(10, 18, 12, 18),
+              decoration: const BoxDecoration(
+                color: Color(0xFF11BFA8),
+                borderRadius: BorderRadius.only(
+                  bottomLeft: Radius.circular(22),
+                  bottomRight: Radius.circular(22),
+                ),
+              ),
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back, color: Colors.white),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          "ElderCare",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w900,
+                            fontSize: 18,
+                          ),
+                        ),
+                        SizedBox(height: 4),
+                        Text(
+                          "Personalized Plan",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: "Logout",
+                    onPressed: () async {
+                      await AuthService().signOut();
+                      if (mounted) {
+                        Navigator.pushAndRemoveUntil(
+                          context,
+                          MaterialPageRoute(builder: (_) => const LoginPage()),
+                          (route) => false,
+                        );
+                      }
+                    },
+                    icon: const Icon(Icons.logout, color: Colors.white),
+                  ),
+                ],
+              ),
+            ),
+
+            // ---------------- BODY ----------------
+            Expanded(
+              child: _loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: ListView(
                   children: [
                     Text(
                       "Resident: ${widget.residentId}",
@@ -237,6 +299,9 @@ class _PersonalizedPlanScreenState extends State<PersonalizedPlanScreen> {
                 ),
               ),
             ),
+          ],
+        ),
+      ),
     );
   }
 }

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'services/risk_api.dart';
 import 'RiskResultScreen.dart';
+import 'auth/auth_service.dart';
+import 'auth/login_page.dart';
 
 class TherapistRiskFormScreen extends StatefulWidget {
   static const routeName = '/therapist-risk-form';
@@ -8,7 +10,8 @@ class TherapistRiskFormScreen extends StatefulWidget {
   const TherapistRiskFormScreen({super.key});
 
   @override
-  State<TherapistRiskFormScreen> createState() => _TherapistRiskFormScreenState();
+  State<TherapistRiskFormScreen> createState() =>
+      _TherapistRiskFormScreenState();
 }
 
 class _TherapistRiskFormScreenState extends State<TherapistRiskFormScreen> {
@@ -43,6 +46,22 @@ class _TherapistRiskFormScreenState extends State<TherapistRiskFormScreen> {
   String? _error;
 
   int _toInt(TextEditingController c) => int.tryParse(c.text.trim()) ?? 0;
+
+  @override
+  void dispose() {
+    _residentId.dispose();
+    _age.dispose();
+    _sleepHours.dispose();
+    _physicalActivity.dispose();
+    _socialSupport.dispose();
+    _anxietyScore.dispose();
+    _depressionScore.dispose();
+    _stressLevel.dispose();
+    _selfEsteem.dispose();
+    _lifeSatisfaction.dispose();
+    _loneliness.dispose();
+    super.dispose();
+  }
 
   Widget sectionTitle(String title, IconData icon) {
     return Padding(
@@ -93,7 +112,9 @@ class _TherapistRiskFormScreenState extends State<TherapistRiskFormScreen> {
           labelText: label,
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
         ),
-        items: items.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+        items: items
+            .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+            .toList(),
         onChanged: onChanged,
         validator: (v) => v == null ? "Required" : null,
       ),
@@ -114,7 +135,6 @@ class _TherapistRiskFormScreenState extends State<TherapistRiskFormScreen> {
         "Education_Level": education,
         "Medication_Use": medicationUse,
         "Substance_Use": substanceUse,
-
         "Age": _toInt(_age),
         "Sleep_Hours": _toInt(_sleepHours),
         "Physical_Activity_Hrs": _toInt(_physicalActivity),
@@ -122,15 +142,12 @@ class _TherapistRiskFormScreenState extends State<TherapistRiskFormScreen> {
         "Anxiety_Score": _toInt(_anxietyScore),
         "Depression_Score": _toInt(_depressionScore),
         "Stress_Level": _toInt(_stressLevel),
-
         "Family_History_Mental_Illness": familyHistory,
         "Chronic_Illnesses": chronicIllnesses,
         "Therapy": therapy,
         "Meditation": meditation,
-
         "Financial_Stress": financialStress,
         "Work_Stress": workStress,
-
         "Self_Esteem_Score": _toInt(_selfEsteem),
         "Life_Satisfaction_Score": _toInt(_lifeSatisfaction),
         "Loneliness_Score": _toInt(_loneliness),
@@ -145,17 +162,23 @@ class _TherapistRiskFormScreenState extends State<TherapistRiskFormScreen> {
 
       setState(() => _loading = false);
 
-      Navigator.push(
+      final navResult = await Navigator.push(
         context,
         MaterialPageRoute(
           builder: (_) => RiskResultScreen(result: result),
         ),
       );
+
+      if (navResult == 'approved' && mounted) {
+        Navigator.pop(context, 'approved');
+      }
     } catch (e) {
-      setState(() {
-        _loading = false;
-        _error = e.toString();
-      });
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _error = e.toString();
+        });
+      }
     }
   }
 
@@ -174,144 +197,198 @@ class _TherapistRiskFormScreenState extends State<TherapistRiskFormScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Mental Health Assessment"),
-        backgroundColor: Colors.teal,
-      ),
+      backgroundColor: const Color(0xFFF6F3FF),
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Form(
-            key: _formKey,
-            child: ListView(
-              children: [
-
-                sectionTitle("Resident Information", Icons.person),
-
-                sectionCard([
-                  TextFormField(
-                    controller: _residentId,
-                    decoration: const InputDecoration(
-                      labelText: "Resident ID",
-                      border: OutlineInputBorder(),
-                    ),
-                    validator: (v) =>
-                        (v == null || v.trim().isEmpty) ? "Required" : null,
-                  ),
-                ]),
-
-                sectionTitle("Basic Information", Icons.info),
-
-                sectionCard([
-                  _drop(
-                    label: "Gender",
-                    value: gender,
-                    items: const ["Male", "Female"],
-                    onChanged: (v) => setState(() => gender = v),
-                  ),
-                  _drop(
-                    label: "Education Level",
-                    value: education,
-                    items: const ["High School", "Undergraduate", "Postgraduate"],
-                    onChanged: (v) => setState(() => education = v),
-                  ),
-                ]),
-
-                sectionTitle("Health & Lifestyle", Icons.favorite),
-
-                sectionCard([
-                  _numField("Age", _age),
-                  _numField("Sleep Hours", _sleepHours),
-                  _numField("Physical Activity Hours", _physicalActivity),
-                  _numField("Social Support Score", _socialSupport),
-                ]),
-
-                sectionTitle("Mental Health Scores", Icons.psychology),
-
-                sectionCard([
-                  _numField("Anxiety Score", _anxietyScore),
-                  _numField("Depression Score", _depressionScore),
-                  _numField("Stress Level", _stressLevel),
-                ]),
-
-                sectionTitle("Medical History", Icons.medical_services),
-
-                sectionCard([
-                  _drop(
-                    label: "Family History (Mental Illness)",
-                    value: familyHistory,
-                    items: const ["Yes", "No"],
-                    onChanged: (v) => setState(() => familyHistory = v),
-                  ),
-                  _drop(
-                    label: "Chronic Illnesses",
-                    value: chronicIllnesses,
-                    items: const ["Yes", "No"],
-                    onChanged: (v) => setState(() => chronicIllnesses = v),
-                  ),
-                  _drop(
-                    label: "Therapy",
-                    value: therapy,
-                    items: const ["Yes", "No"],
-                    onChanged: (v) => setState(() => therapy = v),
-                  ),
-                  _drop(
-                    label: "Meditation",
-                    value: meditation,
-                    items: const ["Yes", "No"],
-                    onChanged: (v) => setState(() => meditation = v),
-                  ),
-                ]),
-
-                sectionTitle("Psychological Indicators", Icons.bar_chart),
-
-                sectionCard([
-                  _drop(
-                    label: "Financial Stress",
-                    value: financialStress,
-                    items: const ["Low", "Medium", "High"],
-                    onChanged: (v) => setState(() => financialStress = v),
-                  ),
-                  _drop(
-                    label: "Work Stress",
-                    value: workStress,
-                    items: const ["Low", "Medium", "High"],
-                    onChanged: (v) => setState(() => workStress = v),
-                  ),
-                  _numField("Self Esteem Score", _selfEsteem),
-                  _numField("Life Satisfaction Score", _lifeSatisfaction),
-                  _numField("Loneliness Score", _loneliness),
-                ]),
-
-                if (_error != null)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: Text(
-                      _error!,
-                      style: const TextStyle(color: Colors.red),
-                    ),
-                  ),
-
-                const SizedBox(height: 10),
-
-                ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.teal,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                  ),
-                  onPressed: _loading ? null : _submit,
-                  icon: _loading
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.analytics),
-                  label: Text(_loading ? "Predicting..." : "Predict Risk"),
+        child: Column(
+          children: [
+            // ---------------- HEADER ----------------
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(10, 18, 12, 18),
+              decoration: const BoxDecoration(
+                color: Color(0xFF11BFA8),
+                borderRadius: BorderRadius.only(
+                  bottomLeft: Radius.circular(22),
+                  bottomRight: Radius.circular(22),
                 ),
-              ],
+              ),
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back, color: Colors.white),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          "ElderCare",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w900,
+                            fontSize: 18,
+                          ),
+                        ),
+                        SizedBox(height: 4),
+                        Text(
+                          "Mental Health Assessment",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: "Logout",
+                    onPressed: () async {
+                      await AuthService().signOut();
+                      if (mounted) {
+                        Navigator.pushAndRemoveUntil(
+                          context,
+                          MaterialPageRoute(builder: (_) => const LoginPage()),
+                          (route) => false,
+                        );
+                      }
+                    },
+                    icon: const Icon(Icons.logout, color: Colors.white),
+                  ),
+                ],
+              ),
             ),
-          ),
+
+            // ---------------- BODY ----------------
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Form(
+                  key: _formKey,
+                  child: ListView(
+                    children: [
+                      sectionTitle("Resident Information", Icons.person),
+                      sectionCard([
+                        TextFormField(
+                          controller: _residentId,
+                          decoration: const InputDecoration(
+                            labelText: "Resident ID",
+                            border: OutlineInputBorder(),
+                          ),
+                          validator: (v) =>
+                              (v == null || v.trim().isEmpty) ? "Required" : null,
+                        ),
+                      ]),
+                      sectionTitle("Basic Information", Icons.info),
+                      sectionCard([
+                        _drop(
+                          label: "Gender",
+                          value: gender,
+                          items: const ["Male", "Female"],
+                          onChanged: (v) => setState(() => gender = v),
+                        ),
+                        _drop(
+                          label: "Education Level",
+                          value: education,
+                          items: const [
+                            "High School",
+                            "Undergraduate",
+                            "Postgraduate",
+                          ],
+                          onChanged: (v) => setState(() => education = v),
+                        ),
+                      ]),
+                      sectionTitle("Health & Lifestyle", Icons.favorite),
+                      sectionCard([
+                        _numField("Age", _age),
+                        _numField("Sleep Hours", _sleepHours),
+                        _numField("Physical Activity Hours", _physicalActivity),
+                        _numField("Social Support Score", _socialSupport),
+                      ]),
+                      sectionTitle("Mental Health Scores", Icons.psychology),
+                      sectionCard([
+                        _numField("Anxiety Score", _anxietyScore),
+                        _numField("Depression Score", _depressionScore),
+                        _numField("Stress Level", _stressLevel),
+                      ]),
+                      sectionTitle("Medical History", Icons.medical_services),
+                      sectionCard([
+                        _drop(
+                          label: "Family History (Mental Illness)",
+                          value: familyHistory,
+                          items: const ["Yes", "No"],
+                          onChanged: (v) => setState(() => familyHistory = v),
+                        ),
+                        _drop(
+                          label: "Chronic Illnesses",
+                          value: chronicIllnesses,
+                          items: const ["Yes", "No"],
+                          onChanged: (v) => setState(() => chronicIllnesses = v),
+                        ),
+                        _drop(
+                          label: "Therapy",
+                          value: therapy,
+                          items: const ["Yes", "No"],
+                          onChanged: (v) => setState(() => therapy = v),
+                        ),
+                        _drop(
+                          label: "Meditation",
+                          value: meditation,
+                          items: const ["Yes", "No"],
+                          onChanged: (v) => setState(() => meditation = v),
+                        ),
+                      ]),
+                      sectionTitle("Psychological Indicators", Icons.bar_chart),
+                      sectionCard([
+                        _drop(
+                          label: "Financial Stress",
+                          value: financialStress,
+                          items: const ["Low", "Medium", "High"],
+                          onChanged: (v) =>
+                              setState(() => financialStress = v),
+                        ),
+                        _drop(
+                          label: "Work Stress",
+                          value: workStress,
+                          items: const ["Low", "Medium", "High"],
+                          onChanged: (v) => setState(() => workStress = v),
+                        ),
+                        _numField("Self Esteem Score", _selfEsteem),
+                        _numField("Life Satisfaction Score", _lifeSatisfaction),
+                        _numField("Loneliness Score", _loneliness),
+                      ]),
+                      if (_error != null)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: Text(
+                            _error!,
+                            style: const TextStyle(color: Colors.red),
+                          ),
+                        ),
+                      const SizedBox(height: 10),
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.teal,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                        ),
+                        onPressed: _loading ? null : _submit,
+                        icon: _loading
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Icon(Icons.analytics),
+                        label: Text(
+                          _loading ? "Predicting..." : "Predict Risk",
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

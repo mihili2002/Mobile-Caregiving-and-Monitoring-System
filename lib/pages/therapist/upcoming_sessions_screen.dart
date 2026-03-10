@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../../models/user_model.dart';
 import 'risk_history_chart_screen.dart';
 import 'personalized_plan_screen.dart';
+import '../../auth/auth_service.dart';
+import '../../auth/login_page.dart';
 
 class UpcomingSessionsScreen extends StatelessWidget {
   final AppUser therapist;
@@ -38,27 +40,88 @@ class UpcomingSessionsScreen extends StatelessWidget {
     const brownDark = Color(0xFF3E2723);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Upcoming Sessions"),
-        backgroundColor: brownDark,
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: ListView(
+      backgroundColor: const Color(0xFFF6F3FF),
+      body: SafeArea(
+        child: Column(
           children: [
-            Text(
-              "Hello ${therapist.name}, here are your next sessions:",
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w800,
+            // ---------------- HEADER ----------------
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(10, 18, 12, 18),
+              decoration: const BoxDecoration(
+                color: Color(0xFF11BFA8),
+                borderRadius: BorderRadius.only(
+                  bottomLeft: Radius.circular(22),
+                  bottomRight: Radius.circular(22),
+                ),
+              ),
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back, color: Colors.white),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          "ElderCare",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w900,
+                            fontSize: 18,
+                          ),
+                        ),
+                        SizedBox(height: 4),
+                        Text(
+                          "Upcoming Sessions",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: "Logout",
+                    onPressed: () async {
+                      await AuthService().signOut();
+                      if (context.mounted) {
+                        Navigator.pushAndRemoveUntil(
+                          context,
+                          MaterialPageRoute(builder: (_) => const LoginPage()),
+                          (route) => false,
+                        );
+                      }
+                    },
+                    icon: const Icon(Icons.logout, color: Colors.white),
+                  ),
+                ],
               ),
             ),
 
-            const SizedBox(height: 12),
-
-            ..._demoSessions.map((s) => _SessionCard(session: s)),
-
-            const SizedBox(height: 8),
+            // ---------------- BODY ----------------
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: ListView(
+                  children: [
+                    Text(
+                      "Hello ${therapist.name}, here are your next sessions:",
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    ..._demoSessions.map((s) => _SessionCard(session: s)),
+                    const SizedBox(height: 8),
+                  ],
+                ),
+              ),
+            ),
           ],
         ),
       ),
