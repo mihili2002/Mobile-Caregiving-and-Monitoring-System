@@ -1,102 +1,145 @@
 import 'package:flutter/material.dart';
 import '../../../models/user_model.dart';
+import '../../../services/therapy_plan_service.dart';
 
-class ElderPlanViewPage extends StatelessWidget {
+class ElderPlanViewPage extends StatefulWidget {
   final AppUser user;
+
   const ElderPlanViewPage({super.key, required this.user});
 
   @override
-  Widget build(BuildContext context) {
-    final plan = _demoPlan();
+  State<ElderPlanViewPage> createState() => _ElderPlanViewPageState();
+}
 
-    return Scaffold(
-      appBar: AppBar(title: const Text("My Personalized Plan")),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: ListView(
-          children: [
-            Text(
-              "Hi ${user.name ?? 'there'} 👋",
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              "",
-              style: TextStyle(color: Colors.black.withOpacity(0.6)),
-            ),
-            const SizedBox(height: 16),
+class _ElderPlanViewPageState extends State<ElderPlanViewPage> {
 
-            _section("Depression Prevention", plan["depression"]!),
-            _section("Anxiety Reduction", plan["anxiety"]!),
-            _section("Insomnia Improvement", plan["insomnia"]!),
-            _section("Emotional Wellbeing", plan["emotional"]!),
+  bool _loading = true;
+  List<dynamic> _domains = [];
+  String _status = "";
 
-            const SizedBox(height: 18),
-            Card(
-              color: Colors.green.withOpacity(0.08),
-              child: const ListTile(
-                leading: Icon(Icons.verified, color: Colors.green),
-                title: Text("Status: Active "),
-                subtitle: Text("Therapist-approved plan will appear here later."),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+  @override
+  void initState() {
+    super.initState();
+    _loadPlan();
   }
 
-  Widget _section(String title, List<String> bullets) {
+  Future<void> _loadPlan() async {
+    try {
+
+      final result =
+          await TherapyPlanService.getPlanByEmail(widget.user.email!);
+
+      setState(() {
+        _domains = result["domains"];
+        _status = result["status"];
+        _loading = false;
+      });
+
+    } catch (e) {
+      setState(() => _loading = false);
+    }
+  }
+
+  Widget _section(Map domain) {
+
+    final interventions = domain["interventions"] as List;
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+
+            Text(
+              domain["domain"]
+                  .replaceAll("_Risk", "")
+                  .replaceAll("_", " "),
+              style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800),
+            ),
+
             const SizedBox(height: 8),
-            ...bullets.map((b) => Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text("• "),
-                      Expanded(child: Text(b)),
-                    ],
-                  ),
-                )),
+
+            ...interventions.map((item) {
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text("• "),
+                    Expanded(
+                        child: Text(item["activity"])),
+                  ],
+                ),
+              );
+            }).toList(),
           ],
         ),
       ),
     );
   }
 
-  Map<String, List<String>> _demoPlan() {
-    return {
-      "depression": [
-        "Take a 15–20 minute walk in the morning (sunlight helps mood).",
-        "Talk to a family member/friend once per day (call or message).",
-        "Write 3 positive things each night (gratitude journal).",
-        "Do one enjoyable activity daily (music, gardening, hobbies).",
-      ],
-      "anxiety": [
-        "Practice 4-7-8 breathing for 2 minutes when feeling stressed.",
-        "Limit news/social media to 15 minutes per day.",
-        "Drink water and avoid too much caffeine after noon.",
-        "Use a simple routine: same wake-up, meals, and bedtime.",
-      ],
-      "insomnia": [
-        "Sleep at the same time daily (even weekends).",
-        "No screens 60 minutes before bed (use book or calm music).",
-        "Avoid heavy meals late night; warm milk/herbal tea is okay.",
-        "Try a 5-minute body scan relaxation before sleeping.",
-      ],
-      "emotional": [
-        "Spend 10 minutes doing mindfulness or prayer/meditation.",
-        "Do one social interaction daily (even a short chat).",
-        "Join a light physical activity: stretching or chair exercises.",
-        "Write down worries → then write one small action you can do.",
-      ],
-    };
+  @override
+  Widget build(BuildContext context) {
+
+    return Scaffold(
+      appBar: AppBar(title: const Text("My Personalized Plan")),
+      body: Padding(
+        padding: const EdgeInsets.all(16),
+        child: _loading
+            ? const Center(child: CircularProgressIndicator())
+            : ListView(
+                children: [
+
+                  Text(
+                    "Hi ${widget.user.name ?? 'there'} 👋",
+                    style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800),
+                  ),
+
+                  const SizedBox(height: 6),
+
+                  Text(
+                    "Your therapist-approved support plan",
+                    style: TextStyle(
+                        color: Colors.black.withOpacity(0.6)),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  if (_domains.isEmpty)
+                    Card(
+                      color: Colors.orange.withOpacity(0.08),
+                      child: const ListTile(
+                        leading: Icon(Icons.info_outline,
+                            color: Colors.orange),
+                        title: Text("No plan available yet"),
+                        subtitle: Text(
+                            "Your therapist has not approved a plan yet."),
+                      ),
+                    ),
+
+                  ..._domains.map((d) => _section(d)).toList(),
+
+                  const SizedBox(height: 18),
+
+                  if (_status == "Active")
+                    Card(
+                      color: Colors.green.withOpacity(0.08),
+                      child: const ListTile(
+                        leading: Icon(Icons.verified,
+                            color: Colors.green),
+                        title: Text("Status: Active"),
+                        subtitle: Text(
+                            "This plan has been approved by your therapist."),
+                      ),
+                    ),
+                ],
+              ),
+      ),
+    );
   }
 }
