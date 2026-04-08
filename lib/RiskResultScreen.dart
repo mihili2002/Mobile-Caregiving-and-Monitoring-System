@@ -201,6 +201,7 @@ class RiskResultScreen extends StatelessWidget {
                     tile("Depression_Risk"),
                     tile("Anxiety_Risk"),
                     tile("Insomnia_Risk"),
+                    tile("Emoti"),
                     tile("Emotional_WellBeing_Risk"),
                     const SizedBox(height: 24),
                     Row(
