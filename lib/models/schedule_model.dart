@@ -19,7 +19,7 @@ class Schedule {
       userName: json['UserName'] ?? json['userName'] ?? '',
       date: json['Date'] ?? json['date'] ?? '',
       tasks: (json['tasks'] as List<dynamic>?)
-              ?.map((e) => ScheduleTask.fromJson(e as Map<String, dynamic>))
+              ?.map((e) => ScheduleTask.fromJson(Map<String, dynamic>.from(e)))
               .toList() ??
           [],
     );
@@ -115,8 +115,7 @@ class ScheduleTask {
       time: json['Time'] ?? json['time'] ?? '',
       type: json['Type'] ?? json['type'] ?? 'common',
       isCompleted: completed,
-      status: json['status'] ??
-          (completed == true ? 'completed_confirmed' : 'scheduled'),
+      status: json['status'] ?? (completed == true ? 'completed_confirmed' : 'scheduled'),
       scheduledAt: json['scheduledAt'],
       validFrom: json['validFrom'],
       validUntil: json['validUntil'],
@@ -176,8 +175,7 @@ class ScheduleTask {
     };
   }
 
-  bool get isActiveLike =>
-      [
+  bool get isActiveLike => const [
         'scheduled',
         'upcoming',
         'reminder_triggered',
@@ -186,13 +184,13 @@ class ScheduleTask {
         'in_progress',
       ].contains(status);
 
-  bool get isFinishedLike =>
-      [
+  bool get isFinishedLike => const [
         'completed_confirmed',
         'completed_likely',
         'skipped',
         'missed_likely',
         'missed_confirmed',
+        'needs_caregiver_review',
         'escalated',
       ].contains(status);
 }
