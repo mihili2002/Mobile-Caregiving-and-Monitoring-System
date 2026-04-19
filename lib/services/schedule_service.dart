@@ -70,7 +70,7 @@ class ScheduleService {
           "date": dateStr,
           "task_id": taskId,
           "completed": completed,
-          "status": completed ? "completed-confirmed" : "pending"
+          "status": completed ? "completed_confirmed" : "pending"
         }),
       );
 
@@ -101,23 +101,101 @@ class ScheduleService {
     }
   }
 
-  // 6. Complete Task (Log Event Side Effect)
-  Future<bool> completeTask(String uid, DateTime date, String taskId) async {
-    final dateStr = date.toIso8601String().split('T')[0];
+  // --- NEW AI TASK ACTION ENDPOINTS ---
+  
+  Future<bool> completeTask({required String uid, required String date, required String taskId}) async {
     try {
       final response = await http.post(
-        Uri.parse('$baseUrl/api/schedule/complete'),
+        Uri.parse('$baseUrl/api/ai/tasks/complete'),
         headers: {"Content-Type": "application/json"},
         body: jsonEncode({
-          "uid": uid,
-          "date": dateStr,
-          "taskId": taskId
+          'uid': uid,
+          'date': date,
+          'task_id': taskId,
+          'actor': 'elder',
         }),
       );
-
       return response.statusCode == 200;
     } catch (e) {
       print("Error completing task: $e");
+      return false;
+    }
+  }
+
+  Future<bool> acknowledgeTask({required String uid, required String date, required String taskId}) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/api/ai/tasks/acknowledge'),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({
+          'uid': uid,
+          'date': date,
+          'task_id': taskId,
+          'actor': 'elder',
+        }),
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      print("Error acknowledging task: $e");
+      return false;
+    }
+  }
+
+  Future<bool> startTask({required String uid, required String date, required String taskId}) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/api/ai/tasks/start'),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({
+          'uid': uid,
+          'date': date,
+          'task_id': taskId,
+          'actor': 'elder',
+        }),
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      print("Error starting task: $e");
+      return false;
+    }
+  }
+
+  Future<bool> snoozeTask({required String uid, required String date, required String taskId, int snoozeMinutes = 10}) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/api/ai/tasks/snooze'),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({
+          'uid': uid,
+          'date': date,
+          'task_id': taskId,
+          'actor': 'elder',
+          'snooze_minutes': snoozeMinutes,
+        }),
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      print("Error snoozing task: $e");
+      return false;
+    }
+  }
+
+  Future<bool> skipTask({required String uid, required String date, required String taskId, String? reason}) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/api/ai/tasks/skip'),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({
+          'uid': uid,
+          'date': date,
+          'task_id': taskId,
+          'actor': 'elder',
+          'reason': reason ?? 'user_skipped',
+        }),
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      print("Error skipping task: $e");
       return false;
     }
   }
@@ -192,7 +270,7 @@ class ScheduleService {
         for (var task in tasks) {
           if (task['id'] == taskId) {
             task['completed'] = completed;
-            task['status'] = status ?? (completed ? 'completed-confirmed' : 'pending');
+            task['status'] = status ?? (completed ? 'completed_confirmed' : 'pending');
             changed = true;
             break;
           }

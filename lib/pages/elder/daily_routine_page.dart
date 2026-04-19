@@ -861,9 +861,33 @@ class _DailyRoutinePageState extends State<DailyRoutinePage> with SingleTickerPr
     );
   }
 
+  Future<void> _handleCompleteTask(String taskId) async {
+    final dateStr = _selectedDate.toIso8601String().split('T')[0];
+    await _scheduleService.completeTask(uid: effectiveUid, date: dateStr, taskId: taskId);
+    _fetchSchedule();
+  }
+
+  Future<void> _handleSnoozeTask(String taskId) async {
+    final dateStr = _selectedDate.toIso8601String().split('T')[0];
+    await _scheduleService.snoozeTask(uid: effectiveUid, date: dateStr, taskId: taskId);
+    _fetchSchedule();
+  }
+
+  Future<void> _handleStartTask(String taskId) async {
+    final dateStr = _selectedDate.toIso8601String().split('T')[0];
+    await _scheduleService.startTask(uid: effectiveUid, date: dateStr, taskId: taskId);
+    _fetchSchedule();
+  }
+
+  Future<void> _handleSkipTask(String taskId) async {
+    final dateStr = _selectedDate.toIso8601String().split('T')[0];
+    await _scheduleService.skipTask(uid: effectiveUid, date: dateStr, taskId: taskId);
+    _fetchSchedule();
+  }
+
   Widget _buildTaskTile(Map<String, dynamic> task) {
     final bool isCompleted = task['completed'] == true;
-    final String status = task['status'] ?? (isCompleted ? "completed-confirmed" : "pending");
+    final String status = task['status'] ?? (isCompleted ? "completed_confirmed" : "pending");
     final String time = task['time'] ?? "--:--";
     final String subtitle = task['subtitle'] ?? "";
 
@@ -871,31 +895,76 @@ class _DailyRoutinePageState extends State<DailyRoutinePage> with SingleTickerPr
     IconData statusIcon = Icons.access_time;
     String statusLabel = "";
 
+    final bool canActOnTask = [
+      'scheduled',
+      'upcoming',
+      'reminder_triggered',
+      'acknowledged',
+      'snoozed',
+      'in_progress',
+    ].contains(status);
+
     switch (status) {
-      case 'completed-confirmed':
+      case 'scheduled':
+        statusColor = Colors.teal;
+        statusIcon = Icons.access_time;
+        statusLabel = "Scheduled";
+        break;
+      case 'upcoming':
+        statusColor = Colors.teal;
+        statusIcon = Icons.upcoming;
+        statusLabel = "Coming up";
+        break;
+      case 'reminder_triggered':
+        statusColor = Colors.orange;
+        statusIcon = Icons.notifications_active;
+        statusLabel = "Reminder sent";
+        break;
+      case 'acknowledged':
+        statusColor = Colors.blue;
+        statusIcon = Icons.thumb_up_alt_outlined;
+        statusLabel = "Acknowledged";
+        break;
+      case 'snoozed':
+        statusColor = Colors.orange;
+        statusIcon = Icons.snooze;
+        statusLabel = "Delayed";
+        break;
+      case 'in_progress':
+        statusColor = Colors.blueAccent;
+        statusIcon = Icons.play_circle_outline;
+        statusLabel = "In progress";
+        break;
+      case 'completed_confirmed':
         statusColor = Colors.green;
         statusIcon = Icons.check_circle;
-        statusLabel = "Confirmed";
+        statusLabel = "Completed";
         break;
-      case 'completed-likely':
+      case 'completed_likely':
         statusColor = Colors.green[300]!;
         statusIcon = Icons.check_circle_outline;
-        statusLabel = "Likely Done";
+        statusLabel = "Probably completed";
         break;
-      case 'missed-likely':
-        statusColor = Colors.orange;
-        statusIcon = Icons.help_outline;
-        statusLabel = "Likely Missed";
+      case 'skipped':
+        statusColor = Colors.grey;
+        statusIcon = Icons.skip_next;
+        statusLabel = "Skipped";
         break;
-      case 'missed-confirmed':
+      case 'missed_likely':
+      case 'missed_confirmed':
         statusColor = Colors.red;
         statusIcon = Icons.cancel;
         statusLabel = "Missed";
         break;
-      case 'needs-caregiver-review':
+      case 'needs_caregiver_review':
         statusColor = Colors.purple;
         statusIcon = Icons.notification_important;
-        statusLabel = "Needs Review";
+        statusLabel = "Needs review";
+        break;
+      case 'escalated':
+        statusColor = Colors.redAccent;
+        statusIcon = Icons.warning;
+        statusLabel = "Caregiver informed";
         break;
       case 'pending':
       default:
@@ -908,60 +977,93 @@ class _DailyRoutinePageState extends State<DailyRoutinePage> with SingleTickerPr
       margin: const EdgeInsets.only(bottom: 12),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       elevation: 2,
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        onLongPress: () => _confirmDeleteTask(task),
-        leading: CircleAvatar(
-          backgroundColor: statusColor.withOpacity(0.1),
-          child: Icon(
-            statusIcon,
-            color: statusColor,
-          ),
-        ),
-        title: Text(
-          task['task_name'] ?? "Task",
-          style: TextStyle(
-            decoration: isCompleted ? TextDecoration.lineThrough : null,
-            color: isCompleted ? Colors.grey : Colors.black87,
-            fontWeight: FontWeight.w600,
-            fontSize: 16
-          ),
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (subtitle.isNotEmpty) 
-               Text(subtitle, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
-            if (statusLabel.isNotEmpty)
-               Text(statusLabel, style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: statusColor)),
-          ],
-        ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            GestureDetector(
-              onTap: () => _updateTaskTime(task),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: Colors.teal.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: Colors.teal.withOpacity(0.3))
-                ),
-                child: Text(
-                  time, 
-                  style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.teal)
-                ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            onLongPress: () => _confirmDeleteTask(task),
+            leading: CircleAvatar(
+              backgroundColor: statusColor.withOpacity(0.1),
+              child: Icon(
+                statusIcon,
+                color: statusColor,
               ),
             ),
-            const SizedBox(width: 8),
-            Checkbox(
-              value: isCompleted,
-              onChanged: (val) => _toggleTaskCompletion(task['id'], isCompleted),
-              activeColor: Colors.teal,
+            title: Text(
+              task['task_name'] ?? "Task",
+              style: TextStyle(
+                decoration: isCompleted ? TextDecoration.lineThrough : null,
+                color: isCompleted ? Colors.grey : Colors.black87,
+                fontWeight: FontWeight.w600,
+                fontSize: 16
+              ),
             ),
-          ],
-        ),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (subtitle.isNotEmpty) 
+                   Text(subtitle, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                if (statusLabel.isNotEmpty)
+                   Text(statusLabel, style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: statusColor)),
+              ],
+            ),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                GestureDetector(
+                  onTap: () => _updateTaskTime(task),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.teal.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: Colors.teal.withOpacity(0.3))
+                    ),
+                    child: Text(
+                      time, 
+                      style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.teal)
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Checkbox(
+                  value: isCompleted,
+                  onChanged: (val) => _toggleTaskCompletion(task['id'], isCompleted),
+                  activeColor: Colors.teal,
+                ),
+              ],
+            ),
+          ),
+          if (canActOnTask)
+            Padding(
+              padding: const EdgeInsets.only(left: 16, right: 16, bottom: 12),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                alignment: WrapAlignment.start,
+                children: [
+                  ElevatedButton(
+                    onPressed: () => _handleCompleteTask(task['id']),
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
+                    child: const Text('Done'),
+                  ),
+                  OutlinedButton(
+                    onPressed: () => _handleSnoozeTask(task['id']),
+                    child: const Text('Later'),
+                  ),
+                  OutlinedButton(
+                    onPressed: () => _handleStartTask(task['id']),
+                    child: const Text('Doing now'),
+                  ),
+                  TextButton(
+                    onPressed: () => _handleSkipTask(task['id']),
+                    child: const Text('Skip', style: TextStyle(color: Colors.red)),
+                  ),
+                ],
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -1083,10 +1185,10 @@ class _DailyRoutinePageState extends State<DailyRoutinePage> with SingleTickerPr
      // Update Firestore for history consistency
      await _scheduleService.updateFirestoreTaskStatus(effectiveUid, _selectedDate, taskId, !currentStatus);
 
-     if (!currentStatus) { 
-        // Marking as COMPLETED -> Use new Backend Endpoint (logs event automatically)
-        await _scheduleService.completeTask(effectiveUid, _selectedDate, taskId);
-        _cancelTaskNotifications(taskId);
+      if (!currentStatus) { 
+         // Marking as COMPLETED -> Use new Backend Endpoint (logs event automatically)
+         await _scheduleService.completeTask(uid: effectiveUid, date: _selectedDate.toIso8601String().split('T')[0], taskId: taskId);
+         _cancelTaskNotifications(taskId);
      } else {
         // Unmarking -> Use standard status update (no event log needed for "undo" usually, or simple update)
         await _scheduleService.updateTaskStatus(effectiveUid, _selectedDate, taskId, false);
