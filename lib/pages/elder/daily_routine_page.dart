@@ -496,84 +496,185 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
     );
   }
 
-  Future<void> _showRescheduleVoiceDialog(String taskId, String initialPrompt) async {
+  Future<void> _showRescheduleVoiceConversation(String taskId, String initialPrompt) async {
     if (!mounted) return;
 
-    String? userInput;
+    final List<Map<String, String>> _laterConversation = [];
+    _laterConversation.add({"speaker": "alex", "text": initialPrompt});
+
     String currentPrompt = initialPrompt;
+    bool flowStarted = false;
+    bool isListening = false;
 
-    while (mounted) {
-      final controller = TextEditingController();
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      isDismissible: false,
+      enableDrag: false,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setStateSheet) {
+            
+            if (!flowStarted) {
+              flowStarted = true;
+              Future.microtask(() async {
+                while (ctx.mounted) {
+                  // 1. Alex speaks
+                  await _voiceService.speak(currentPrompt);
+                  
+                  if (!ctx.mounted) break;
+                  setStateSheet(() { isListening = true; });
 
-      final submitted = await showDialog<String>(
-        context: context,
-        barrierDismissible: false,
-        builder: (ctx) => AlertDialog(
-          title: const Text("Alex"),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(currentPrompt),
-              const SizedBox(height: 12),
-              TextField(
-                controller: controller,
-                autofocus: true,
-                decoration: const InputDecoration(
-                  hintText: "Type the time, e.g. 2:30 PM",
-                  border: OutlineInputBorder(),
-                ),
+                  // 2. Elder listens
+                  final heardText = await _voiceService.listenOnce(
+                    listenFor: const Duration(seconds: 8),
+                    pauseFor: const Duration(seconds: 3),
+                  );
+                  
+                  if (!ctx.mounted) break;
+                  setStateSheet(() { isListening = false; });
+
+                  if (heardText == null || heardText.trim().isEmpty) {
+                    currentPrompt = "I didn't catch that. Please say the time again.";
+                    setStateSheet(() {
+                      _laterConversation.add({"speaker": "alex", "text": currentPrompt});
+                    });
+                    continue;
+                  }
+
+                  setStateSheet(() {
+                    _laterConversation.add({"speaker": "elder", "text": heardText});
+                  });
+
+                  final result = await _scheduleService.sendVoiceCommand(
+                    uid: effectiveUid,
+                    text: heardText,
+                    sessionId: _voiceSessionId,
+                    localTime: DateTime.now(),
+                  );
+
+                  if (result == null) {
+                    const failMsg = "Sorry, I couldn't update the time right now.";
+                    setStateSheet(() {
+                      _laterConversation.add({"speaker": "alex", "text": failMsg});
+                    });
+                    await _voiceService.speak(failMsg);
+                    await Future.delayed(const Duration(seconds: 2));
+                    if (ctx.mounted) Navigator.pop(ctx);
+                    return;
+                  }
+
+                  final reply = result['reply']?.toString() ?? "Okay.";
+                  final intent = result['intent']?.toString() ?? "";
+
+                  setStateSheet(() {
+                    _laterConversation.add({"speaker": "alex", "text": reply});
+                  });
+
+                  if (intent == "task_rescheduled") {
+                    await _voiceService.speak(reply);
+
+                    // Clear old reminders and local tracking for this task
+                    await VoiceReminderService().resyncAfterTaskReschedule(
+                      effectiveUid,
+                      taskId,
+                    );
+
+                    await _fetchSchedule();
+                    await Future.delayed(const Duration(seconds: 2));
+                    if (ctx.mounted) Navigator.pop(ctx);
+                    return;
+                  }
+
+                  if (intent == "task_followup" || intent == "task_followup_confirmation") {
+                    currentPrompt = reply;
+                    continue;
+                  }
+
+                  await _voiceService.speak(reply);
+                  await _fetchSchedule();
+                  await Future.delayed(const Duration(seconds: 2));
+                  if (ctx.mounted) Navigator.pop(ctx);
+                  return;
+                }
+              });
+            }
+
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(ctx).viewInsets.bottom,
+                left: 16, right: 16, top: 24,
               ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, null),
-              child: const Text("Cancel"),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(ctx, controller.text.trim()),
-              child: const Text("Send"),
-            ),
-          ],
-        ),
-      );
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text("Reschedule Task", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.teal)),
+                  const SizedBox(height: 16),
+                  
+                  // Chat Messages List
+                  ConstrainedBox(
+                    constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.4),
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: _laterConversation.length,
+                      itemBuilder: (context, index) {
+                        final msg = _laterConversation[index];
+                        final isAlex = msg['speaker'] == 'alex';
+                        return Container(
+                          margin: const EdgeInsets.symmetric(vertical: 4),
+                          alignment: isAlex ? Alignment.centerLeft : Alignment.centerRight,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            decoration: BoxDecoration(
+                              color: isAlex ? Colors.teal.shade50 : Colors.blue.shade50,
+                              borderRadius: BorderRadius.circular(16).copyWith(
+                                bottomLeft: isAlex ? const Radius.circular(0) : const Radius.circular(16),
+                                bottomRight: !isAlex ? const Radius.circular(0) : const Radius.circular(16),
+                              ),
+                              border: Border.all(color: isAlex ? Colors.teal.shade200 : Colors.blue.shade200),
+                            ),
+                            child: Text(
+                              msg['text'] ?? "",
+                              style: TextStyle(fontSize: 16, color: isAlex ? Colors.teal.shade900 : Colors.blue.shade900),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
 
-      if (submitted == null || submitted.isEmpty) {
-        return;
-      }
+                  const SizedBox(height: 24),
+                  if (isListening)
+                    const Column(
+                      children: [
+                        Icon(Icons.mic, color: Colors.redAccent, size: 48),
+                        SizedBox(height: 8),
+                        Text("Listening...", style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+                      ],
+                    )
+                  else
+                    const SizedBox(height: 72), // Maintain height to prevent jumping
 
-      userInput = submitted;
-
-      final result = await _scheduleService.sendVoiceCommand(
-        uid: effectiveUid,
-        text: userInput,
-        sessionId: _voiceSessionId,
-        localTime: DateTime.now(),
-      );
-
-      if (result == null) {
-        await _showVoiceReplyDialog("Sorry, I couldn't update the time right now.");
-        return;
-      }
-
-      final reply = result['reply']?.toString() ?? "Okay.";
-      final intent = result['intent']?.toString() ?? "";
-
-      if (intent == "task_rescheduled") {
-        await _showVoiceReplyDialog(reply);
-        await _fetchSchedule();
-        return;
-      }
-
-      if (intent == "task_followup" || intent == "task_followup_confirmation") {
-        currentPrompt = reply;
-        continue;
-      }
-
-      await _showVoiceReplyDialog(reply);
-      await _fetchSchedule();
-      return;
-    }
+                  const SizedBox(height: 16),
+                  
+                  TextButton(
+                    onPressed: () {
+                      _voiceService.stop();
+                      Navigator.pop(ctx);
+                    },
+                    child: const Text("Cancel", style: TextStyle(color: Colors.grey)),
+                  ),
+                  const SizedBox(height: 24),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   Future<void> _handleCompleteTask(String taskId) async {
@@ -608,7 +709,7 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
     final reply = result['reply']?.toString() ??
         "Alright. Then, at what time would you like to complete this task?";
 
-    await _showRescheduleVoiceDialog(taskId, reply);
+    await _showRescheduleVoiceConversation(taskId, reply);
   }
 
   Future<void> _handleStartTask(String taskId) async {
