@@ -15,6 +15,17 @@ import '../../services/voice_reminder_service.dart';
 import '../../services/voice_service.dart';
 import 'schedule_history_page.dart';
 import 'voice_chatbot_page.dart';
+import 'widgets/task_skip_review_widget.dart';
+
+const skipReasonOptions = [
+  'not_feeling_well',
+  'not_available',
+  'already_done_uncertain',
+  'out_of_medicine',
+  'elder_refused',
+  'caregiver_skipped',
+  'other',
+];
 
 class DailyRoutinePage extends StatefulWidget {
   final String? elderId;
@@ -58,8 +69,6 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
   List<dynamic> _insights = [];
 
   String _riskTier = "Tier 1";
-
-  // Used for conversational follow-up flows such as "Later"
   String _voiceSessionId = "";
 
   @override
@@ -114,12 +123,13 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
 
         if (data is Map && data['exists'] == true && data['data'] is Map) {
           final Map<String, dynamic> profileMap = data['data'];
-          final freshTier = profileMap['prediction_tier']?.toString() ?? "Tier 1";
+          final freshTier =
+              profileMap['prediction_tier']?.toString() ?? "Tier 1";
           final freshProb = profileMap['prediction_probability'];
 
           await prefs.setString('cached_risk_tier', freshTier);
           if (freshProb != null) {
-            double p = (freshProb is int) ? freshProb.toDouble() : freshProb;
+            final p = (freshProb is int) ? freshProb.toDouble() : freshProb as double;
             await prefs.setDouble('cached_risk_prob', p);
           }
 
@@ -138,7 +148,8 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
   bool get _isPast {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    final selected = DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day);
+    final selected =
+        DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day);
     return selected.isBefore(today);
   }
 
@@ -158,9 +169,11 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
     var data = await _scheduleService.getSchedule(effectiveUid, _selectedDate);
 
     if (data == null && _isPast) {
-      debugPrint("DailyRoutinePage: API failed for past date, checking Firestore...");
+      debugPrint(
+          "DailyRoutinePage: API failed for past date, checking Firestore...");
       final firestoreData =
-          await _scheduleService.getScheduleFromFirestore(effectiveUid, _selectedDate);
+          await _scheduleService.getScheduleFromFirestore(
+              effectiveUid, _selectedDate);
       if (firestoreData != null) {
         data = firestoreData;
       }
@@ -175,7 +188,6 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
     }
 
     final tasks = List<dynamic>.from(data['tasks'] ?? []);
-
     setState(() {
       _dailyTasks = tasks;
     });
@@ -207,7 +219,8 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
   }
 
   Future<void> _enterPlanningMode() async {
-    final suggestions = await _routineService.getDailySuggestions(effectiveUid) ?? {};
+    final suggestions =
+        await _routineService.getDailySuggestions(effectiveUid) ?? {};
 
     if (!mounted) return;
 
@@ -215,9 +228,10 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
       final rawCommon = suggestions['common'] as List? ?? [];
       final Map<String, Map<String, dynamic>> uniqueCommon = {};
 
-      for (var x in rawCommon) {
+      for (final x in rawCommon) {
         final item = Map<String, dynamic>.from(x);
-        final name = (item['task_name'] ?? "").toString().trim().toLowerCase();
+        final name =
+            (item['task_name'] ?? "").toString().trim().toLowerCase();
         if (name.isNotEmpty && !uniqueCommon.containsKey(name)) {
           uniqueCommon[name] = item;
         }
@@ -225,17 +239,19 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
 
       _planningCommon = uniqueCommon.values.toList();
       _planningMeds = List<Map<String, dynamic>>.from(
-        (suggestions['medications'] as List? ?? []).map((x) => Map<String, dynamic>.from(x)),
+        (suggestions['medications'] as List? ?? [])
+            .map((x) => Map<String, dynamic>.from(x)),
       );
       _planningTherapy = List<Map<String, dynamic>>.from(
-        (suggestions['therapy'] as List? ?? []).map((x) => Map<String, dynamic>.from(x)),
+        (suggestions['therapy'] as List? ?? [])
+            .map((x) => Map<String, dynamic>.from(x)),
       );
 
       _isPlanningMode = true;
       _isLoading = false;
       _selectedCommonIds.clear();
 
-      for (var t in _planningTherapy) {
+      for (final t in _planningTherapy) {
         if (t['time'] == null) t['time'] = "10:00";
       }
     });
@@ -246,7 +262,7 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
     String? lunchTime;
     String? dinnerTime;
 
-    for (var c in _planningCommon) {
+    for (final c in _planningCommon) {
       final name = c['task_name'].toString().toLowerCase();
       final time = c['default_time'];
 
@@ -255,7 +271,7 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
       if (name.contains("dinner")) dinnerTime = time;
     }
 
-    for (var m in _planningMeds) {
+    for (final m in _planningMeds) {
       final label = m['timing_label'].toString().toLowerCase();
       String? baseTime;
 
@@ -266,11 +282,21 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
       if (baseTime != null) {
         try {
           final parts = baseTime.split(':');
-          final dt = DateTime(2022, 1, 1, int.parse(parts[0]), int.parse(parts[1]));
-          DateTime newDt = dt;
+          final dt = DateTime(
+            2022,
+            1,
+            1,
+            int.parse(parts[0]),
+            int.parse(parts[1]),
+          );
+          var newDt = dt;
 
-          if (label.contains("before")) newDt = dt.subtract(const Duration(minutes: 30));
-          if (label.contains("after")) newDt = dt.add(const Duration(minutes: 30));
+          if (label.contains("before")) {
+            newDt = dt.subtract(const Duration(minutes: 30));
+          }
+          if (label.contains("after")) {
+            newDt = dt.add(const Duration(minutes: 30));
+          }
 
           m['time'] =
               "${newDt.hour.toString().padLeft(2, '0')}:${newDt.minute.toString().padLeft(2, '0')}";
@@ -287,15 +313,17 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
     try {
       final List<Map<String, dynamic>> allTasksForFirestore = [];
 
-      for (var c in _planningCommon) {
+      for (final c in _planningCommon) {
         if (_selectedCommonIds.contains(c['id'].toString())) {
           final task = {
             "task_name": c['task_name'],
             "time": c['default_time'],
             "type": "common",
             "completed": false,
-            "id": "${effectiveUid}_common_${c['id']}_${DateTime.now().microsecondsSinceEpoch}",
-            "scheduledAt": _combineDateAndTime(_selectedDate, c['default_time']),
+            "id":
+                "${effectiveUid}_common_${c['id']}_${DateTime.now().microsecondsSinceEpoch}",
+            "scheduledAt":
+                _combineDateAndTime(_selectedDate, c['default_time']),
             "graceMinutes": 30,
             "status": "scheduled",
           };
@@ -304,14 +332,15 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
         }
       }
 
-      for (var m in _planningMeds) {
+      for (final m in _planningMeds) {
         final task = {
           "task_name": "${m['drug_name']} ${m['dosage'] ?? ''}".trim(),
           "time": m['time'],
           "type": "medication",
           "completed": false,
           "subtitle": m['timing_label'],
-          "id": "${effectiveUid}_med_${m['id']}_${DateTime.now().microsecondsSinceEpoch}",
+          "id":
+              "${effectiveUid}_med_${m['id']}_${DateTime.now().microsecondsSinceEpoch}",
           "scheduledAt": _combineDateAndTime(_selectedDate, m['time']),
           "graceMinutes": 60,
           "status": "scheduled",
@@ -320,14 +349,15 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
         allTasksForFirestore.add(task);
       }
 
-      for (var t in _planningTherapy) {
+      for (final t in _planningTherapy) {
         final task = {
           "task_name": t['activity_name'],
           "time": t['time'],
           "type": "therapy",
           "completed": false,
           "subtitle": t['duration'],
-          "id": "${effectiveUid}_therapy_${t['id']}_${DateTime.now().microsecondsSinceEpoch}",
+          "id":
+              "${effectiveUid}_therapy_${t['id']}_${DateTime.now().microsecondsSinceEpoch}",
           "scheduledAt": _combineDateAndTime(_selectedDate, t['time']),
           "graceMinutes": 15,
           "status": "scheduled",
@@ -413,12 +443,14 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
     await _notificationService.cancelAll();
 
     final offsets = _getTierOffsets(_riskTier);
-    debugPrint(
-      "Scheduling Reminders for ${_dailyTasks.length} tasks with offsets $offsets (Tier: $_riskTier)",
-    );
 
-    for (var t in _dailyTasks) {
-      if (t['completed'] == true) continue;
+    for (final t in _dailyTasks) {
+      final bool isCompleted = t['completed'] == true;
+      final String rawStatus = (t['status'] ?? '').toString().trim();
+      final String normalizedStatus = _normalizeStatus(rawStatus, isCompleted);
+
+      if (isCompleted) continue;
+      if (_isTerminalStatus(normalizedStatus)) continue;
 
       DateTime? scheduledTime;
       try {
@@ -435,8 +467,7 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
             int.parse(parts[1]),
           );
         }
-      } catch (e) {
-        debugPrint("Error parsing time for task ${t['id']}: $e");
+      } catch (_) {
         continue;
       }
 
@@ -474,6 +505,139 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
     }
   }
 
+  bool _isTerminalStatus(String status) {
+    return const {
+      'completed',
+      'completed_confirmed',
+      'completed_likely',
+      'skipped',
+      'missed_likely',
+      'missed_confirmed',
+      'needs_caregiver_review',
+      'escalated',
+      'snoozed',
+      'in_progress',
+    }.contains(status);
+  }
+
+  String _normalizeStatus(String? rawStatus, bool isCompleted) {
+    final status = (rawStatus ?? '').trim();
+
+    if (status.isEmpty) {
+      return isCompleted ? 'completed_confirmed' : 'scheduled';
+    }
+
+    switch (status) {
+      case 'pending':
+        return isCompleted ? 'completed_confirmed' : 'scheduled';
+      case 'acknowledged':
+        return 'reminder_triggered';
+      case 'reminder_sent':
+        return 'reminder_triggered';
+      default:
+        return status;
+    }
+  }
+
+  bool _showDone(String status, bool isCompleted) {
+    if (isCompleted) return false;
+
+    return const {
+      'scheduled',
+      'upcoming',
+      'reminder_triggered',
+      'snoozed',
+      'in_progress',
+      'needs_caregiver_review',
+      'escalated',
+    }.contains(status);
+  }
+
+  bool _showLater(String status, bool isCompleted) {
+    if (isCompleted) return false;
+
+    return const {
+      'scheduled',
+      'upcoming',
+      'reminder_triggered',
+      'snoozed',
+      'missed_likely',
+      'missed_confirmed',
+      'needs_caregiver_review',
+    }.contains(status);
+  }
+
+  bool _showDoingNow(String status, bool isCompleted) {
+    if (isCompleted) return false;
+
+    return const {
+      'scheduled',
+      'upcoming',
+      'reminder_triggered',
+      'snoozed',
+      'needs_caregiver_review',
+    }.contains(status);
+  }
+
+  bool _showSkip(String status, bool isCompleted) {
+    if (isCompleted) return false;
+
+    return const {
+      'scheduled',
+      'upcoming',
+      'reminder_triggered',
+      'snoozed',
+      'missed_likely',
+      'missed_confirmed',
+      'needs_caregiver_review',
+      'escalated',
+    }.contains(status);
+  }
+
+  String _buildSkipReasonText(Map<String, dynamic> task) {
+    final dynamic reasons = task['skipReasons'];
+
+    if (reasons is List && reasons.isNotEmpty) {
+      return reasons.map((e) => e.toString().replaceAll('_', ' ')).join(', ');
+    }
+
+    final singleReason = (task['skipReason'] ?? '').toString().trim();
+    if (singleReason.isNotEmpty) {
+      return singleReason.replaceAll('_', ' ');
+    }
+
+    return '—';
+  }
+
+  String _buildDecisionByText(Map<String, dynamic> task) {
+    final decisionBy =
+        (task['skipDecisionBy'] ?? task['lastSkipDecisionBy'] ?? '')
+            .toString()
+            .trim();
+
+    if (decisionBy.isEmpty) return '—';
+    return decisionBy;
+  }
+
+  String _formatSkippedAt(dynamic raw) {
+    if (raw == null) return '—';
+
+    final value = raw.toString().trim();
+    if (value.isEmpty) return '—';
+
+    try {
+      final parsed = DateTime.parse(value).toLocal();
+      final day = parsed.day.toString().padLeft(2, '0');
+      final month = parsed.month.toString().padLeft(2, '0');
+      final year = parsed.year.toString();
+      final hour = parsed.hour.toString().padLeft(2, '0');
+      final minute = parsed.minute.toString().padLeft(2, '0');
+      return '$day/$month/$year $hour:$minute';
+    } catch (_) {
+      return value;
+    }
+  }
+
   Future<void> _showVoiceReplyDialog(String message) async {
     if (!mounted) return;
 
@@ -496,11 +660,12 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
     );
   }
 
-  Future<void> _showRescheduleVoiceConversation(String taskId, String initialPrompt) async {
+  Future<void> _showRescheduleVoiceConversation(
+      String taskId, String initialPrompt) async {
     if (!mounted) return;
 
-    final List<Map<String, String>> _laterConversation = [];
-    _laterConversation.add({"speaker": "alex", "text": initialPrompt});
+    final List<Map<String, String>> laterConversation = [];
+    laterConversation.add({"speaker": "alex", "text": initialPrompt});
 
     String currentPrompt = initialPrompt;
     bool flowStarted = false;
@@ -517,36 +682,39 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
       builder: (ctx) {
         return StatefulBuilder(
           builder: (ctx, setStateSheet) {
-            
             if (!flowStarted) {
               flowStarted = true;
               Future.microtask(() async {
                 while (ctx.mounted) {
-                  // 1. Alex speaks
                   await _voiceService.speak(currentPrompt);
-                  
-                  if (!ctx.mounted) break;
-                  setStateSheet(() { isListening = true; });
 
-                  // 2. Elder listens
+                  if (!ctx.mounted) break;
+                  setStateSheet(() {
+                    isListening = true;
+                  });
+
                   final heardText = await _voiceService.listenOnce(
                     listenFor: const Duration(seconds: 8),
                     pauseFor: const Duration(seconds: 3),
                   );
-                  
+
                   if (!ctx.mounted) break;
-                  setStateSheet(() { isListening = false; });
+                  setStateSheet(() {
+                    isListening = false;
+                  });
 
                   if (heardText == null || heardText.trim().isEmpty) {
-                    currentPrompt = "I didn't catch that. Please say the time again.";
+                    currentPrompt =
+                        "I didn't catch that. Please say the time again.";
                     setStateSheet(() {
-                      _laterConversation.add({"speaker": "alex", "text": currentPrompt});
+                      laterConversation
+                          .add({"speaker": "alex", "text": currentPrompt});
                     });
                     continue;
                   }
 
                   setStateSheet(() {
-                    _laterConversation.add({"speaker": "elder", "text": heardText});
+                    laterConversation.add({"speaker": "elder", "text": heardText});
                   });
 
                   final result = await _scheduleService.sendVoiceCommand(
@@ -557,9 +725,10 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
                   );
 
                   if (result == null) {
-                    const failMsg = "Sorry, I couldn't update the time right now.";
+                    const failMsg =
+                        "Sorry, I couldn't update the time right now.";
                     setStateSheet(() {
-                      _laterConversation.add({"speaker": "alex", "text": failMsg});
+                      laterConversation.add({"speaker": "alex", "text": failMsg});
                     });
                     await _voiceService.speak(failMsg);
                     await Future.delayed(const Duration(seconds: 2));
@@ -571,25 +740,23 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
                   final intent = result['intent']?.toString() ?? "";
 
                   setStateSheet(() {
-                    _laterConversation.add({"speaker": "alex", "text": reply});
+                    laterConversation.add({"speaker": "alex", "text": reply});
                   });
 
                   if (intent == "task_rescheduled") {
                     await _voiceService.speak(reply);
-
-                    // Clear old reminders and local tracking for this task
                     await VoiceReminderService().resyncAfterTaskReschedule(
                       effectiveUid,
                       taskId,
                     );
-
                     await _fetchSchedule();
                     await Future.delayed(const Duration(seconds: 2));
                     if (ctx.mounted) Navigator.pop(ctx);
                     return;
                   }
 
-                  if (intent == "task_followup" || intent == "task_followup_confirmation") {
+                  if (intent == "task_followup" ||
+                      intent == "task_followup_confirmation") {
                     currentPrompt = reply;
                     continue;
                   }
@@ -606,60 +773,90 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
             return Padding(
               padding: EdgeInsets.only(
                 bottom: MediaQuery.of(ctx).viewInsets.bottom,
-                left: 16, right: 16, top: 24,
+                left: 16,
+                right: 16,
+                top: 24,
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text("Reschedule Task", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.teal)),
+                  const Text(
+                    "Reschedule Task",
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.teal,
+                    ),
+                  ),
                   const SizedBox(height: 16),
-                  
-                  // Chat Messages List
                   ConstrainedBox(
-                    constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.4),
+                    constraints: BoxConstraints(
+                      maxHeight: MediaQuery.of(ctx).size.height * 0.4,
+                    ),
                     child: ListView.builder(
                       shrinkWrap: true,
-                      itemCount: _laterConversation.length,
+                      itemCount: laterConversation.length,
                       itemBuilder: (context, index) {
-                        final msg = _laterConversation[index];
+                        final msg = laterConversation[index];
                         final isAlex = msg['speaker'] == 'alex';
                         return Container(
                           margin: const EdgeInsets.symmetric(vertical: 4),
-                          alignment: isAlex ? Alignment.centerLeft : Alignment.centerRight,
+                          alignment: isAlex
+                              ? Alignment.centerLeft
+                              : Alignment.centerRight,
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 12),
                             decoration: BoxDecoration(
-                              color: isAlex ? Colors.teal.shade50 : Colors.blue.shade50,
+                              color: isAlex
+                                  ? Colors.teal.shade50
+                                  : Colors.blue.shade50,
                               borderRadius: BorderRadius.circular(16).copyWith(
-                                bottomLeft: isAlex ? const Radius.circular(0) : const Radius.circular(16),
-                                bottomRight: !isAlex ? const Radius.circular(0) : const Radius.circular(16),
+                                bottomLeft: isAlex
+                                    ? const Radius.circular(0)
+                                    : const Radius.circular(16),
+                                bottomRight: !isAlex
+                                    ? const Radius.circular(0)
+                                    : const Radius.circular(16),
                               ),
-                              border: Border.all(color: isAlex ? Colors.teal.shade200 : Colors.blue.shade200),
+                              border: Border.all(
+                                color: isAlex
+                                    ? Colors.teal.shade200
+                                    : Colors.blue.shade200,
+                              ),
                             ),
                             child: Text(
                               msg['text'] ?? "",
-                              style: TextStyle(fontSize: 16, color: isAlex ? Colors.teal.shade900 : Colors.blue.shade900),
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: isAlex
+                                    ? Colors.teal.shade900
+                                    : Colors.blue.shade900,
+                              ),
                             ),
                           ),
                         );
                       },
                     ),
                   ),
-
                   const SizedBox(height: 24),
                   if (isListening)
                     const Column(
                       children: [
                         Icon(Icons.mic, color: Colors.redAccent, size: 48),
                         SizedBox(height: 8),
-                        Text("Listening...", style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+                        Text(
+                          "Listening...",
+                          style: TextStyle(
+                            color: Colors.redAccent,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ],
                     )
                   else
-                    const SizedBox(height: 72), // Maintain height to prevent jumping
-
+                    const SizedBox(height: 72),
                   const SizedBox(height: 16),
-                  
                   TextButton(
                     onPressed: () {
                       _voiceService.stop();
@@ -722,15 +919,155 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
     _fetchSchedule();
   }
 
-  Future<void> _handleSkipTask(String taskId) async {
+  Future<void> _handleSkipTask(
+    String taskId, {
+    required Map<String, dynamic> task,
+  }) async {
+    final skipData = await _showSkipDialog(context);
+    if (skipData == null) return;
+
     final dateStr = _selectedDate.toIso8601String().split('T')[0];
-    await _scheduleService.skipTask(
-      uid: effectiveUid,
-      date: dateStr,
-      taskId: taskId,
-    );
-    _cancelTaskNotifications(taskId);
-    _fetchSchedule();
+    final reasons = skipData['reasons'] as List<String>;
+    final decisionBy = skipData['decisionBy'] as String;
+    final caregiverNote = skipData['caregiverNote'] as String?;
+
+    try {
+      final result = await _scheduleService.skipTask(
+        uid: effectiveUid,
+        date: dateStr,
+        taskId: taskId,
+        reasons: reasons,
+        decisionBy: decisionBy,
+        caregiverNote: caregiverNote,
+      );
+
+      final resultStatus = result['status'];
+
+      if (resultStatus == 'confirmation_required') {
+        if (!mounted) return;
+
+        final taskName = task['task_name'] ?? 'this task';
+        final bool willNotifyCaregiver = task['escalateOnSkip'] == true ||
+            task['notifyCaregiverOnSkip'] == true ||
+            task['type'] == 'medication';
+
+        final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: Row(
+              children: const [
+                Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 28),
+                SizedBox(width: 10),
+                Text('Skip Task?'),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  result['message'] ??
+                      'Are you sure you want to skip "$taskName"?',
+                  style: const TextStyle(fontSize: 15),
+                ),
+                if (willNotifyCaregiver) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.shade50,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.orange.shade200),
+                    ),
+                    child: Row(
+                      children: const [
+                        Icon(Icons.info_outline, color: Colors.orange, size: 18),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Your caregiver may be informed about this skip.',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.deepOrange,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('Yes, Skip'),
+              ),
+            ],
+          ),
+        );
+
+        if (confirmed == true) {
+          await _scheduleService.skipTask(
+            uid: effectiveUid,
+            date: dateStr,
+            taskId: taskId,
+            reasons: reasons,
+            decisionBy: decisionBy,
+            caregiverNote: caregiverNote,
+            confirmed: true,
+          );
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Task skipped.')),
+            );
+          }
+        } else {
+          return;
+        }
+      } else if (resultStatus == 'blocked') {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result['message'] ??
+                  'This task cannot be skipped right now.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Task skipped successfully.')),
+          );
+        }
+      }
+
+      _cancelTaskNotifications(taskId);
+      _fetchSchedule();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error skipping task: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   String _statusLabel(String status, bool isCompleted) {
@@ -739,14 +1076,11 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
         return "Scheduled";
       case 'upcoming':
         return "Coming up";
-      case 'reminder_triggered':
-        return "Reminder sent";
-      case 'acknowledged':
-        return "Acknowledged";
       case 'snoozed':
         return "Delayed";
       case 'in_progress':
         return "In progress";
+      case 'completed':
       case 'completed_confirmed':
         return "Completed";
       case 'completed_likely':
@@ -760,7 +1094,6 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
         return "Needs review";
       case 'escalated':
         return "Caregiver informed";
-      case 'pending':
       default:
         return isCompleted ? "Completed" : "Scheduled";
     }
@@ -770,25 +1103,24 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
     switch (status) {
       case 'scheduled':
       case 'upcoming':
-        return Colors.teal;
       case 'reminder_triggered':
+        return Colors.teal;
       case 'snoozed':
         return Colors.orange;
-      case 'acknowledged':
       case 'in_progress':
         return Colors.blue;
+      case 'completed':
       case 'completed_confirmed':
       case 'completed_likely':
         return Colors.green;
       case 'skipped':
-        return Colors.grey;
+        return Colors.red;
       case 'missed_likely':
       case 'missed_confirmed':
       case 'escalated':
         return Colors.red;
       case 'needs_caregiver_review':
         return Colors.purple;
-      case 'pending':
       default:
         return isCompleted ? Colors.green : Colors.teal;
     }
@@ -802,12 +1134,11 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
         return Icons.upcoming;
       case 'reminder_triggered':
         return Icons.notifications_active;
-      case 'acknowledged':
-        return Icons.thumb_up_alt_outlined;
       case 'snoozed':
         return Icons.snooze;
       case 'in_progress':
         return Icons.play_circle_outline;
+      case 'completed':
       case 'completed_confirmed':
       case 'completed_likely':
         return Icons.check_circle;
@@ -820,421 +1151,146 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
         return Icons.notification_important;
       case 'escalated':
         return Icons.warning;
-      case 'pending':
       default:
         return isCompleted ? Icons.check_circle : Icons.access_time;
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey[50],
-      appBar: AppBar(
-        title: Text(
-          _isPlanningMode
-              ? "Plan Your Day"
-              : (widget.elderName != null ? "${widget.elderName}'s Routine" : "My Routine"),
-        ),
-        backgroundColor: Colors.teal,
-        foregroundColor: Colors.white,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.history),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const ScheduleHistoryPage()),
-              );
-            },
-            tooltip: "View History",
+  Future<void> _handleCaregiverSkipTask(
+    String taskId, {
+    required Map<String, dynamic> task,
+  }) async {
+    final skipData =
+        await _showSkipDialog(context, initialDecisionBy: 'caregiver');
+    if (skipData == null) return;
+
+    final dateStr = _selectedDate.toIso8601String().split('T')[0];
+    final reasons = skipData['reasons'] as List<String>;
+    final decisionBy = skipData['decisionBy'] as String;
+    final caregiverNote = skipData['caregiverNote'] as String?;
+
+    try {
+      await _scheduleService.skipTask(
+        uid: effectiveUid,
+        date: dateStr,
+        taskId: taskId,
+        reasons: reasons,
+        decisionBy: decisionBy,
+        caregiverNote: caregiverNote,
+      );
+      _cancelTaskNotifications(taskId);
+      _fetchSchedule();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to skip: $e'),
+            backgroundColor: Colors.red,
           ),
-        ],
-      ),
-      body: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-            color: Colors.white,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.arrow_back_ios),
-                  onPressed: () => _changeDate(-1),
-                ),
-                Column(
+        );
+      }
+    }
+  }
+
+  Future<Map<String, dynamic>?> _showSkipDialog(
+    BuildContext context, {
+    String initialDecisionBy = 'elder',
+  }) async {
+    final selectedReasons = <String>{};
+    String decisionBy = initialDecisionBy;
+    final caregiverNoteController = TextEditingController();
+
+    return showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text('Skip task'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      _dateTitle,
-                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                    ),
-                    if (!_isToday)
-                      GestureDetector(
-                        onTap: () {
-                          setState(() => _selectedDate = DateTime.now());
-                          _fetchSchedule();
+                    const Text('Why is this task being skipped?'),
+                    const SizedBox(height: 8),
+                    ...skipReasonOptions.map((reason) {
+                      return CheckboxListTile(
+                        value: selectedReasons.contains(reason),
+                        title: Text(reason.replaceAll('_', ' ')),
+                        controlAffinity: ListTileControlAffinity.leading,
+                        onChanged: (checked) {
+                          setState(() {
+                            if (checked == true) {
+                              selectedReasons.add(reason);
+                            } else {
+                              selectedReasons.remove(reason);
+                            }
+                          });
                         },
-                        child: const Text(
-                          "Go to Today",
-                          style: TextStyle(color: Colors.blue, fontSize: 12),
+                      );
+                    }),
+                    const SizedBox(height: 12),
+                    const Text('Decision by'),
+                    RadioListTile<String>(
+                      value: 'elder',
+                      groupValue: decisionBy,
+                      title: const Text('Elder'),
+                      onChanged: (value) => setState(() => decisionBy = value!),
+                    ),
+                    RadioListTile<String>(
+                      value: 'caregiver',
+                      groupValue: decisionBy,
+                      title: const Text('Caregiver'),
+                      onChanged: (value) => setState(() => decisionBy = value!),
+                    ),
+                    if (decisionBy == 'caregiver') ...[
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: caregiverNoteController,
+                        maxLines: 3,
+                        decoration: const InputDecoration(
+                          labelText: 'Caregiver note',
+                          hintText:
+                              'Explain why the caregiver decided to skip this task',
+                          border: OutlineInputBorder(),
                         ),
                       ),
+                    ],
                   ],
                 ),
-                IconButton(
-                  icon: const Icon(Icons.arrow_forward_ios),
-                  onPressed: () => _changeDate(1),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: selectedReasons.isEmpty ||
+                          (decisionBy == 'caregiver' &&
+                              caregiverNoteController.text.trim().isEmpty)
+                      ? null
+                      : () {
+                          Navigator.pop(context, {
+                            'reasons': selectedReasons.toList(),
+                            'decisionBy': decisionBy,
+                            'caregiverNote': caregiverNoteController.text.trim(),
+                          });
+                        },
+                  child: const Text('Save'),
                 ),
               ],
-            ),
-          ),
-          const Divider(height: 1),
-          if (_insights.isNotEmpty)
-            Container(
-              width: double.infinity,
-              color: Colors.blue[50],
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    "AI Suggestions",
-                    style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue),
-                  ),
-                  const SizedBox(height: 8),
-                  ..._insights.map(
-                    (i) => Card(
-                      elevation: 2,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      child: Padding(
-                        padding: const EdgeInsets.all(12.0),
-                        child: Column(
-                          children: [
-                            Row(
-                              children: [
-                                const Icon(Icons.auto_awesome, color: Colors.amber),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Text(
-                                    i['message'] ?? "",
-                                    style: const TextStyle(fontSize: 14),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.end,
-                              children: [
-                                TextButton(
-                                  onPressed: () => setState(() => _insights.remove(i)),
-                                  child: const Text("Dismiss"),
-                                ),
-                                ElevatedButton(
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.blue,
-                                    foregroundColor: Colors.white,
-                                  ),
-                                  onPressed: () {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(content: Text("Applying suggestion...")),
-                                    );
-                                    setState(() => _insights.remove(i));
-                                  },
-                                  child: const Text("Update Time"),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _hasError
-                    ? _buildErrorView()
-                    : _isPlanningMode
-                        ? _buildPlanningView()
-                        : _buildReadingView(),
-          ),
-        ],
-      ),
-      floatingActionButton: (!_isPlanningMode && !_isPast)
-          ? Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                FloatingActionButton(
-                  heroTag: "voice",
-                  onPressed: () async {
-                    try {
-                      final user = await UserService().getUser(effectiveUid);
-                      if (user != null && mounted) {
-                        await Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => VoiceChatbotPage(user: user)),
-                        );
-                        if (mounted) _fetchSchedule();
-                      } else {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text("Error loading user profile for voice.")),
-                        );
-                      }
-                    } catch (e) {
-                      debugPrint("Nav error: $e");
-                    }
-                  },
-                  backgroundColor: Colors.redAccent,
-                  child: const Icon(Icons.mic, color: Colors.white),
-                ),
-                const SizedBox(height: 16),
-                FloatingActionButton(
-                  heroTag: "manual",
-                  onPressed: _showManualAddDialog,
-                  backgroundColor: Colors.teal,
-                  child: const Icon(Icons.add, color: Colors.white),
-                ),
-              ],
-            )
-          : null,
-    );
-  }
-
-  Widget _buildPlanningView() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            _isToday ? "${_getGreeting()} Set up your schedule." : "Planning for $_dateTitle",
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: Colors.teal,
-            ),
-          ),
-          const SizedBox(height: 16),
-          _buildPlanSectionHeader("Section A: Routine Tasks", Icons.wb_sunny),
-          const Padding(
-            padding: EdgeInsets.only(bottom: 8),
-            child: Text("Select tasks & adjust time."),
-          ),
-          ..._planningCommon.map((item) {
-            final id = item['id'].toString();
-            final isSelected = _selectedCommonIds.contains(id);
-
-            return Card(
-              margin: const EdgeInsets.only(bottom: 8),
-              child: ListTile(
-                leading: Checkbox(
-                  value: isSelected,
-                  activeColor: Colors.teal,
-                  onChanged: (val) {
-                    setState(() {
-                      if (val == true) {
-                        _selectedCommonIds.add(id);
-                      } else {
-                        _selectedCommonIds.remove(id);
-                      }
-                    });
-                  },
-                ),
-                title: Text(item['task_name']),
-                trailing: OutlinedButton(
-                  onPressed: () async {
-                    String t = item['default_time'];
-                    TimeOfDay initial = const TimeOfDay(hour: 8, minute: 0);
-                    try {
-                      initial = TimeOfDay(
-                        hour: int.parse(t.split(':')[0]),
-                        minute: int.parse(t.split(':')[1]),
-                      );
-                    } catch (_) {}
-
-                    final p = await showTimePicker(context: context, initialTime: initial);
-                    if (p != null) {
-                      setState(() {
-                        item['default_time'] =
-                            "${p.hour.toString().padLeft(2, '0')}:${p.minute.toString().padLeft(2, '0')}";
-                        _adaptMedicationTimes();
-                      });
-                    }
-                  },
-                  child: Text(item['default_time']),
-                ),
-              ),
             );
-          }),
-          const SizedBox(height: 24),
-          _buildPlanSectionHeader("Section B: Medications", Icons.medication),
-          const Padding(
-            padding: EdgeInsets.only(bottom: 8),
-            child: Text("Times adapt to your meals automatically."),
-          ),
-          if (_planningMeds.isEmpty)
-            const Text(
-              "No active medications.",
-              style: TextStyle(fontStyle: FontStyle.italic),
-            ),
-          ..._planningMeds.map((item) {
-            return ListTile(
-              leading: const Icon(Icons.check_circle, color: Colors.grey),
-              title: Text("${item['drug_name']} ${item['dosage'] ?? ''}"),
-              subtitle: Text(item['timing_label'] ?? ""),
-              trailing: Text(
-                item['time'],
-                style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.teal),
-              ),
-            );
-          }),
-          const SizedBox(height: 24),
-          _buildPlanSectionHeader("Section C: Therapy", Icons.accessibility),
-          const Padding(
-            padding: EdgeInsets.only(bottom: 8),
-            child: Text("Choose your preferred time."),
-          ),
-          if (_planningTherapy.isEmpty)
-            const Text(
-              "No therapy assigned.",
-              style: TextStyle(fontStyle: FontStyle.italic),
-            ),
-          ..._planningTherapy.map((item) {
-            return ListTile(
-              leading: const Icon(Icons.check_circle, color: Colors.grey),
-              title: Text(item['activity_name']),
-              subtitle: Text(item['duration'] ?? ""),
-              trailing: OutlinedButton(
-                onPressed: () async {
-                  String t = item['time'];
-                  TimeOfDay initial = const TimeOfDay(hour: 10, minute: 0);
-                  try {
-                    initial = TimeOfDay(
-                      hour: int.parse(t.split(':')[0]),
-                      minute: int.parse(t.split(':')[1]),
-                    );
-                  } catch (_) {}
-
-                  final p = await showTimePicker(context: context, initialTime: initial);
-                  if (p != null) {
-                    setState(() {
-                      item['time'] =
-                          "${p.hour.toString().padLeft(2, '0')}:${p.minute.toString().padLeft(2, '0')}";
-                    });
-                  }
-                },
-                child: Text(item['time']),
-              ),
-            );
-          }),
-          const SizedBox(height: 40),
-          SizedBox(
-            width: double.infinity,
-            height: 50,
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.teal,
-                foregroundColor: Colors.white,
-              ),
-              onPressed: _savePlan,
-              child: const Text("Create My Day Plan", style: TextStyle(fontSize: 18)),
-            ),
-          ),
-          const SizedBox(height: 40),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildErrorView() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(Icons.cloud_off, color: Colors.grey, size: 60),
-          const SizedBox(height: 16),
-          const Text(
-            "Connection Error",
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            "We couldn't load your schedule.",
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 24),
-          ElevatedButton(
-            onPressed: _fetchSchedule,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.teal,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text("Retry"),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPlanSectionHeader(String title, IconData icon) {
-    return Row(
-      children: [
-        Icon(icon, color: Colors.teal),
-        const SizedBox(width: 8),
-        Text(
-          title,
-          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildReadingView() {
-    if (_dailyTasks.isEmpty) {
-      return const Center(child: Text("No tasks scheduled for this day."));
-    }
-
-    final common = _dailyTasks.where((t) => t['type'] == 'common' || t['type'] == 'custom').toList();
-    final meds = _dailyTasks.where((t) => t['type'] == 'medication').toList();
-    final therapy =
-        _dailyTasks.where((t) => t['type'] == 'therapy' || t['type'] == 'therapist').toList();
-
-    _dailyTasks.sort((a, b) => (a['time'] ?? "00:00").compareTo(b['time'] ?? "00:00"));
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (common.isNotEmpty) ...[
-            _buildSectionHeader("Today's Tasks", Icons.assignment),
-            ...common.map((t) => _buildTaskTile(Map<String, dynamic>.from(t))),
-            const SizedBox(height: 20),
-          ],
-          if (meds.isNotEmpty) ...[
-            _buildSectionHeader("Medications", Icons.medication),
-            ...meds.map((t) => _buildTaskTile(Map<String, dynamic>.from(t))),
-            const SizedBox(height: 20),
-          ],
-          if (therapy.isNotEmpty) ...[
-            _buildSectionHeader("Therapy", Icons.accessibility),
-            ...therapy.map((t) => _buildTaskTile(Map<String, dynamic>.from(t))),
-            const SizedBox(height: 20),
-          ],
-        ],
-      ),
+          },
+        );
+      },
     );
   }
 
   Widget _buildTaskTile(Map<String, dynamic> task) {
     final bool isCompleted = task['completed'] == true;
-    final String status =
-        task['status'] ?? (isCompleted ? "completed_confirmed" : "scheduled");
+    final String rawStatus = (task['status'] ?? '').toString().trim();
+    final String status = _normalizeStatus(rawStatus, isCompleted);
     final String time = task['time'] ?? "--:--";
     final String subtitle = task['subtitle'] ?? "";
 
@@ -1242,14 +1298,14 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
     final statusIcon = _statusIcon(status, isCompleted);
     final statusLabel = _statusLabel(status, isCompleted);
 
-    final bool canActOnTask = const [
-      'scheduled',
-      'upcoming',
-      'reminder_triggered',
-      'acknowledged',
-      'snoozed',
-      'in_progress',
-    ].contains(status);
+    final bool showDone = _showDone(status, isCompleted);
+    final bool showLater = _showLater(status, isCompleted);
+    final bool showDoingNow = _showDoingNow(status, isCompleted);
+    final bool showSkip = _showSkip(status, isCompleted);
+
+    final String skipReasonText = _buildSkipReasonText(task);
+    final String decisionByText = _buildDecisionByText(task);
+    final String skippedAtText = _formatSkippedAt(task['skippedAt']);
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -1259,7 +1315,8 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           ListTile(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             onLongPress: () => _confirmDeleteTask(task),
             leading: CircleAvatar(
               backgroundColor: statusColor.withOpacity(0.1),
@@ -1317,47 +1374,113 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
                 const SizedBox(width: 8),
                 Checkbox(
                   value: isCompleted,
-                  onChanged: (val) => _toggleTaskCompletion(task['id'], isCompleted),
+                  onChanged: (val) =>
+                      _toggleTaskCompletion(task['id'], isCompleted),
                   activeColor: Colors.teal,
                 ),
               ],
             ),
           ),
-          if (canActOnTask)
+          if (showDone || showLater || showDoingNow || showSkip)
             Padding(
               padding: const EdgeInsets.only(left: 16, right: 16, bottom: 12),
               child: Wrap(
                 spacing: 8,
                 runSpacing: 8,
                 children: [
-                  ElevatedButton(
-                    onPressed: () => _handleCompleteTask(task['id']),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
-                      foregroundColor: Colors.white,
+                  if (showDone)
+                    ElevatedButton(
+                      onPressed: () => _handleCompleteTask(task['id']),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green,
+                        foregroundColor: Colors.white,
+                      ),
+                      child: const Text('Done'),
                     ),
-                    child: const Text('Done'),
-                  ),
-                  OutlinedButton(
-                    onPressed: () => _handleLaterTask(task['id']),
-                    child: const Text('Later'),
-                  ),
-                  OutlinedButton(
-                    onPressed: () => _handleStartTask(task['id']),
-                    child: const Text('Doing now'),
-                  ),
-                  TextButton(
-                    onPressed: () => _handleSkipTask(task['id']),
-                    child: const Text(
-                      'Skip',
-                      style: TextStyle(color: Colors.red),
+                  if (showLater)
+                    OutlinedButton(
+                      onPressed: () => _handleLaterTask(task['id']),
+                      child: const Text('Later'),
                     ),
-                  ),
+                  if (showDoingNow)
+                    OutlinedButton(
+                      onPressed: () => _handleStartTask(task['id']),
+                      child: const Text('Doing now'),
+                    ),
+                  if (showSkip) _buildElderSkipButton(task),
                 ],
+              ),
+            ),
+          if (showSkip && widget.elderId == null)
+            Padding(
+              padding: const EdgeInsets.only(left: 16, right: 16, bottom: 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (task['requireSkipConfirmation'] == true) ...[
+                    const SizedBox(height: 6),
+                    const Text(
+                      'Skipping this task may require confirmation.',
+                      style: TextStyle(fontSize: 12, color: Colors.orange),
+                    ),
+                  ],
+                  if (task['notifyCaregiverOnSkip'] == true ||
+                      task['escalateOnSkip'] == true ||
+                      task['type'] == 'medication') ...[
+                    const SizedBox(height: 4),
+                    const Text(
+                      'Your caregiver may be informed.',
+                      style: TextStyle(fontSize: 12, color: Colors.redAccent),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          if (widget.elderId != null ||
+              status == 'skipped' ||
+              status == 'needs_caregiver_review' ||
+              status == 'escalated')
+            Padding(
+              padding: const EdgeInsets.only(left: 16, right: 16, bottom: 12),
+              child: TaskSkipReviewWidget(
+                task: {
+                  ...task,
+                  'status': status,
+                  'skipReasonDisplay': skipReasonText,
+                  'skipDecisionByDisplay': decisionByText,
+                  'skippedAtDisplay': skippedAtText,
+                },
+                isCaregiverMode: widget.elderId != null,
+                onCaregiverSkip: widget.elderId != null
+                    ? () => _handleCaregiverSkipTask(task['id'], task: task)
+                    : null,
               ),
             ),
         ],
       ),
+    );
+  }
+
+  Widget _buildElderSkipButton(Map<String, dynamic> task) {
+    final bool requireConfirmation = task['requireSkipConfirmation'] == true;
+
+    if (requireConfirmation) {
+      return OutlinedButton.icon(
+        onPressed: () => _handleSkipTask(task['id'], task: task),
+        icon: const Icon(Icons.block, size: 16, color: Colors.red),
+        label: const Text('Skip', style: TextStyle(color: Colors.red)),
+        style: OutlinedButton.styleFrom(
+          side: const BorderSide(color: Colors.red),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+      );
+    }
+
+    return TextButton(
+      onPressed: () => _handleSkipTask(task['id'], task: task),
+      child: const Text('Skip', style: TextStyle(color: Colors.red)),
     );
   }
 
@@ -1377,68 +1500,253 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
     );
   }
 
-  void _showManualAddDialog() {
-    final nameController = TextEditingController();
-    TimeOfDay selectedTime = const TimeOfDay(hour: 12, minute: 0);
+  Widget _buildPlanningView() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            _isToday
+                ? "Good day! Set up your schedule."
+                : "Planning for $_dateTitle",
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Colors.teal,
+            ),
+          ),
+          const SizedBox(height: 16),
+          _buildPlanSectionHeader("Section A: Routine Tasks", Icons.wb_sunny),
+          const Padding(
+            padding: EdgeInsets.only(bottom: 8),
+            child: Text("Select tasks & adjust time."),
+          ),
+          ..._planningCommon.map((item) {
+            final id = item['id'].toString();
+            final isSelected = _selectedCommonIds.contains(id);
 
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text("Add Custom Activity"),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameController,
-              decoration: const InputDecoration(labelText: "Name"),
-            ),
-            ListTile(
-              title: const Text("Time"),
-              trailing: Text(
-                "${selectedTime.hour}:${selectedTime.minute.toString().padLeft(2, '0')}",
-              ),
-              onTap: () async {
-                final p = await showTimePicker(
-                  context: context,
-                  initialTime: selectedTime,
-                );
-                if (p != null) selectedTime = p;
-              },
-            ),
-          ],
-        ),
-        actions: [
-          ElevatedButton(
-            child: const Text("Add"),
-            onPressed: () async {
-              if (nameController.text.isNotEmpty) {
-                final hhmm =
-                    "${selectedTime.hour.toString().padLeft(2, '0')}:${selectedTime.minute.toString().padLeft(2, '0')}";
-                final success = await _scheduleService.addTask(
-                  effectiveUid,
-                  _selectedDate,
-                  {
-                    "task_name": nameController.text,
-                    "time": hhmm,
-                    "type": "common",
-                    "completed": false,
-                    "id": "${effectiveUid}_manual_${DateTime.now().millisecondsSinceEpoch}",
-                    "scheduledAt": _combineDateAndTime(_selectedDate, hhmm),
-                    "status": "scheduled",
-                    "graceMinutes": 30,
+            return Card(
+              margin: const EdgeInsets.only(bottom: 8),
+              child: ListTile(
+                leading: Checkbox(
+                  value: isSelected,
+                  activeColor: Colors.teal,
+                  onChanged: (val) {
+                    setState(() {
+                      if (val == true) {
+                        _selectedCommonIds.add(id);
+                      } else {
+                        _selectedCommonIds.remove(id);
+                      }
+                    });
                   },
-                );
+                ),
+                title: Text(item['task_name']),
+                trailing: OutlinedButton(
+                  onPressed: () async {
+                    String t = item['default_time'];
+                    TimeOfDay initial = const TimeOfDay(hour: 8, minute: 0);
+                    try {
+                      initial = TimeOfDay(
+                        hour: int.parse(t.split(':')[0]),
+                        minute: int.parse(t.split(':')[1]),
+                      );
+                    } catch (_) {}
 
-                if (success && ctx.mounted) {
-                  Navigator.pop(ctx);
-                  _fetchSchedule();
-                }
-              }
-            },
+                    final p = await showTimePicker(
+                      context: context,
+                      initialTime: initial,
+                    );
+                    if (p != null) {
+                      setState(() {
+                        item['default_time'] =
+                            "${p.hour.toString().padLeft(2, '0')}:${p.minute.toString().padLeft(2, '0')}";
+                        _adaptMedicationTimes();
+                      });
+                    }
+                  },
+                  child: Text(item['default_time']),
+                ),
+              ),
+            );
+          }),
+          const SizedBox(height: 24),
+          _buildPlanSectionHeader("Section B: Medications", Icons.medication),
+          const Padding(
+            padding: EdgeInsets.only(bottom: 8),
+            child: Text("Times adapt to your meals automatically."),
+          ),
+          if (_planningMeds.isEmpty)
+            const Text(
+              "No active medications.",
+              style: TextStyle(fontStyle: FontStyle.italic),
+            ),
+          ..._planningMeds.map((item) {
+            return ListTile(
+              leading: const Icon(Icons.check_circle, color: Colors.grey),
+              title: Text("${item['drug_name']} ${item['dosage'] ?? ''}"),
+              subtitle: Text(item['timing_label'] ?? ""),
+              trailing: Text(
+                item['time'],
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.teal,
+                ),
+              ),
+            );
+          }),
+          const SizedBox(height: 24),
+          _buildPlanSectionHeader("Section C: Therapy", Icons.accessibility),
+          const Padding(
+            padding: EdgeInsets.only(bottom: 8),
+            child: Text("Choose your preferred time."),
+          ),
+          if (_planningTherapy.isEmpty)
+            const Text(
+              "No therapy assigned.",
+              style: TextStyle(fontStyle: FontStyle.italic),
+            ),
+          ..._planningTherapy.map((item) {
+            return ListTile(
+              leading: const Icon(Icons.check_circle, color: Colors.grey),
+              title: Text(item['activity_name']),
+              subtitle: Text(item['duration'] ?? ""),
+              trailing: OutlinedButton(
+                onPressed: () async {
+                  String t = item['time'];
+                  TimeOfDay initial = const TimeOfDay(hour: 10, minute: 0);
+                  try {
+                    initial = TimeOfDay(
+                      hour: int.parse(t.split(':')[0]),
+                      minute: int.parse(t.split(':')[1]),
+                    );
+                  } catch (_) {}
+
+                  final p = await showTimePicker(
+                    context: context,
+                    initialTime: initial,
+                  );
+                  if (p != null) {
+                    setState(() {
+                      item['time'] =
+                          "${p.hour.toString().padLeft(2, '0')}:${p.minute.toString().padLeft(2, '0')}";
+                    });
+                  }
+                },
+                child: Text(item['time']),
+              ),
+            );
+          }),
+          const SizedBox(height: 40),
+          SizedBox(
+            width: double.infinity,
+            height: 50,
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.teal,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: _savePlan,
+              child: const Text(
+                "Create My Day Plan",
+                style: TextStyle(fontSize: 18),
+              ),
+            ),
+          ),
+          const SizedBox(height: 40),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildErrorView() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.cloud_off, color: Colors.grey, size: 60),
+          const SizedBox(height: 16),
+          const Text(
+            "Connection Error",
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            "We couldn't load your schedule.",
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 24),
+          ElevatedButton(
+            onPressed: _fetchSchedule,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.teal,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text("Retry"),
           ),
         ],
       ),
     );
+  }
+
+  Widget _buildPlanSectionHeader(String title, IconData icon) {
+    return Row(
+      children: [
+        Icon(icon, color: Colors.teal),
+        const SizedBox(width: 8),
+        Text(
+          title,
+          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildReadingView() {
+    if (_dailyTasks.isEmpty) {
+      return const Center(child: Text("No tasks scheduled for this day."));
+    }
+
+    final common = _dailyTasks
+        .where((t) => t['type'] == 'common' || t['type'] == 'custom')
+        .toList();
+    final meds = _dailyTasks.where((t) => t['type'] == 'medication').toList();
+    final therapy = _dailyTasks
+        .where((t) => t['type'] == 'therapy' || t['type'] == 'therapist')
+        .toList();
+
+    _dailyTasks.sort((a, b) => (a['time'] ?? "00:00").compareTo(b['time'] ?? "00:00"));
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (common.isNotEmpty) ...[
+            _buildSectionHeader("Today's Tasks", Icons.assignment),
+            ...common.map((t) => _buildTaskTile(Map<String, dynamic>.from(t))),
+            const SizedBox(height: 20),
+          ],
+          if (meds.isNotEmpty) ...[
+            _buildSectionHeader("Medications", Icons.medication),
+            ...meds.map((t) => _buildTaskTile(Map<String, dynamic>.from(t))),
+            const SizedBox(height: 20),
+          ],
+          if (therapy.isNotEmpty) ...[
+            _buildSectionHeader("Therapy", Icons.accessibility),
+            ...therapy.map((t) => _buildTaskTile(Map<String, dynamic>.from(t))),
+            const SizedBox(height: 20),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Future<void> _deleteTask(String taskId) async {
+    setState(() => _dailyTasks.removeWhere((t) => t['id'] == taskId));
+    await _scheduleService.deleteTask(effectiveUid, _selectedDate, taskId);
+    _cancelTaskNotifications(taskId);
   }
 
   void _confirmDeleteTask(Map<String, dynamic> task) {
@@ -1467,11 +1775,6 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
     );
   }
 
-  Future<void> _deleteTask(String taskId) async {
-    setState(() => _dailyTasks.removeWhere((t) => t['id'] == taskId));
-    await _scheduleService.deleteTask(effectiveUid, _selectedDate, taskId);
-  }
-
   Future<void> _updateTaskTime(Map<String, dynamic> task) async {
     String current = task['time'] ?? "08:00";
     TimeOfDay initial = const TimeOfDay(hour: 8, minute: 0);
@@ -1483,7 +1786,10 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
       );
     } catch (_) {}
 
-    final p = await showTimePicker(context: context, initialTime: initial);
+    final p = await showTimePicker(
+      context: context,
+      initialTime: initial,
+    );
     if (p != null) {
       final newTime =
           "${p.hour.toString().padLeft(2, '0')}:${p.minute.toString().padLeft(2, '0')}";
@@ -1494,6 +1800,7 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
         task['id'],
         {"time": newTime},
       );
+      _fetchSchedule();
     }
   }
 
@@ -1571,8 +1878,271 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
   }
 
   String _getScheduleDocId() {
-    final d =
-        "${_selectedDate.day.toString().padLeft(2, '0')}.${_selectedDate.month.toString().padLeft(2, '0')}.${_selectedDate.year}";
-    return "${effectiveUid}_$d";
+  final d =
+      "${_selectedDate.day.toString().padLeft(2, '0')}.${_selectedDate.month.toString().padLeft(2, '0')}.${_selectedDate.year}";
+  return "${effectiveUid}_$d";
+}
+
+  void _showManualAddDialog() {
+    final nameController = TextEditingController();
+    TimeOfDay selectedTime = const TimeOfDay(hour: 12, minute: 0);
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text("Add Custom Activity"),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameController,
+              decoration: const InputDecoration(labelText: "Name"),
+            ),
+            ListTile(
+              title: const Text("Time"),
+              trailing: Text(
+                "${selectedTime.hour}:${selectedTime.minute.toString().padLeft(2, '0')}",
+              ),
+              onTap: () async {
+                final picked = await showTimePicker(
+                  context: context,
+                  initialTime: selectedTime,
+                );
+                if (picked != null) {
+                  selectedTime = picked;
+                }
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text("Cancel"),
+          ),
+          ElevatedButton(
+            child: const Text("Add"),
+            onPressed: () async {
+              if (nameController.text.trim().isEmpty) return;
+
+              final hhmm =
+                  "${selectedTime.hour.toString().padLeft(2, '0')}:${selectedTime.minute.toString().padLeft(2, '0')}";
+
+              final success = await _scheduleService.addTask(
+                effectiveUid,
+                _selectedDate,
+                {
+                  "task_name": nameController.text.trim(),
+                  "time": hhmm,
+                  "type": "common",
+                  "completed": false,
+                  "id":
+                      "${effectiveUid}_manual_${DateTime.now().millisecondsSinceEpoch}",
+                  "scheduledAt": _combineDateAndTime(_selectedDate, hhmm),
+                  "status": "scheduled",
+                  "graceMinutes": 30,
+                },
+              );
+
+              if (success && ctx.mounted) {
+                Navigator.pop(ctx);
+                _fetchSchedule();
+              }
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.grey[50],
+      appBar: AppBar(
+        title: Text(
+          _isPlanningMode
+              ? "Plan Your Day"
+              : (widget.elderName != null
+                  ? "${widget.elderName}'s Routine"
+                  : "My Routine"),
+        ),
+        backgroundColor: Colors.teal,
+        foregroundColor: Colors.white,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.history),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ScheduleHistoryPage()),
+              );
+            },
+            tooltip: "View History",
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+            color: Colors.white,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.arrow_back_ios),
+                  onPressed: () => _changeDate(-1),
+                ),
+                Column(
+                  children: [
+                    Text(
+                      _dateTitle,
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    if (!_isToday)
+                      GestureDetector(
+                        onTap: () {
+                          setState(() => _selectedDate = DateTime.now());
+                          _fetchSchedule();
+                        },
+                        child: const Text(
+                          "Go to Today",
+                          style: TextStyle(color: Colors.blue, fontSize: 12),
+                        ),
+                      ),
+                  ],
+                ),
+                IconButton(
+                  icon: const Icon(Icons.arrow_forward_ios),
+                  onPressed: () => _changeDate(1),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          if (_insights.isNotEmpty)
+            Container(
+              width: double.infinity,
+              color: Colors.blue[50],
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    "AI Suggestions",
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.blue,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  ..._insights.map(
+                    (i) => Card(
+                      elevation: 2,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(12.0),
+                        child: Column(
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(Icons.auto_awesome, color: Colors.amber),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    i['message'] ?? "",
+                                    style: const TextStyle(fontSize: 14),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.end,
+                              children: [
+                                TextButton(
+                                  onPressed: () => setState(() => _insights.remove(i)),
+                                  child: const Text("Dismiss"),
+                                ),
+                                ElevatedButton(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.blue,
+                                    foregroundColor: Colors.white,
+                                  ),
+                                  onPressed: () {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text("Applying suggestion...")),
+                                    );
+                                    setState(() => _insights.remove(i));
+                                  },
+                                  child: const Text("Update Time"),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _hasError
+                    ? _buildErrorView()
+                    : _isPlanningMode
+                        ? _buildPlanningView()
+                        : _buildReadingView(),
+          ),
+        ],
+      ),
+      floatingActionButton: (!_isPlanningMode && !_isPast)
+          ? Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                FloatingActionButton(
+                  heroTag: "voice",
+                  onPressed: () async {
+                    try {
+                      final user = await UserService().getUser(effectiveUid);
+                      if (user != null && mounted) {
+                        await Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => VoiceChatbotPage(user: user)),
+                        );
+                        if (mounted) _fetchSchedule();
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text("Error loading user profile for voice."),
+                          ),
+                        );
+                      }
+                    } catch (e) {
+                      debugPrint("Nav error: $e");
+                    }
+                  },
+                  backgroundColor: Colors.redAccent,
+                  child: const Icon(Icons.mic, color: Colors.white),
+                ),
+                const SizedBox(height: 16),
+                FloatingActionButton(
+                  heroTag: "manual",
+                  onPressed: _showManualAddDialog,
+                  backgroundColor: Colors.teal,
+                  child: const Icon(Icons.add, color: Colors.white),
+                ),
+              ],
+            )
+          : null,
+    );
   }
 }

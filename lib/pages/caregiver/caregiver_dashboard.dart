@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import '../../models/user_model.dart';
+import '../../models/notification_model.dart';
 import '../../auth/auth_service.dart';
 import '../../services/user_service.dart';
+import '../../services/notification_service.dart';
 import '../../pages/profile_page.dart';
 import '../../auth/login_page.dart';
 import 'manage_elders_page.dart';
 import '../../features/voice_chatbot/screens/elders_emotions_page.dart';
-// ✅ ADD this import (update path to your actual file)
-//import '../chatbot/all_emotions_screen.dart'; // <-- change if your folder differs
 import '../../features/voice_chatbot/screens/all_emotion_screen.dart';
 class CaregiverDashboard extends StatefulWidget {
   final AppUser user;
@@ -20,6 +20,7 @@ class CaregiverDashboard extends StatefulWidget {
 
 class _CaregiverDashboardState extends State<CaregiverDashboard> {
   final _userService = UserService();
+  final _notificationService = NotificationService();
   int _totalElders = 0;
   bool _isLoading = true;
 
@@ -79,6 +80,8 @@ class _CaregiverDashboardState extends State<CaregiverDashboard> {
                 _buildHeader(),
                 const SizedBox(height: 14),
                 _buildStatsCard(),
+                const SizedBox(height: 18),
+                _buildNotificationSection(),
                 const SizedBox(height: 18),
                 _buildSectionTitle("Quick Actions"),
                 const SizedBox(height: 12),
@@ -353,6 +356,122 @@ class _CaregiverDashboardState extends State<CaregiverDashboard> {
                 ),
               ],
             ),
+    );
+  }
+
+  // ==========================================================
+  // NOTIFICATION SECTION
+  // ==========================================================
+
+  Widget _buildNotificationSection() {
+    return StreamBuilder<List<CaregiverNotification>>(
+      stream: _notificationService.streamCaregiverNotifications(widget.user.uid),
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return const SizedBox.shrink();
+        }
+
+        final notifications = snapshot.data
+                ?.where((n) => n.needsReview)
+                .toList() ??
+            [];
+
+        if (notifications.isEmpty) {
+          return const SizedBox.shrink();
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildSectionTitle("Skipped Tasks Needing Review"),
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 160,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: notifications.length,
+                separatorBuilder: (context, index) => const SizedBox(width: 12),
+                itemBuilder: (context, index) {
+                  final notification = notifications[index];
+                  return _buildNotificationCard(notification);
+                },
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildNotificationCard(CaregiverNotification notification) {
+    return Container(
+      width: 280,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.red.withOpacity(0.3)),
+        boxShadow: [
+          BoxShadow(
+            blurRadius: 15,
+            offset: const Offset(0, 8),
+            color: Colors.black.withOpacity(0.05),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: Colors.red.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.warning_amber_rounded,
+                    color: Colors.red, size: 18),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  notification.taskName,
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w900, fontSize: 15),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            "Elder skipped: \"${notification.reason}\"",
+            style: TextStyle(
+                fontSize: 13,
+                color: Colors.black.withOpacity(0.6),
+                fontWeight: FontWeight.w500),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const Spacer(),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              TextButton(
+                onPressed: () => _notificationService.markAsReviewed(
+                    widget.user.uid, notification),
+                style: TextButton.styleFrom(
+                  foregroundColor: _green900,
+                  textStyle: const TextStyle(fontWeight: FontWeight.w800),
+                ),
+                child: const Text("Mark Reviewed"),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 

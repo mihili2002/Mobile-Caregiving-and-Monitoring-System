@@ -81,7 +81,13 @@ class VoiceReminderService {
     debugPrint("VoiceReminderService: Checking ${_tasks.length} tasks for reminders (Risk Tier: $_riskTier, Time: ${now.hour}:${now.minute})");
     
     for (var task in _tasks) {
-      if (task['completed'] == true) continue;
+      // Stop reminding if task is completed or effectively "finished" (skipped, missed, etc.)
+      final status = task['status']?.toString() ?? '';
+      if (task['completed'] == true || 
+          status == 'skipped' || 
+          status == 'needs_caregiver_review' || 
+          status == 'escalated' || 
+          status.startsWith('missed')) continue;
       
       DateTime? effectiveReminderTime;
 
@@ -216,8 +222,13 @@ class VoiceReminderService {
               
               // TRIGGER: Check for reminder_count increases (FOR WEB/CHROME DEMO)
               for (var task in newTasks) {
-                // Skip if task is completed - no reminders for finished tasks!
-                if (task['completed'] == true) continue;
+                // Skip if task is completed or effectively "finished" (skipped, etc.)
+                final status = task['status']?.toString() ?? '';
+                if (task['completed'] == true || 
+                    status == 'skipped' || 
+                    status == 'needs_caregiver_review' || 
+                    status == 'escalated' || 
+                    status.startsWith('missed')) continue;
                 
                 final taskId = task['id']?.toString() ?? "";
                 final currentCount = task['reminder_count'] ?? 0;
@@ -357,7 +368,12 @@ class VoiceReminderService {
     await _notificationService.init();
     
     for (var task in _tasks) {
-      if (task['completed'] == true) continue;
+      // Ignore tasks that are finished or being reviewed
+      final status = task['status']?.toString() ?? '';
+      if (task['completed'] == true || 
+          status == 'skipped' || 
+          status == 'needs_caregiver_review' || 
+          status == 'escalated') continue;
       
       DateTime? scheduledTime;
       final now = DateTime.now();

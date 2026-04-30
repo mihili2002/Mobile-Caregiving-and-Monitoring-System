@@ -224,29 +224,38 @@ class ScheduleService {
     }
   }
 
-  Future<bool> skipTask({
+  Future<Map<String, dynamic>> skipTask({
     required String uid,
     required String date,
     required String taskId,
-    String? reason,
+    required List<String> reasons,
+    required String decisionBy, // elder | caregiver
+    String? caregiverNote,
+    bool confirmed = false,
+    bool? notifyCaregiver,
   }) async {
-    try {
-      final response = await http.post(
-        Uri.parse('$baseUrl/api/ai/tasks/skip'),
-        headers: _jsonHeaders,
-        body: jsonEncode({
-          "uid": uid,
-          "date": date,
-          "task_id": taskId,
-          "actor": "elder",
-          "reason": reason ?? "user_skipped",
-        }),
-      );
-      return response.statusCode == 200;
-    } catch (e) {
-      debugPrint("ScheduleService.skipTask error: $e");
-      return false;
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/ai/tasks/skip'),
+      headers: _jsonHeaders,
+      body: jsonEncode({
+        "uid": uid,
+        "date": date,
+        "task_id": taskId,
+        "actor": decisionBy,
+        "reasons": reasons,
+        "reason": reasons.isNotEmpty ? reasons.first : "other", // backward compat
+        "skip_decision_by": decisionBy,
+        "caregiver_skip_note": caregiverNote,
+        "confirmed": confirmed,
+        "notify_caregiver": notifyCaregiver,
+      }),
+    );
+
+    if (response.statusCode >= 400) {
+      throw Exception('Failed to skip task: ${response.body}');
     }
+
+    return jsonDecode(response.body) as Map<String, dynamic>;
   }
 
   // ----------------------------

@@ -58,6 +58,9 @@ class ScheduleTask {
   final String? startedAt;
   final String? skippedAt;
   final String? skipReason;
+  final List<String>? skipReasons;
+  final String? skipDecisionBy;
+  final String? caregiverSkipNote;
   final String? snoozedUntil;
 
   final String? completedAt;
@@ -69,6 +72,21 @@ class ScheduleTask {
 
   final bool? caregiverNotified;
   final bool? escalateOnMiss;
+
+  // --- skip policy (rule-derived, immutable after creation) ---
+  final bool? caregiverSkipNotified;
+  final bool? escalateOnSkip;
+  final bool? requireSkipConfirmation;
+  final bool? allowPreScheduleSkip;
+  final bool? notifyCaregiverOnSkip;
+  final int? skipLimitWindowDays;
+  final int? skipLimitCount;
+  final int? skipCount;
+  final int? skipCountWindow;
+  final bool? skipReviewRequired;
+  final String? lastSkipDecisionBy;
+  final String? pendingReminderInvalidatedAt;
+  final int? reminderVersion;
 
   final String? createdAt;
   final String? updatedAt;
@@ -93,6 +111,9 @@ class ScheduleTask {
     this.startedAt,
     this.skippedAt,
     this.skipReason,
+    this.skipReasons,
+    this.skipDecisionBy,
+    this.caregiverSkipNote,
     this.snoozedUntil,
     this.completedAt,
     this.completedBy,
@@ -101,6 +122,19 @@ class ScheduleTask {
     this.recurrenceRule,
     this.caregiverNotified,
     this.escalateOnMiss,
+    this.caregiverSkipNotified,
+    this.escalateOnSkip,
+    this.requireSkipConfirmation,
+    this.allowPreScheduleSkip,
+    this.notifyCaregiverOnSkip,
+    this.skipLimitWindowDays,
+    this.skipLimitCount,
+    this.skipCount,
+    this.skipCountWindow,
+    this.skipReviewRequired,
+    this.lastSkipDecisionBy,
+    this.pendingReminderInvalidatedAt,
+    this.reminderVersion,
     this.createdAt,
     this.updatedAt,
   });
@@ -128,6 +162,11 @@ class ScheduleTask {
       startedAt: json['startedAt'],
       skippedAt: json['skippedAt'],
       skipReason: json['skipReason'],
+      skipReasons: (json['skipReasons'] as List<dynamic>?)
+          ?.map((e) => e.toString())
+          .toList(),
+      skipDecisionBy: json['skipDecisionBy'] as String?,
+      caregiverSkipNote: json['caregiverSkipNote'] as String?,
       snoozedUntil: json['snoozedUntil'],
       completedAt: json['completedAt'],
       completedBy: json['completedBy'],
@@ -136,8 +175,21 @@ class ScheduleTask {
       recurrenceRule: json['recurrenceRule'],
       caregiverNotified: json['caregiverNotified'],
       escalateOnMiss: json['escalateOnMiss'],
-      createdAt: json['createdAt'],
-      updatedAt: json['updatedAt'],
+      caregiverSkipNotified: json['caregiverSkipNotified'],
+      escalateOnSkip: json['escalateOnSkip'],
+      requireSkipConfirmation: json['requireSkipConfirmation'],
+      allowPreScheduleSkip: json['allowPreScheduleSkip'] as bool?,
+      notifyCaregiverOnSkip: json['notifyCaregiverOnSkip'] as bool?,
+      skipLimitWindowDays: json['skipLimitWindowDays'] as int?,
+      skipLimitCount: json['skipLimitCount'] as int?,
+      skipCount: json['skipCount'] as int?,
+      skipCountWindow: json['skipCountWindow'] as int?,
+      skipReviewRequired: json['skipReviewRequired'] as bool?,
+      lastSkipDecisionBy: json['lastSkipDecisionBy'] as String?,
+      pendingReminderInvalidatedAt: json['pendingReminderInvalidatedAt'] as String?,
+      reminderVersion: json['reminderVersion'] as int?,
+      createdAt: json['createdAt'] as String?,
+      updatedAt: json['updatedAt'] as String?,
     );
   }
 
@@ -162,6 +214,9 @@ class ScheduleTask {
       'startedAt': startedAt,
       'skippedAt': skippedAt,
       'skipReason': skipReason,
+      'skipReasons': skipReasons,
+      'skipDecisionBy': skipDecisionBy,
+      'caregiverSkipNote': caregiverSkipNote,
       'snoozedUntil': snoozedUntil,
       'completedAt': completedAt,
       'completedBy': completedBy,
@@ -170,6 +225,19 @@ class ScheduleTask {
       'recurrenceRule': recurrenceRule,
       'caregiverNotified': caregiverNotified,
       'escalateOnMiss': escalateOnMiss,
+      'caregiverSkipNotified': caregiverSkipNotified,
+      'escalateOnSkip': escalateOnSkip,
+      'requireSkipConfirmation': requireSkipConfirmation,
+      'allowPreScheduleSkip': allowPreScheduleSkip,
+      'notifyCaregiverOnSkip': notifyCaregiverOnSkip,
+      'skipLimitWindowDays': skipLimitWindowDays,
+      'skipLimitCount': skipLimitCount,
+      'skipCount': skipCount,
+      'skipCountWindow': skipCountWindow,
+      'skipReviewRequired': skipReviewRequired,
+      'lastSkipDecisionBy': lastSkipDecisionBy,
+      'pendingReminderInvalidatedAt': pendingReminderInvalidatedAt,
+      'reminderVersion': reminderVersion,
       'createdAt': createdAt,
       'updatedAt': updatedAt,
     };
@@ -179,7 +247,7 @@ class ScheduleTask {
         'scheduled',
         'upcoming',
         'reminder_triggered',
-        'acknowledged',
+        // 'acknowledged',
         'snoozed',
         'in_progress',
       ].contains(status);
@@ -193,4 +261,7 @@ class ScheduleTask {
         'needs_caregiver_review',
         'escalated',
       ].contains(status);
+
+  bool get needsCaregiverReview =>
+      status == 'needs_caregiver_review' || skipReviewRequired == true;
 }
