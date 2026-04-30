@@ -67,6 +67,7 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
 
   final Set<String> _selectedCommonIds = {};
   List<dynamic> _insights = [];
+  bool _insightsFetched = false; // Guard: only fetch insights once per session
 
   String _riskTier = "Tier 1";
   String _voiceSessionId = "";
@@ -212,6 +213,10 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
   }
 
   Future<void> _checkInsights() async {
+    // Only fetch insights once per page session to avoid repeated API calls
+    if (_insightsFetched) return;
+    _insightsFetched = true;
+
     final insights = await _behaviorService.getInsights();
     if (insights.isNotEmpty && mounted) {
       setState(() => _insights = insights);
@@ -379,7 +384,8 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
 
         final user = await UserService().getUser(effectiveUid);
         if (user != null) {
-          Navigator.push(
+          // await the push so _fetchSchedule() fires exactly once, after dismissal
+          await Navigator.push(
             context,
             MaterialPageRoute(
               builder: (_) => VoiceChatbotPage(
@@ -388,13 +394,11 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
                     "Your plan is ready. Is there anything to add additionally into your today's plan, like appointments or calls?",
               ),
             ),
-          ).then((_) {
-            if (mounted) _fetchSchedule();
-          });
+          );
         }
+        // Single refresh after returning from the chatbot
+        if (mounted) _fetchSchedule();
       }
-
-      _fetchSchedule();
     } catch (e) {
       debugPrint("Error saving plan: $e");
     } finally {
