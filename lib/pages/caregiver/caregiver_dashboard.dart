@@ -6,9 +6,9 @@ import '../../pages/profile_page.dart';
 import '../../auth/login_page.dart';
 import 'manage_elders_page.dart';
 import '../../features/voice_chatbot/screens/elders_emotions_page.dart';
-// ✅ ADD this import (update path to your actual file)
-//import '../chatbot/all_emotions_screen.dart'; // <-- change if your folder differs
 import '../../features/voice_chatbot/screens/all_emotion_screen.dart';
+import 'manage_elder_profiles_page.dart';
+
 class CaregiverDashboard extends StatefulWidget {
   final AppUser user;
 
@@ -97,7 +97,7 @@ class _CaregiverDashboardState extends State<CaregiverDashboard> {
                   icon: Icons.shield_outlined,
                   title: "Emergency readiness",
                   body:
-                      "Keep emergency contacts updated and ensure the elder’s key medical info is available.",
+                      "Keep emergency contacts updated and ensure the elder's key medical info is available.",
                 ),
               ],
             ),
@@ -363,7 +363,7 @@ class _CaregiverDashboardState extends State<CaregiverDashboard> {
     );
   }
 
-  // ✅ UPDATED: Added "Emotions" card
+  // Updated Quick Actions Grid with single Manage Profiles button
   Widget _buildQuickActionsGrid() {
     return GridView.count(
       crossAxisCount: 2,
@@ -388,21 +388,34 @@ class _CaregiverDashboardState extends State<CaregiverDashboard> {
           },
         ),
         _buildFeatureCard(
+          title: "Manage Profiles",
+          icon: Icons.account_circle_outlined,
+          color: const Color(0xFF8B5CF6),
+          description: "View and edit elder profiles",
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => ManageElderProfilesPage(caregiver: widget.user),
+              ),
+            );
+          },
+        ),
+        _buildFeatureCard(
           title: "Emotions",
           icon: Icons.mood_outlined,
           color: const Color(0xFF0EA5E9),
           description: "View emotion insights",
-         onTap: () {
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (_) => EldersEmotionsPage(
-        baseUrl: "http://127.0.0.1:8000", // change to your real API url
-      ),
-    ),
-  );
-},
-
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => EldersEmotionsPage(
+                  baseUrl: "http://127.0.0.1:8000",
+                ),
+              ),
+            );
+          },
         ),
         _buildFeatureCard(
           title: "Daily Routines",
