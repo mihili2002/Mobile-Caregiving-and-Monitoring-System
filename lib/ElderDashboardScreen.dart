@@ -8,6 +8,8 @@ import 'pages/elder/meal_plans/elder_meal_plan_dashboard.dart';
 import 'pages/elder/therapist_support/elder_therapist_support_page.dart';
 import './RoutineHome.dart';
 import '../../features/voice_chatbot/screens/journal_record_page.dart';
+import 'auth/auth_service.dart';
+import 'auth/login_page.dart';
 
 class ElderDashboard extends StatefulWidget {
   final AppUser user;
@@ -221,6 +223,30 @@ class _ElderDashboardState extends State<ElderDashboard> with SingleTickerProvid
             ],
           ),
         ),
+        Material(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          elevation: 2,
+          shadowColor: Colors.black12,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(14),
+            onTap: () async {
+              await AuthService().signOut();
+              if (context.mounted) {
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(builder: (_) => const LoginPage()),
+                  (route) => false,
+                );
+              }
+            },
+            child: const Padding(
+              padding: EdgeInsets.all(10),
+              child: Icon(Icons.logout_rounded, color: Colors.black54),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
         Material(
           color: Colors.white,
           borderRadius: BorderRadius.circular(14),

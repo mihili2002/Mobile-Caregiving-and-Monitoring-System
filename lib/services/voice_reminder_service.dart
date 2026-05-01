@@ -81,16 +81,44 @@ class VoiceReminderService {
     debugPrint("VoiceReminderService: Checking ${_tasks.length} tasks for reminders (Risk Tier: $_riskTier, Time: ${now.hour}:${now.minute})");
     
     for (var task in _tasks) {
-      if (task['completed'] == true) continue;
+      // Stop reminding if task is completed or effectively "finished" (skipped, missed, etc.)
+      final status = task['status']?.toString() ?? '';
+      if (task['completed'] == true || 
+          status == 'skipped' || 
+          status == 'needs_caregiver_review' || 
+          status == 'escalated' || 
+          status.startsWith('missed')) continue;
       
-      String? tStr = task['time'];
-      if (tStr == null || !tStr.contains(":")) continue;
-      
+      DateTime? effectiveReminderTime;
+
       try {
-        final parts = tStr.split(":");
-        final taskMinutes = int.parse(parts[0]) * 60 + int.parse(parts[1]);
-        
-        int diff = currentMinutes - taskMinutes;
+        if (task['status'] == 'snoozed' && task['snoozedUntil'] != null) {
+          effectiveReminderTime = DateTime.parse(task['snoozedUntil']);
+        } else if (task['scheduledAt'] != null) {
+          effectiveReminderTime = DateTime.parse(task['scheduledAt']);
+        } else {
+          final tStr = task['time']?.toString();
+          if (tStr != null && tStr.contains(":")) {
+            final parts = tStr.split(":");
+            effectiveReminderTime = DateTime(
+              now.year,
+              now.month,
+              now.day,
+              int.parse(parts[0]),
+              int.parse(parts[1]),
+            );
+          }
+        }
+      } catch (e) {
+        debugPrint("VoiceReminderService: Error parsing effective reminder time: $e");
+        continue;
+      }
+
+      if (effectiveReminderTime == null) continue;
+
+      final taskMinutes =
+          effectiveReminderTime.hour * 60 + effectiveReminderTime.minute;
+      final diff = currentMinutes - taskMinutes;
         
         // 1. Standard/Tier-based triggers
         bool shouldRemind = false;
@@ -148,9 +176,6 @@ class VoiceReminderService {
             _spokenKeys.add(key);
           }
         }
-      } catch (e) {
-        debugPrint("VoiceReminderService: Error parsing task time: $e");
-      }
     }
   }
 
@@ -197,8 +222,13 @@ class VoiceReminderService {
               
               // TRIGGER: Check for reminder_count increases (FOR WEB/CHROME DEMO)
               for (var task in newTasks) {
-                // Skip if task is completed - no reminders for finished tasks!
-                if (task['completed'] == true) continue;
+                // Skip if task is completed or effectively "finished" (skipped, etc.)
+                final status = task['status']?.toString() ?? '';
+                if (task['completed'] == true || 
+                    status == 'skipped' || 
+                    status == 'needs_caregiver_review' || 
+                    status == 'escalated' || 
+                    status.startsWith('missed')) continue;
                 
                 final taskId = task['id']?.toString() ?? "";
                 final currentCount = task['reminder_count'] ?? 0;
@@ -321,27 +351,59 @@ class VoiceReminderService {
     _audioPlayer.dispose();
   }
 
+  Future<void> resyncAfterTaskReschedule(String uid, String taskId) async {
+    _spokenKeys.removeWhere((key) => key.startsWith("${taskId}_"));
+    _lastPlayedCounts.remove(taskId);
+
+    for (int i = 0; i < 5; i++) {
+      final notifId = NotificationService.makeId(uid, taskId, i);
+      await _notificationService.cancel(notifId);
+    }
+
+    debugPrint("VoiceReminderService: Cleared old reminder cycle for task $taskId");
+  }
+
   // NEW: Schedule Local Notifications for reliability
   Future<void> _scheduleNotificationsForTasks() async {
     await _notificationService.init();
     
     for (var task in _tasks) {
-      if (task['completed'] == true) continue;
+      // Ignore tasks that are finished or being reviewed
+      final status = task['status']?.toString() ?? '';
+      if (task['completed'] == true || 
+          status == 'skipped' || 
+          status == 'needs_caregiver_review' || 
+          status == 'escalated') continue;
       
-      final timeStr = task['time']?.toString() ?? "";
-      if (!timeStr.contains(":")) continue;
-      
+      DateTime? scheduledTime;
+      final now = DateTime.now();
+
       try {
-        final parts = timeStr.split(":");
-        final taskHour = int.parse(parts[0]);
-        final taskMinute = int.parse(parts[1]);
+        if (task['status'] == 'snoozed' && task['snoozedUntil'] != null) {
+          scheduledTime = DateTime.parse(task['snoozedUntil']);
+        } else if (task['scheduledAt'] != null) {
+          scheduledTime = DateTime.parse(task['scheduledAt']);
+        } else {
+          final timeStr = task['time']?.toString() ?? "";
+          if (timeStr.contains(":")) {
+            final parts = timeStr.split(":");
+            scheduledTime = DateTime(
+              now.year,
+              now.month,
+              now.day,
+              int.parse(parts[0]),
+              int.parse(parts[1]),
+            );
+          }
+        }
+      } catch (e) {
+        debugPrint("VoiceReminderService: Error scheduling local notification: $e");
+        continue;
+      }
+
+      if (scheduledTime == null) continue;
         
-        final now = DateTime.now();
-        final scheduledTime = DateTime(
-          now.year, now.month, now.day,
-          taskHour, taskMinute
-        );
-        
+      try {
         // Only schedule if time is in future
         if (scheduledTime.isAfter(now)) {
            final taskIdStr = task['id']?.toString() ?? task['task_name']?.toString() ?? "";

@@ -13,7 +13,8 @@ class TherapyPlanService {
   // 🧠 Generate AI Personalized Plan
   // ---------------------------------------------------
   static Future<Map<String, dynamic>> generatePlan(
-      String residentId) async {
+      String residentId,
+      {String? elderEmail}) async {
 
     final url =
         Uri.parse("$baseUrl$therapyPrefix/generate_personalized_plan");
@@ -23,6 +24,7 @@ class TherapyPlanService {
       headers: {"Content-Type": "application/json"},
       body: jsonEncode({
         "resident_id": residentId,
+        "elder_email": elderEmail, // ⭐ new optional field
       }),
     );
 
@@ -69,5 +71,43 @@ class TherapyPlanService {
   // ---------------------------------------------------
   static String getPdfUrl(String planId) {
     return "$baseUrl$therapyPrefix/export_plan_pdf/$planId";
+  }
+
+  // ---------------------------------------------------
+  // 📥 Get Active Approved Plan (by Resident ID)
+  // ---------------------------------------------------
+  static Future<Map<String, dynamic>> getActivePlan(
+      String residentId) async {
+
+    final url =
+        Uri.parse("$baseUrl$therapyPrefix/get_active_plan/$residentId");
+
+    final response = await http.get(url);
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    } else {
+      throw Exception(
+        "Failed to fetch active plan (${response.statusCode})",
+      );
+    }
+  }
+
+  // ---------------------------------------------------
+  // 📥 Get Active Plan by Email (for Elder Dashboard)
+  // ---------------------------------------------------
+  static Future<Map<String, dynamic>> getPlanByEmail(
+      String email) async {
+
+    final url =
+        Uri.parse("$baseUrl$therapyPrefix/get_plan_by_email/$email");
+
+    final response = await http.get(url);
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    } else {
+      throw Exception("No plan found for this user");
+    }
   }
 }

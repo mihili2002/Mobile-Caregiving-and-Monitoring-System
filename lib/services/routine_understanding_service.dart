@@ -34,7 +34,7 @@ class RoutineUnderstandingService {
             now, 
             taskMap['id']?.toString() ?? "", 
             true, 
-            status: 'completed-likely'
+            status: 'completed_likely'
           );
         } else if (_isMissed(normalizedText)) {
           await _scheduleService.updateFirestoreTaskStatus(
@@ -42,7 +42,7 @@ class RoutineUnderstandingService {
             now, 
             taskMap['id']?.toString() ?? "", 
             false, 
-            status: 'missed-likely'
+            status: 'missed_likely'
           );
         }
       }
