@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
+
 import '../../../models/meal_plan_model.dart';
 import '../../elder/meal_plans/widgets/meal_day_accordion.dart';
 import 'nutritional_justification_panel.dart';
+import 'edit_meal_plan_screen.dart';
+import '../../../services/doctor_meal_plan_service.dart';
 
-class MealPlanModal extends StatelessWidget {
+class MealPlanModal extends StatefulWidget {
   final MealPlanModel plan;
   final VoidCallback onApprove;
   final VoidCallback onReject;
-  // final VoidCallback onEdit;
+  final ValueChanged<MealPlanModel>? onEdit;
 
   // ✅ Optional fields for Disease-Aware Nutritional Justification Panel
   final List<String> chronicConditions;
@@ -23,7 +26,7 @@ class MealPlanModal extends StatelessWidget {
     required this.plan,
     required this.onApprove,
     required this.onReject,
-    // required this.onEdit,
+    this.onEdit,
 
     // ✅ added (safe defaults so old code won’t break)
     this.chronicConditions = const [],
@@ -36,7 +39,35 @@ class MealPlanModal extends StatelessWidget {
   });
 
   @override
+  State<MealPlanModal> createState() => _MealPlanModalState();
+}
+
+class _MealPlanModalState extends State<MealPlanModal> {
+  bool _isSaving = false;
+
+  Future<void> _updateMealPlan(MealPlanModel plan) async {
+    setState(() => _isSaving = true);
+
+    try {
+      final svc = DoctorMealPlanService();
+      await svc.edit(mealPlanId: plan.id, payload: plan.toJson());
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Meal plan saved')));
+
+      // Notify parent to refresh UI
+      widget.onEdit?.call(plan);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Save failed: $e')));
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final plan = widget.plan;
     final days = plan.meals.keys.toList();
 
     return SafeArea(
@@ -106,14 +137,14 @@ class MealPlanModal extends StatelessWidget {
               children: [
                 // ✅ Collapsible Disease-aware panel
                 NutritionalJustificationPanel(
-                  chronicConditions: chronicConditions,
+                  chronicConditions: widget.chronicConditions,
                   plan: plan,
-                  age: age,
-                  bmi: bmi,
-                  bloodPressure: bloodPressure,
-                  bloodSugar: bloodSugar,
-                  dietaryHabit: dietaryHabit,
-                  foodAllergies: foodAllergies,
+                  age: widget.age,
+                  bmi: widget.bmi,
+                  bloodPressure: widget.bloodPressure,
+                  bloodSugar: widget.bloodSugar,
+                  dietaryHabit: widget.dietaryHabit,
+                  foodAllergies: widget.foodAllergies,
                 ),
 
                 const SizedBox(height: 12),
@@ -155,7 +186,7 @@ class MealPlanModal extends StatelessWidget {
                         borderRadius: BorderRadius.circular(14),
                       ),
                     ),
-                    onPressed: onApprove,
+                    onPressed: _isSaving ? null : widget.onApprove,
                     child: const Text(
                       "Approve Plan",
                       style: TextStyle(fontWeight: FontWeight.w900),
@@ -174,28 +205,43 @@ class MealPlanModal extends StatelessWidget {
                         borderRadius: BorderRadius.circular(14),
                       ),
                     ),
-                    onPressed: onReject,
+                    onPressed: _isSaving ? null : widget.onReject,
                     child: const Text(
                       "Reject Plan",
                       style: TextStyle(fontWeight: FontWeight.w900),
                     ),
                   ),
                 ),
-                // Keep your commented edit button untouched
-                // const SizedBox(height: 10),
-                // SizedBox(
-                //   width: double.infinity,
-                //   child: ElevatedButton(
-                //     style: ElevatedButton.styleFrom(
-                //       backgroundColor: const Color(0xFF2979FF),
-                //       foregroundColor: Colors.white,
-                //       padding: const EdgeInsets.symmetric(vertical: 14),
-                //       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                //     ),
-                //     onPressed: onEdit,
-                //     child: const Text("Edit Plan", style: TextStyle(fontWeight: FontWeight.w900)),
-                //   ),
-                // ),
+                const SizedBox(height: 10),
+                // Edit button — opens an editor and returns updated plan
+                if (widget.onEdit != null)
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF2979FF),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                      onPressed: _isSaving
+                          ? null
+                          : () async {
+                              final updated = await Navigator.of(context).push<MealPlanModel>(
+                                MaterialPageRoute(
+                                  builder: (_) => EditMealPlanScreen(plan: plan),
+                                ),
+                              );
+
+                              if (updated != null) {
+                                await _updateMealPlan(updated);
+                              }
+                            },
+                      child: _isSaving
+                          ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                          : const Text("Edit Plan", style: TextStyle(fontWeight: FontWeight.w900)),
+                    ),
+                  ),
               ],
             ),
           ),

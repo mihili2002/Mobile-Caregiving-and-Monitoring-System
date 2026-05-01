@@ -9,6 +9,7 @@ import '../../auth/login_page.dart';
 import 'manage_elders_page.dart';
 import '../../features/voice_chatbot/screens/elders_emotions_page.dart';
 import '../../features/voice_chatbot/screens/all_emotion_screen.dart';
+import '../../pages/shared/elders_selection_screen.dart';
 import 'manage_elder_profiles_page.dart';
 
 class CaregiverDashboard extends StatefulWidget {
@@ -562,6 +563,24 @@ class _CaregiverDashboardState extends State<CaregiverDashboard> {
               context,
               MaterialPageRoute(
                 builder: (context) => ManageEldersPage(caregiver: widget.user),
+              ),
+            );
+          },
+        ),
+        _buildFeatureCard(
+          title: "Health Details",
+          icon: Icons.medical_information_outlined,
+          color: const Color(0xFF06B6D4),
+          description: "Record health data for elders",
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => EldersSelectionScreen(
+                  title: "Select Elder - Lifestyle & Nutrition",
+                  description: "Record lifestyle, nutrition intakes, and dietary information for the selected elder.",
+                  userRole: UserRole.caregiver,
+                ),
               ),
             );
           },
