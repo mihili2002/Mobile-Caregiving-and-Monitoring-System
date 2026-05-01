@@ -56,13 +56,31 @@ class _VoiceChatbotPageState extends State<VoiceChatbotPage> {
     });
   }
 
+  String _getGreetingPhrase() {
+    final hour = DateTime.now().hour;
+    if (hour < 12) {
+      return "Good morning";
+    } else if (hour < 15) {
+      return "Good afternoon";
+    } else {
+      return "Good evening";
+    }
+  }
+
   Future<void> _fetchGreeting() async {
     try {
       final baseUrl = UserService.getApiUrl(context);
       final response = await http.get(Uri.parse('$baseUrl/api/ai/greet?uid=${widget.user.uid}'));
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        final reply = data['reply'] ?? "Hello! I'm Alex.";
+        String reply = data['reply'] ?? "Hello! I'm Alex.";
+        
+        // Ensure the reply starts with the real-time greeting
+        final greeting = _getGreetingPhrase();
+        if (!reply.toLowerCase().startsWith(greeting.toLowerCase())) {
+          reply = "$greeting! $reply";
+        }
+
         if (mounted) {
           setState(() {
             _aiReply = reply;
@@ -73,6 +91,14 @@ class _VoiceChatbotPageState extends State<VoiceChatbotPage> {
       }
     } catch (e) {
       debugPrint("Error fetching greeting: $e");
+      final greeting = _getGreetingPhrase();
+      if (mounted) {
+        setState(() {
+          _aiReply = "$greeting! How can I help you today?";
+        });
+        await _voiceService.speak(_aiReply);
+        _startListening();
+      }
     }
   }
   

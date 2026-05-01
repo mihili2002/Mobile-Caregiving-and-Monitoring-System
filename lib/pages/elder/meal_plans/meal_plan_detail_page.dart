@@ -738,23 +738,35 @@ class _MealPlanDetailPageState extends State<MealPlanDetailPage> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(_mealEmoji(title), style: const TextStyle(fontSize: 18)),
+            Text(
+            _mealEmoji(title),
+             style: const TextStyle(
+             fontSize: 20,
+             height: 1,
+          ),
+             textAlign: TextAlign.center,
+         ),
             const SizedBox(width: 10),
             SizedBox(
-              width: 92,
-              child: Text(
-                title,
-                style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15),
-              ),
-            ),
+          width: 92,
+          child: Text(
+          title,
+          style: const TextStyle(
+          color: Colors.black,
+          fontWeight: FontWeight.w900,
+          fontSize: 15,
+        ),
+      ),
+    ),
             Expanded(
               child: Text(
                 text,
-                style: TextStyle(
-                  color: Colors.black.withOpacity(0.75),
+                style: const TextStyle(
+                  color: Colors.black87,
                   fontSize: 15,
                   height: 1.25,
-                ),
+                  fontWeight: FontWeight.w500,
+                )
               ),
             ),
           ],
@@ -875,10 +887,12 @@ class _MealPlanDetailPageState extends State<MealPlanDetailPage> {
 
     return Padding(
       padding: const EdgeInsets.only(top: 14),
-      child: Opacity(
-        opacity: done ? 0.55 : 1.0,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+      child: DefaultTextStyle.merge(
+      style: TextStyle(
+        color: done?Colors.grey : Colors.black,
+      ),
+      child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               crossAxisAlignment: CrossAxisAlignment.center,

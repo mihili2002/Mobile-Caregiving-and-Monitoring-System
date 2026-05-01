@@ -174,7 +174,6 @@ class ElderProfilePage extends StatelessWidget {
             title: "Basic Info",
             icon: Icons.person,
             children: [
-              _InfoRow(label: "Name", value: "${data['name'] ?? 'N/A'}"),
               _InfoRow(label: "Age", value: "${data['age'] ?? 'N/A'}"),
               _InfoRow(label: "Long-term illness", value: "${data['long_term_illness'] ?? 'N/A'}"),
               _InfoRow(label: "Completed At", value: "${data['completed_at'] ?? data['created_at'] ?? 'N/A'}"),

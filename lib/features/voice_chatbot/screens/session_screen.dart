@@ -20,8 +20,9 @@ class _SessionsScreenState extends State<SessionsScreen> {
   String _error = "";
   List<Map<String, dynamic>> _sessions = [];
 
-  static const _green900 = Color(0xFF00A693);
-  static const _mint = Color(0xFFF2FBF7);
+  static const _teal900 = Color(0xFF007A6E);
+  static const _teal200 = Color(0xFFB2EBF2);
+  static const _softBg = Color(0xFFF0F9F8);
 
   @override
   void initState() {
@@ -171,9 +172,9 @@ class _SessionsScreenState extends State<SessionsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _mint,
+      backgroundColor: _softBg,
       appBar: AppBar(
-        backgroundColor: _green900,
+        backgroundColor: _teal900,
         title: const Text("All Chat Sessions"),
         actions: [
           IconButton(
