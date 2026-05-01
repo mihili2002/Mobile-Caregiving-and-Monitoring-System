@@ -1,24 +1,29 @@
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:io';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
+
 class ScheduleService {
-  // Same smart URL logic as RoutineService
   String get baseUrl {
     if (kIsWeb) return "http://127.0.0.1:8000";
     if (defaultTargetPlatform == TargetPlatform.android) return "http://10.0.2.2:8000";
     return "http://192.168.8.115:8000";
   }
 
-  // 1. Get Schedule for a Date
+  Map<String, String> get _jsonHeaders => {"Content-Type": "application/json"};
+
+  // ----------------------------
+  // Schedule CRUD
+  // ----------------------------
+
   Future<Map<String, dynamic>?> getSchedule(String uid, DateTime date) async {
-    final dateStr = date.toIso8601String().split('T')[0]; // YYYY-MM-DD
+    final dateStr = date.toIso8601String().split('T')[0];
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/api/schedule/get_schedule'),
-        headers: {"Content-Type": "application/json"},
+        headers: _jsonHeaders,
         body: jsonEncode({
           "uid": uid,
           "date": dateStr,
@@ -28,123 +33,298 @@ class ScheduleService {
       if (response.statusCode == 200) {
         return jsonDecode(response.body);
       } else {
-        print("Failed to load schedule: ${response.body}");
+        debugPrint("ScheduleService.getSchedule failed: ${response.body}");
         return null;
       }
     } catch (e) {
-      print("Error fetching schedule: $e");
+      debugPrint("ScheduleService.getSchedule error: $e");
       return null;
     }
   }
 
-  // 2. Add Task to Schedule
   Future<bool> addTask(String uid, DateTime date, Map<String, dynamic> task) async {
     final dateStr = date.toIso8601String().split('T')[0];
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/api/schedule/add_task'),
-        headers: {"Content-Type": "application/json"},
+        headers: _jsonHeaders,
         body: jsonEncode({
           "uid": uid,
           "date": dateStr,
-          "task": task
+          "task": task,
         }),
       );
 
       return response.statusCode == 200;
     } catch (e) {
-      print("Error adding task: $e");
+      debugPrint("ScheduleService.addTask error: $e");
       return false;
     }
   }
 
-  // 3. Update Task Status
   Future<bool> updateTaskStatus(String uid, DateTime date, String taskId, bool completed) async {
     final dateStr = date.toIso8601String().split('T')[0];
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/api/schedule/update_task_status'),
-        headers: {"Content-Type": "application/json"},
+        headers: _jsonHeaders,
         body: jsonEncode({
           "uid": uid,
           "date": dateStr,
           "task_id": taskId,
           "completed": completed,
-          "status": completed ? "completed-confirmed" : "pending"
+          "status": completed ? "completed_confirmed" : "scheduled",
         }),
       );
 
       return response.statusCode == 200;
     } catch (e) {
-      print("Error updating task: $e");
+      debugPrint("ScheduleService.updateTaskStatus error: $e");
       return false;
     }
   }
-  // 4. Delete Task
+
   Future<bool> deleteTask(String uid, DateTime date, String taskId) async {
     final dateStr = date.toIso8601String().split('T')[0];
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/api/schedule/delete_task'),
-        headers: {"Content-Type": "application/json"},
+        headers: _jsonHeaders,
         body: jsonEncode({
           "uid": uid,
           "date": dateStr,
-          "task_id": taskId
+          "task_id": taskId,
         }),
       );
 
       return response.statusCode == 200;
     } catch (e) {
-      print("Error deleting task: $e");
+      debugPrint("ScheduleService.deleteTask error: $e");
       return false;
     }
   }
 
-  // 6. Complete Task (Log Event Side Effect)
-  Future<bool> completeTask(String uid, DateTime date, String taskId) async {
-    final dateStr = date.toIso8601String().split('T')[0];
-    try {
-      final response = await http.post(
-        Uri.parse('$baseUrl/api/schedule/complete'),
-        headers: {"Content-Type": "application/json"},
-        body: jsonEncode({
-          "uid": uid,
-          "date": dateStr,
-          "taskId": taskId
-        }),
-      );
-
-      return response.statusCode == 200;
-    } catch (e) {
-      print("Error completing task: $e");
-      return false;
-    }
-  }
-
-  // 5. Update Task Details
   Future<bool> updateTask(String uid, DateTime date, String taskId, Map<String, dynamic> updates) async {
     final dateStr = date.toIso8601String().split('T')[0];
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/api/schedule/update_task'),
-        headers: {"Content-Type": "application/json"},
+        headers: _jsonHeaders,
         body: jsonEncode({
           "uid": uid,
           "date": dateStr,
           "task_id": taskId,
-          "updates": updates
+          "updates": updates,
         }),
       );
 
       return response.statusCode == 200;
     } catch (e) {
-      print("Error updating task: $e");
+      debugPrint("ScheduleService.updateTask error: $e");
       return false;
     }
   }
 
-  // --- FIRESTORE PERSISTENCE (For History) ---
+  // ----------------------------
+  // AI task action endpoints
+  // ----------------------------
+
+  Future<bool> completeTask({
+    required String uid,
+    required String date,
+    required String taskId,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/api/ai/tasks/complete'),
+        headers: _jsonHeaders,
+        body: jsonEncode({
+          "uid": uid,
+          "date": date,
+          "task_id": taskId,
+          "actor": "elder",
+        }),
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      debugPrint("ScheduleService.completeTask error: $e");
+      return false;
+    }
+  }
+
+  Future<bool> acknowledgeTask({
+    required String uid,
+    required String date,
+    required String taskId,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/api/ai/tasks/acknowledge'),
+        headers: _jsonHeaders,
+        body: jsonEncode({
+          "uid": uid,
+          "date": date,
+          "task_id": taskId,
+          "actor": "elder",
+        }),
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      debugPrint("ScheduleService.acknowledgeTask error: $e");
+      return false;
+    }
+  }
+
+  Future<bool> startTask({
+    required String uid,
+    required String date,
+    required String taskId,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/api/ai/tasks/start'),
+        headers: _jsonHeaders,
+        body: jsonEncode({
+          "uid": uid,
+          "date": date,
+          "task_id": taskId,
+          "actor": "elder",
+        }),
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      debugPrint("ScheduleService.startTask error: $e");
+      return false;
+    }
+  }
+
+  // Old direct snooze remains available if you ever still need it.
+  Future<bool> snoozeTask({
+    required String uid,
+    required String date,
+    required String taskId,
+    int snoozeMinutes = 10,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/api/ai/tasks/snooze'),
+        headers: _jsonHeaders,
+        body: jsonEncode({
+          "uid": uid,
+          "date": date,
+          "task_id": taskId,
+          "actor": "elder",
+          "snooze_minutes": snoozeMinutes,
+        }),
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      debugPrint("ScheduleService.snoozeTask error: $e");
+      return false;
+    }
+  }
+
+  Future<Map<String, dynamic>> skipTask({
+    required String uid,
+    required String date,
+    required String taskId,
+    required List<String> reasons,
+    required String decisionBy, // elder | caregiver
+    String? caregiverNote,
+    bool confirmed = false,
+    bool? notifyCaregiver,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/ai/tasks/skip'),
+      headers: _jsonHeaders,
+      body: jsonEncode({
+        "uid": uid,
+        "date": date,
+        "task_id": taskId,
+        "actor": decisionBy,
+        "reasons": reasons,
+        "reason": reasons.isNotEmpty ? reasons.first : "other", // backward compat
+        "skip_decision_by": decisionBy,
+        "caregiver_skip_note": caregiverNote,
+        "confirmed": confirmed,
+        "notify_caregiver": notifyCaregiver,
+      }),
+    );
+
+    if (response.statusCode >= 400) {
+      throw Exception('Failed to skip task: ${response.body}');
+    }
+
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
+  // ----------------------------
+  // New conversational "Later" flow
+  // ----------------------------
+
+  Future<Map<String, dynamic>?> requestTaskLater({
+    required String uid,
+    required String date,
+    required String taskId,
+    String? sessionId,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/api/ai/tasks/request_later'),
+        headers: _jsonHeaders,
+        body: jsonEncode({
+          "uid": uid,
+          "date": date,
+          "task_id": taskId,
+          "session_id": sessionId,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      }
+
+      debugPrint("ScheduleService.requestTaskLater failed: ${response.body}");
+      return null;
+    } catch (e) {
+      debugPrint("ScheduleService.requestTaskLater error: $e");
+      return null;
+    }
+  }
+
+  Future<Map<String, dynamic>?> sendVoiceCommand({
+    required String uid,
+    required String text,
+    String? sessionId,
+    DateTime? localTime,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/api/ai/process_voice_command'),
+        headers: _jsonHeaders,
+        body: jsonEncode({
+          "uid": uid,
+          "text": text,
+          "session_id": sessionId,
+          "local_time": (localTime ?? DateTime.now()).toIso8601String(),
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      }
+
+      debugPrint("ScheduleService.sendVoiceCommand failed: ${response.body}");
+      return null;
+    } catch (e) {
+      debugPrint("ScheduleService.sendVoiceCommand error: $e");
+      return null;
+    }
+  }
+
+  // ----------------------------
+  // Firestore helpers
+  // ----------------------------
 
   Future<void> saveScheduleToFirestore(String uid, DateTime date, List<dynamic> tasks) async {
     final dateStr = date.toIso8601String().split('T')[0];
@@ -178,25 +358,33 @@ class ScheduleService {
     return null;
   }
 
-  Future<void> updateFirestoreTaskStatus(String uid, DateTime date, String taskId, bool completed, {String? status}) async {
+  Future<void> updateFirestoreTaskStatus(
+    String uid,
+    DateTime date,
+    String taskId,
+    bool completed, {
+    String? status,
+  }) async {
     final dateStr = date.toIso8601String().split('T')[0];
     final docId = "${uid}_$dateStr";
 
     try {
       final docRef = FirebaseFirestore.instance.collection('schedules').doc(docId);
       final doc = await docRef.get();
-      
+
       if (doc.exists) {
         final tasks = List<dynamic>.from(doc.data()?['tasks'] ?? []);
         bool changed = false;
+
         for (var task in tasks) {
           if (task['id'] == taskId) {
             task['completed'] = completed;
-            task['status'] = status ?? (completed ? 'completed-confirmed' : 'pending');
+            task['status'] = status ?? (completed ? 'completed_confirmed' : 'scheduled');
             changed = true;
             break;
           }
         }
+
         if (changed) {
           await docRef.update({'tasks': tasks});
         }
