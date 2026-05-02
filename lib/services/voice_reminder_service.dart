@@ -490,12 +490,13 @@ class VoiceReminderService {
               await _audioPlayer.stop();
               await _audioPlayer.setVolume(1.0);
 
+              // Increased timeout to 15 seconds for reliability
               await _audioPlayer
                   .play(UrlSource(audioUrl))
-                  .timeout(const Duration(seconds: 8));
+                  .timeout(const Duration(seconds: 15));
 
               await _audioPlayer.onPlayerComplete.first.timeout(
-                const Duration(seconds: 20),
+                const Duration(seconds: 25),
                 onTimeout: () {
                   throw TimeoutException(
                     "OpenAI audio completion timeout for $taskName",
@@ -518,9 +519,12 @@ class VoiceReminderService {
           }
 
           if (!openAiSuccess) {
-            debugPrint(
-              "🔊 FlutterTTS skipped for reminder: $taskName. "
-              "FlutterTTS is reserved only for verification questions.",
+            debugPrint("🔊 USING FLUTTERTTS FALLBACK for reminder: $taskName");
+            // Safety: Stop any other voice before starting fallback
+            await _voiceService.stop();
+            await _voiceService.speak(
+              text,
+              category: category,
             );
           }
 
