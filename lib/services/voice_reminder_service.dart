@@ -37,7 +37,11 @@ class VoiceReminderService {
   // CROSS-PATH deduplication: prevents the same reminder from being spoken
   // by multiple trigger paths (local timer, Firestore listener, FCM)
   final Set<String> _spokenReminderIds = {};
-  bool _isCurrentlyPlaying = false; // Mutex: only one audio plays at a time
+  
+  // AUDIO QUEUE: Ensures reminders don't clash or get dropped
+  final List<RemoteMessage> _audioQueue = [];
+  bool _isProcessingQueue = false;
+  bool _isCurrentlyPlaying = false; // Internal flag for the processor
 
   // Restore helper methods
   void updateTasks(List<dynamic> tasks) {
@@ -112,9 +116,9 @@ class VoiceReminderService {
 
       try {
         if (task['status'] == 'snoozed' && task['snoozedUntil'] != null) {
-          effectiveReminderTime = DateTime.parse(task['snoozedUntil']);
+          effectiveReminderTime = DateTime.parse(task['snoozedUntil']).toLocal();
         } else if (task['scheduledAt'] != null) {
-          effectiveReminderTime = DateTime.parse(task['scheduledAt']);
+          effectiveReminderTime = DateTime.parse(task['scheduledAt']).toLocal();
         } else {
           final tStr = task['time']?.toString();
           if (tStr != null && tStr.contains(":")) {
@@ -139,25 +143,35 @@ class VoiceReminderService {
           effectiveReminderTime.hour * 60 + effectiveReminderTime.minute;
       final diff = currentMinutes - taskMinutes;
         
-        // 1. Standard/Tier-based triggers
         bool shouldRemind = false;
-        if (diff < 0) continue; // Future task
+        
+        // 1. Future Task Check
+        if (diff < 0) continue; 
 
-        // SKIP tier-based reminders if already completed or in progress
+        // 2. Forgotten Task Logic (30 mins after) - HIGHEST PRIORITY
+        // This fires even if status just flipped to 'missed_likely'
+        if (diff == 30) {
+          final key = "${task['id']}_$diff";
+          if (!_spokenKeys.contains(key) && task['completed'] != true) {
+            debugPrint("🔊 FORGOTTEN ALERT (30 mins): Triggering for ${task['task_name']}");
+            _handleManualReminderTrigger(task['uid'] ?? _currentUid ?? "", task, forgotten: true);
+            _spokenKeys.add(key);
+          }
+          continue; // Finish this task processing for this tick
+        }
+
+        // 3. Status Check for regular reminders/questions
         final isFinished = task['completed'] == true || 
                           ['skipped', 'needs_caregiver_review', 'escalated', 'missed_likely', 'missed_confirmed']
                           .contains(status);
-        
         if (isFinished) continue;
 
-        // 2. Verification Mode Trigger (10 mins after)
-        // Works for both 'pending' and 'in_progress'
-        if (diff == 10) {
+        // 4. Verification Mode Triggers (10 & 20 mins after)
+        if (diff == 10 || diff == 20) {
            String taskName = task['task_name'] ?? "Task";
-           debugPrint("🔊 VERIFICATION: Asking if $taskName is done (Status: $status)");
+           debugPrint("🔊 VERIFICATION ($diff mins): Asking if $taskName is done (Status: $status)");
            _voiceService.speak(_routineService.getVerificationQuestion(taskName), category: 'urgent');
            
-           // Mark as pending if not already marked (don't change status if in_progress)
            if (status == 'pending' || status == 'scheduled' || status == 'reminder_triggered') {
              _scheduleService.updateFirestoreTaskStatus(
                task['uid'] ?? _currentUid ?? "", 
@@ -167,12 +181,11 @@ class VoiceReminderService {
                status: 'pending' 
              );
            }
-           continue; // Don't do tier-based reminder at the same time as verification
+           continue; 
         }
 
-        // 3. Tier-based reminders (ONLY for non-in-progress tasks)
+        // 5. Tier-based reminders (ONLY for non-in-progress tasks)
         if (status == 'in_progress') {
-           // User is already "Doing now", so stop the nagging reminders
            continue;
         }
 
@@ -185,11 +198,6 @@ class VoiceReminderService {
         } else {
           // Default / Tier 1: 0, 2
           shouldRemind = diff == 0 || diff == 2;
-        }
-
-        // 4. Forgotten Task Logic (All Tiers)
-        if (diff == 30) {
-           shouldRemind = true;
         }
 
         if (shouldRemind) {
@@ -327,37 +335,72 @@ class VoiceReminderService {
     if (message.data['type'] != 'VOICE_REMINDER') return;
 
     final taskName = message.data['taskName'] ?? 'Task';
-    final audioUrl = message.data['audioUrl'];
-    final category = message.data['category'] ?? 'common';
     final taskId = message.data['taskId'] ?? '';
 
+    // ── CROSS-PATH DEDUPLICATION ──────────────────────────────────
     final now = DateTime.now();
     final dedupeKey = '${taskId}_${now.hour}_${now.minute}';
     if (_spokenReminderIds.contains(dedupeKey)) return;
     _spokenReminderIds.add(dedupeKey);
 
-    if (_isCurrentlyPlaying) return;
-    _isCurrentlyPlaying = true;
-
-    bool backendSuccess = false;
-    try {
-      if (audioUrl != null && audioUrl.isNotEmpty) {
-        await _audioPlayer.setVolume(1.0);
-        await _audioPlayer.play(UrlSource(audioUrl)).timeout(
-          const Duration(seconds: 8),
-          onTimeout: () => throw TimeoutException("Timeout"),
-        );
-        backendSuccess = true;
-      }
-    } catch (e) {
-      debugPrint("🔊 Backend audio failed: $e");
-    }
-
-    if (!backendSuccess) {
-      await _voiceService.speakReminder(taskName, category: category);
-    }
-    _isCurrentlyPlaying = false;
+    // ── ADD TO QUEUE ─────────────────────────────────────────────
+    debugPrint("🔊 QUEUED: $taskName");
+    _audioQueue.add(message);
+    
+    // Start processing if not already running
+    _processAudioQueue();
   }
+
+  Future<void> _processAudioQueue() async {
+    if (_isProcessingQueue) return;
+    _isProcessingQueue = true;
+
+    while (_audioQueue.isNotEmpty) {
+      final message = _audioQueue.removeAt(0);
+      final taskName = message.data['taskName'] ?? 'Task';
+      final audioUrl = message.data['audioUrl'];
+      final category = message.data['category'] ?? 'common';
+
+      _isCurrentlyPlaying = true;
+      debugPrint("🔊 PLAYING FROM QUEUE: $taskName");
+
+      bool backendSuccess = false;
+      try {
+        if (audioUrl != null && audioUrl.isNotEmpty) {
+          await _audioPlayer.setVolume(1.0);
+          await _audioPlayer.play(UrlSource(audioUrl)).timeout(
+            const Duration(seconds: 8),
+            onTimeout: () => throw TimeoutException("Timeout"),
+          );
+          
+          // Wait for the audio to actually finish playing
+          await _audioPlayer.onPlayerComplete.first.timeout(
+            const Duration(seconds: 15), 
+            onTimeout: () => debugPrint("🔊 Audio playback took too long, moving to next"),
+          );
+          backendSuccess = true;
+        }
+      } catch (e) {
+        debugPrint("🔊 Backend audio failed for $taskName: $e");
+      }
+
+      if (!backendSuccess) {
+        debugPrint("🔊 TTS FALLBACK: Using FlutterTts for $taskName");
+        await _voiceService.speakReminder(taskName, category: category);
+      }
+
+      _isCurrentlyPlaying = false;
+      
+      // BREATHING SPACE: Wait 2 seconds before the next reminder starts
+      if (_audioQueue.isNotEmpty) {
+        debugPrint("🔊 Queue breathing space (2s)...");
+        await Future.delayed(const Duration(seconds: 2));
+      }
+    }
+
+    _isProcessingQueue = false;
+  }
+
 
   void stop() {
     _subscription?.cancel();
@@ -401,9 +444,9 @@ class VoiceReminderService {
 
       try {
         if (task['status'] == 'snoozed' && task['snoozedUntil'] != null) {
-          scheduledTime = DateTime.parse(task['snoozedUntil']);
+          scheduledTime = DateTime.parse(task['snoozedUntil']).toLocal();
         } else if (task['scheduledAt'] != null) {
-          scheduledTime = DateTime.parse(task['scheduledAt']);
+          scheduledTime = DateTime.parse(task['scheduledAt']).toLocal();
         } else {
           final timeStr = task['time']?.toString() ?? "";
           if (timeStr.contains(":")) {
