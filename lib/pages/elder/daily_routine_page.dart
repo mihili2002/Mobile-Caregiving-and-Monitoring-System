@@ -1713,7 +1713,7 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
     }
 
     final common = _dailyTasks
-        .where((t) => t['type'] == 'common' || t['type'] == 'custom')
+        .where((t) => t['type'] != 'medication' && t['type'] != 'therapy' && t['type'] != 'therapist')
         .toList();
     final meds = _dailyTasks.where((t) => t['type'] == 'medication').toList();
     final therapy = _dailyTasks
@@ -1882,10 +1882,35 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
   }
 
   String _getScheduleDocId() {
-  final d =
-      "${_selectedDate.day.toString().padLeft(2, '0')}.${_selectedDate.month.toString().padLeft(2, '0')}.${_selectedDate.year}";
-  return "${effectiveUid}_$d";
-}
+    final d =
+        "${_selectedDate.day.toString().padLeft(2, '0')}.${_selectedDate.month.toString().padLeft(2, '0')}.${_selectedDate.year}";
+    return "${effectiveUid}_$d";
+  }
+
+  String _determineCategory(String taskName) {
+    final lower = taskName.toLowerCase();
+    
+    // Medication / Health
+    if (lower.contains('pill') || lower.contains('vitamin') || lower.contains('medication') || lower.contains('medicine') || lower.contains('tablet') || lower.contains('syrup')) return 'medication';
+    if (lower.contains('water') || lower.contains('drink') || lower.contains('hydrate') || lower.contains('health')) return 'health';
+    
+    // Meals
+    if (lower.contains('eat') || lower.contains('breakfast') || lower.contains('lunch') || lower.contains('dinner') || lower.contains('meal') || lower.contains('snack')) return 'meals';
+    
+    // Social
+    if (lower.contains('call') || lower.contains('visit') || lower.contains('talk') || lower.contains('friend') || lower.contains('daughter') || lower.contains('son') || lower.contains('family')) return 'social';
+    
+    // Leisure
+    if (lower.contains('read') || lower.contains('tv') || lower.contains('relax') || lower.contains('walk') || lower.contains('garden') || lower.contains('music')) return 'leisure';
+    
+    // Therapy
+    if (lower.contains('therapy') || lower.contains('stretch') || lower.contains('exercise') || lower.contains('massage') || lower.contains('physio')) return 'therapy';
+    
+    // Urgent
+    if (lower.contains('doctor') || lower.contains('clinic') || lower.contains('hospital') || lower.contains('appointment') || lower.contains('emergency')) return 'urgent';
+    
+    return 'common';
+  }
 
   void _showManualAddDialog() {
     final nameController = TextEditingController();
@@ -1927,18 +1952,21 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
           ElevatedButton(
             child: const Text("Add"),
             onPressed: () async {
-              if (nameController.text.trim().isEmpty) return;
+              final taskName = nameController.text.trim();
+              if (taskName.isEmpty) return;
 
               final hhmm =
                   "${selectedTime.hour.toString().padLeft(2, '0')}:${selectedTime.minute.toString().padLeft(2, '0')}";
+              
+              final category = _determineCategory(taskName);
 
               final success = await _scheduleService.addTask(
                 effectiveUid,
                 _selectedDate,
                 {
-                  "task_name": nameController.text.trim(),
+                  "task_name": taskName,
                   "time": hhmm,
-                  "type": "common",
+                  "type": category,
                   "completed": false,
                   "id":
                       "${effectiveUid}_manual_${DateTime.now().millisecondsSinceEpoch}",

@@ -21,16 +21,23 @@ class VoiceReminderService {
   final ScheduleService _scheduleService = ScheduleService();
   final AudioPlayer _audioPlayer = AudioPlayer();
   
+  String? _currentUid; // NEW: Store current user context
   List<dynamic> _tasks = [];
   String _riskTier = "Tier 1";
   StreamSubscription<QuerySnapshot>? _subscription;
   StreamSubscription<DocumentSnapshot>? _profileSubscription; // NEW
   StreamSubscription<RemoteMessage>? _fcmSubscription;
   Timer? _checkTimer;
+  Timer? _cleanupTimer;
   
   // NEW: Track played reminders locally for Web/Mobile sync
   final Map<String, int> _lastPlayedCounts = {};
-  final Set<String> _spokenKeys = {}; // NEW: Prevents duplicate voice announcements
+  final Set<String> _spokenKeys = {}; // Prevents duplicate voice announcements in _checkLocalReminders
+
+  // CROSS-PATH deduplication: prevents the same reminder from being spoken
+  // by multiple trigger paths (local timer, Firestore listener, FCM)
+  final Set<String> _spokenReminderIds = {};
+  bool _isCurrentlyPlaying = false; // Mutex: only one audio plays at a time
 
   // Restore helper methods
   void updateTasks(List<dynamic> tasks) {
@@ -65,6 +72,13 @@ class VoiceReminderService {
       _checkLocalReminders();
     });
     
+    // Clean up old spoken keys every hour to avoid unbounded memory growth
+    _cleanupTimer ??= Timer.periodic(const Duration(hours: 1), (_) {
+      _spokenReminderIds.clear();
+      _spokenKeys.clear();
+      debugPrint("VoiceReminderService: Cleaned up spoken key caches.");
+    });
+    
     // Run once immediately
     _checkLocalReminders();
   }
@@ -87,7 +101,12 @@ class VoiceReminderService {
           status == 'skipped' || 
           status == 'needs_caregiver_review' || 
           status == 'escalated' || 
-          status.startsWith('missed')) continue;
+          status == 'in_progress' || // STOP TIER-BASED REMINDERS IF IN PROGRESS
+          status.startsWith('missed')) {
+        
+        // HOWEVER, we still want to allow the 10-min verification question for 'in_progress'
+        // So we don't 'continue' here yet, we'll check diff below.
+      }
       
       DateTime? effectiveReminderTime;
 
@@ -124,6 +143,39 @@ class VoiceReminderService {
         bool shouldRemind = false;
         if (diff < 0) continue; // Future task
 
+        // SKIP tier-based reminders if already completed or in progress
+        final isFinished = task['completed'] == true || 
+                          ['skipped', 'needs_caregiver_review', 'escalated', 'missed_likely', 'missed_confirmed']
+                          .contains(status);
+        
+        if (isFinished) continue;
+
+        // 2. Verification Mode Trigger (10 mins after)
+        // Works for both 'pending' and 'in_progress'
+        if (diff == 10) {
+           String taskName = task['task_name'] ?? "Task";
+           debugPrint("🔊 VERIFICATION: Asking if $taskName is done (Status: $status)");
+           _voiceService.speak(_routineService.getVerificationQuestion(taskName), category: 'urgent');
+           
+           // Mark as pending if not already marked (don't change status if in_progress)
+           if (status == 'pending' || status == 'scheduled' || status == 'reminder_triggered') {
+             _scheduleService.updateFirestoreTaskStatus(
+               task['uid'] ?? _currentUid ?? "", 
+               now, 
+               task['id']?.toString() ?? "", 
+               false, 
+               status: 'pending' 
+             );
+           }
+           continue; // Don't do tier-based reminder at the same time as verification
+        }
+
+        // 3. Tier-based reminders (ONLY for non-in-progress tasks)
+        if (status == 'in_progress') {
+           // User is already "Doing now", so stop the nagging reminders
+           continue;
+        }
+
         if (_riskTier.contains("Tier 3") || _riskTier.contains("High")) {
           // Tier 3: Every 2 minutes indefinitely
           shouldRemind = diff % 2 == 0;
@@ -135,24 +187,7 @@ class VoiceReminderService {
           shouldRemind = diff == 0 || diff == 2;
         }
 
-        // 2. Verification Mode Trigger
-        // After 10 mins if not completed, ask a verification question
-        if (diff == 10) {
-           String taskName = task['task_name'] ?? "Task";
-           _voiceService.speak(_routineService.getVerificationQuestion(taskName));
-           // Mark as pending if not already marked
-           if (task['status'] == 'pending') {
-             _scheduleService.updateFirestoreTaskStatus(
-               task['uid'] ?? "", 
-               now, 
-               task['id']?.toString() ?? "", 
-               false, 
-               status: 'pending' // Still pending, but we've asked
-             );
-           }
-        }
-
-        // 3. Forgotten Task Logic (All Tiers)
+        // 4. Forgotten Task Logic (All Tiers)
         if (diff == 30) {
            shouldRemind = true;
         }
@@ -163,14 +198,16 @@ class VoiceReminderService {
           
           if (!_spokenKeys.contains(key)) {
             String taskName = task['task_name'] ?? "Task";
+            String category = task['type'] ?? "common"; // Extract category
+
             debugPrint("🔊 TRIGGER: Speaking reminder for $taskName at diff $diff (Tier: $_riskTier)");
             
             if (diff == 30) {
-               _voiceService.speak("Reminder: You haven't finished $taskName yet. Please try to complete it at least now.");
+               _handleManualReminderTrigger(task['uid'] ?? _currentUid ?? "", task, forgotten: true);
             } else if (diff > 0) {
-               _voiceService.speak("Reminder: You haven't finished $taskName yet. It's time.");
+               _handleManualReminderTrigger(task['uid'] ?? _currentUid ?? "", task, forgotten: true);
             } else {
-               _voiceService.speakReminder(taskName);
+               _handleManualReminderTrigger(task['uid'] ?? _currentUid ?? "", task, forgotten: false);
             }
             
             _spokenKeys.add(key);
@@ -181,6 +218,7 @@ class VoiceReminderService {
 
   // Start listening to Firestore for real-time updates
   void listen(String uid) {
+    _currentUid = uid;
     if (_subscription != null) return;
     
     debugPrint("VoiceReminderService: Listening to Firestore for $uid...");
@@ -201,8 +239,6 @@ class VoiceReminderService {
         }, onError: (e) => debugPrint("VoiceReminderService: Profile Listen Error: $e"));
 
     // 2. Listen for Schedule Changes
-    // Switch to Query-based listening to avoid Permission Denied on non-existent docs
-    // Field 'date' is stored as YYYY-MM-DD in ai_routes.py
     final now = DateTime.now();
     final dateStr = DateFormat('yyyy-MM-dd').format(now);
     
@@ -220,9 +256,7 @@ class VoiceReminderService {
           if (data['tasks'] != null) {
               final newTasks = List<dynamic>.from(data['tasks']);
               
-              // TRIGGER: Check for reminder_count increases (FOR WEB/CHROME DEMO)
               for (var task in newTasks) {
-                // Skip if task is completed or effectively "finished" (skipped, etc.)
                 final status = task['status']?.toString() ?? '';
                 if (task['completed'] == true || 
                     status == 'skipped' || 
@@ -235,108 +269,94 @@ class VoiceReminderService {
                 final lastCount = _lastPlayedCounts[taskId] ?? 0;
 
                 if (currentCount > lastCount) {
-                  debugPrint("🔊 FIRESTORE TRIGGER: Reminder count increased for $taskId ($lastCount -> $currentCount)");
-                  
-                  // Play the reminder manually since FCM might not work on Web
+                  final dedupeKey = '${taskId}_${DateTime.now().hour}_${DateTime.now().minute}';
+                  if (_spokenReminderIds.contains(dedupeKey)) {
+                    _lastPlayedCounts[taskId] = currentCount;
+                    continue;
+                  }
                   _handleManualReminderTrigger(elderId, task);
-                  
-                  // Update tracking
                   _lastPlayedCounts[taskId] = currentCount;
                 }
               }
-
               updateTasks(newTasks);
           }
        }
-    }, onError: (e) {
-        debugPrint("VoiceReminderService: Firestore Listen Error: $e");
-    });
+    }, onError: (e) => debugPrint("VoiceReminderService: Firestore Listen Error: $e"));
   }
 
-  void _handleManualReminderTrigger(String uid, Map<String, dynamic> task) {
+  void _handleManualReminderTrigger(String uid, Map<String, dynamic> task, {bool forgotten = false}) {
     final taskName = task['task_name'] ?? task['taskName'] ?? "Task";
     final category = task['type'] ?? task['category'] ?? "common";
     final taskId = task['id'] ?? task['taskId'] ?? "";
     
-    // Construct the same audio URL the backend uses
-    final audioUrl = "http://127.0.0.1:8000/api/audio/$uid/$taskId";
+    String audioUrl = "http://127.0.0.1:8000/api/audio/$uid/$taskId";
+    if (forgotten) {
+      audioUrl += "?forgotten=true";
+    }
     
-    debugPrint("🔊 Triggering Local Playback for: $taskName");
-    
-    // Reuse the existing handler
     final message = RemoteMessage(
       data: {
         'type': 'VOICE_REMINDER',
         'taskName': taskName,
         'audioUrl': audioUrl,
         'category': category,
+        'taskId': taskId.toString(),
       }
     );
     _handleVoiceReminder(message);
   }
 
   void start(String uid) async {
-    debugPrint("VoiceReminderService: Starting service for $uid...");
-    
-    if (kIsWeb) {
-      debugPrint("VoiceReminderService: Web platform detected. Skipping FCM token registration (Mobile only).");
-    } else {
-      // 1. Get FCM Token and update backend (Mobile Only)
+    _currentUid = uid;
+    if (!kIsWeb) {
       try {
         String? token = await FirebaseMessaging.instance.getToken();
         if (token != null) {
-          debugPrint("VoiceReminderService: FCM Token retrieved: ${token.substring(0, 10)}...");
-          bool success = await UserService().updateFCMToken(uid, token);
-          if (success) {
-            debugPrint("VoiceReminderService: FCM Token registered successfully");
-          } else {
-            debugPrint("VoiceReminderService: FCM Token registration failed");
-          }
-        } else {
-          debugPrint("VoiceReminderService: Could not retrieve FCM Token");
+          await UserService().updateFCMToken(uid, token);
         }
       } catch (e) {
-        debugPrint("VoiceReminderService: Error during FCM registration: $e");
+        debugPrint("VoiceReminderService: FCM Error: $e");
       }
     }
 
-    // 2. Listen for foreground messages
-    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      _handleVoiceReminder(message);
-    });
-
-    // 3. Handle background messages
-    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-      _handleVoiceReminder(message);
-    });
+    FirebaseMessaging.onMessage.listen(_handleVoiceReminder);
+    FirebaseMessaging.onMessageOpenedApp.listen(_handleVoiceReminder);
   }
 
-  void _handleVoiceReminder(RemoteMessage message) async {
-    if (message.data['type'] == 'VOICE_REMINDER') {
-      final taskName = message.data['taskName'];
-      final audioUrl = message.data['audioUrl'];
-      final category = message.data['category'];
-      
-      debugPrint("🔊 Voice Reminder Received: $taskName, Type: $category");
-      
-      try {
-        if (audioUrl != null && audioUrl.isNotEmpty) {
-          // Attempt to play recorded audio from backend
-          // We set a short timeout for the source load to fail fast if backend is down
-          await _audioPlayer.play(UrlSource(audioUrl)).timeout(
-            const Duration(seconds: 2),
-            onTimeout: () => throw TimeoutException("Backend audio server unreachable"),
-          );
-        } else {
-          // Fallback to local TTS if no URL
-          await _voiceService.speak("Reminder: it is time for $taskName.");
-        }
-      } catch (e) {
-        // Silently fallback without noisy stack traces if it's a known connection/format error
-        debugPrint("🔊 TTS FALLBACK: Remote audio at $audioUrl failed to play (Likely Backend Offline). Using local voice.");
-        await _voiceService.speak("Reminder: it is time for $taskName.");
+  Future<void> _handleVoiceReminder(RemoteMessage message) async {
+    if (message.data['type'] != 'VOICE_REMINDER') return;
+
+    final taskName = message.data['taskName'] ?? 'Task';
+    final audioUrl = message.data['audioUrl'];
+    final category = message.data['category'] ?? 'common';
+    final taskId = message.data['taskId'] ?? '';
+
+    final now = DateTime.now();
+    final dedupeKey = '${taskId}_${now.hour}_${now.minute}';
+    if (_spokenReminderIds.contains(dedupeKey)) return;
+    _spokenReminderIds.add(dedupeKey);
+
+    if (_isCurrentlyPlaying) return;
+    _isCurrentlyPlaying = true;
+
+    bool backendSuccess = false;
+    try {
+      if (audioUrl != null && audioUrl.isNotEmpty) {
+        await _audioPlayer.setVolume(1.0);
+        await _audioPlayer.play(UrlSource(audioUrl)).timeout(
+          const Duration(seconds: 8),
+          onTimeout: () => throw TimeoutException("Timeout"),
+        );
+        backendSuccess = true;
       }
+    } catch (e) {
+      debugPrint("🔊 Backend audio failed: $e");
     }
+
+    if (!backendSuccess) {
+      await _voiceService.speakReminder(taskName, category: category);
+    }
+    _isCurrentlyPlaying = false;
   }
 
   void stop() {
@@ -348,27 +368,28 @@ class VoiceReminderService {
     _fcmSubscription = null;
     _checkTimer?.cancel();
     _checkTimer = null;
+    _cleanupTimer?.cancel();
+    _cleanupTimer = null;
+    _spokenReminderIds.clear();
+    _isCurrentlyPlaying = false;
     _audioPlayer.dispose();
   }
 
   Future<void> resyncAfterTaskReschedule(String uid, String taskId) async {
     _spokenKeys.removeWhere((key) => key.startsWith("${taskId}_"));
+    _spokenReminderIds.removeWhere((key) => key.startsWith("${taskId}_"));
     _lastPlayedCounts.remove(taskId);
 
     for (int i = 0; i < 5; i++) {
       final notifId = NotificationService.makeId(uid, taskId, i);
       await _notificationService.cancel(notifId);
     }
-
-    debugPrint("VoiceReminderService: Cleared old reminder cycle for task $taskId");
   }
 
-  // NEW: Schedule Local Notifications for reliability
   Future<void> _scheduleNotificationsForTasks() async {
     await _notificationService.init();
     
     for (var task in _tasks) {
-      // Ignore tasks that are finished or being reviewed
       final status = task['status']?.toString() ?? '';
       if (task['completed'] == true || 
           status == 'skipped' || 
@@ -387,42 +408,21 @@ class VoiceReminderService {
           final timeStr = task['time']?.toString() ?? "";
           if (timeStr.contains(":")) {
             final parts = timeStr.split(":");
-            scheduledTime = DateTime(
-              now.year,
-              now.month,
-              now.day,
-              int.parse(parts[0]),
-              int.parse(parts[1]),
-            );
+            scheduledTime = DateTime(now.year, now.month, now.day, int.parse(parts[0]), int.parse(parts[1]));
           }
         }
-      } catch (e) {
-        debugPrint("VoiceReminderService: Error scheduling local notification: $e");
-        continue;
-      }
+      } catch (e) { continue; }
 
-      if (scheduledTime == null) continue;
-        
-      try {
-        // Only schedule if time is in future
-        if (scheduledTime.isAfter(now)) {
-           final taskIdStr = task['id']?.toString() ?? task['task_name']?.toString() ?? "";
-           
-           // Use hash for ID
-           // We use offset 0 for main reminder
-           final notifId = NotificationService.makeId(task['uid'] ?? "user", taskIdStr, 0);
-           
-           await _notificationService.scheduleNotification(
-             id: notifId, 
-             title: "Reminder", 
-             body: "Time for ${task['task_name']}", 
-             scheduledTime: scheduledTime
-           );
-        }
-      } catch (e) {
-        debugPrint("VoiceReminderService: Error scheduling local notification: $e");
+      if (scheduledTime != null && scheduledTime.isAfter(now)) {
+        final taskIdStr = task['id']?.toString() ?? task['task_name']?.toString() ?? "";
+        final notifId = NotificationService.makeId(task['uid'] ?? "user", taskIdStr, 0);
+        await _notificationService.scheduleNotification(
+          id: notifId, 
+          title: "Reminder", 
+          body: "Time for ${task['task_name']}", 
+          scheduledTime: scheduledTime
+        );
       }
     }
   }
-
 }
