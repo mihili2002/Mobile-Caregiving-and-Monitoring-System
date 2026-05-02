@@ -34,6 +34,8 @@ class VoiceReminderService {
   Timer? _cleanupTimer;
 
   final Set<String> _spokenReminderIds = {};
+  // [GENERALIZED] Guard for tasks undergoing state changes (reschedule, skip, complete)
+  final Set<String> _pendingTaskStateChangeIds = {};
 
   final List<Map<String, dynamic>> _audioQueue = [];
   bool _isProcessingQueue = false;
@@ -41,11 +43,55 @@ class VoiceReminderService {
   final Map<String, int> _lastPlayedCounts = {};
 
   void updateTasks(List<dynamic> tasks) {
+    final oldTasks = List.from(_tasks);
     _tasks = tasks;
+
+    for (final t in tasks) {
+      final id = t['id']?.toString() ?? "";
+      if (id.isEmpty) continue;
+
+      final status = t['status']?.toString() ?? "";
+
+      // [GENERALIZED] If in pending state change, only clear if we see the new info
+      if (_pendingTaskStateChangeIds.contains(id)) {
+        final oldTask = oldTasks.isEmpty
+            ? null
+            : oldTasks.firstWhere((ot) => ot['id'] == id, orElse: () => null);
+
+        if (oldTask != null) {
+          final oldTime = oldTask['scheduledAt'] ?? oldTask['time'];
+          final newTime = t['scheduledAt'] ?? t['time'];
+          final oldVersion = int.tryParse(oldTask['reminderVersion']?.toString() ?? '0') ?? 0;
+          final newVersion = int.tryParse(t['reminderVersion']?.toString() ?? '0') ?? 0;
+
+          // Clear guard if time changed, status became stable, or version incremented
+          if (oldTime != newTime || 
+              newVersion > oldVersion ||
+              status == 'scheduled' || 
+              status == 'skipped' || 
+              status == 'completed') {
+            _pendingTaskStateChangeIds.remove(id);
+            debugPrint(
+              "🔊 VoiceReminderService: Fresh data confirmed for $id (status=$status), clearing pending guard.",
+            );
+          }
+        } else {
+          // Task just appeared or was missing before
+          _pendingTaskStateChangeIds.remove(id);
+        }
+      }
+
+      // Always clear for terminal or resolve-like states
+      if (status == 'skipped' ||
+          status == 'completed' ||
+          status == 'completed_confirmed') {
+        _pendingTaskStateChangeIds.remove(id);
+      }
+    }
 
     debugPrint(
       "VoiceReminderService: Updated with ${tasks.length} tasks "
-      "(Current Tier: $_riskTier)",
+      "(Current Tier: $_riskTier, Pending Changes: ${_pendingTaskStateChangeIds.length})",
     );
 
     _scheduleNotificationsForTasks();
@@ -95,7 +141,17 @@ class VoiceReminderService {
     );
 
     for (final task in _tasks) {
+      final String taskId = task['id']?.toString() ?? '';
       final status = task['status']?.toString() ?? '';
+
+      if (taskId.isEmpty) continue;
+
+      if (_pendingTaskStateChangeIds.contains(taskId)) {
+        debugPrint(
+          "🔊 VoiceReminderService: Skipping $taskId as it is pending state-change propagation.",
+        );
+        continue;
+      }
 
       DateTime? effectiveReminderTime;
 
@@ -129,14 +185,16 @@ class VoiceReminderService {
       if (effectiveReminderTime == null) continue;
 
       final diff = now.difference(effectiveReminderTime).inMinutes;
-      if (diff < 0) continue;
 
-      final taskId = task['id']?.toString() ?? '';
-      if (taskId.isEmpty) continue;
+      final String name = task['task_name']?.toString() ?? "Unknown";
+      debugPrint(
+        "🔊 [Checking Task: $name] status=$status, effectiveTime=$effectiveReminderTime, diff=$diff",
+      );
+
+      if (diff < 0) continue;
 
       final minuteKey = "${taskId}_${now.hour}_${now.minute}";
 
-      // 30-minute forgotten reminder: OpenAI TTS only.
       if (diff == 30) {
         if (!_spokenReminderIds.contains(minuteKey) &&
             task['completed'] != true) {
@@ -161,15 +219,24 @@ class VoiceReminderService {
       final isFinished = task['completed'] == true ||
           [
             'skipped',
+            'done',
+            'completed',
+            'cancelled',
+            'archived',
             'needs_caregiver_review',
             'escalated',
             'missed_likely',
             'missed_confirmed',
           ].contains(status);
 
-      if (isFinished) continue;
+      if (isFinished) {
+        // [NEW] If finished but not cleared from guard, clear it
+        if (_pendingTaskStateChangeIds.contains(taskId)) {
+           _pendingTaskStateChangeIds.remove(taskId);
+        }
+        continue;
+      }
 
-      // Verification questions: FlutterTTS only.
       if (diff == 10 || diff == 20) {
         if (!_spokenReminderIds.contains(minuteKey)) {
           _spokenReminderIds.add(minuteKey);
@@ -201,7 +268,6 @@ class VoiceReminderService {
         continue;
       }
 
-      // Tier-based reminders: OpenAI TTS only.
       if (status == 'in_progress') continue;
 
       bool shouldRemind = false;
@@ -211,7 +277,10 @@ class VoiceReminderService {
       } else if (_riskTier.contains("Tier 2")) {
         shouldRemind = diff % 2 == 0 && diff <= 8;
       } else {
-        shouldRemind = diff == 0 || diff == 2;
+        // Tier 1: Remind at 0 and 2. 
+        // Also catch up if rescheduled to a recent past time (within 5 mins) and hasn't been spoken yet.
+        shouldRemind = diff == 0 || diff == 2 || 
+            (diff < 5 && !_spokenReminderIds.any((k) => k.startsWith("${taskId}_")));
       }
 
       if (shouldRemind) {
@@ -339,8 +408,8 @@ class VoiceReminderService {
     final baseUrl = UserService().baseUrl;
 
     final text = forgotten
-        ? "Pardon me, it seems you have forgotten $taskName"
-        : "Time for $taskName";
+        ? "Pardon me, it seems you have forgotten your $taskName"
+        : "It is time for your $taskName. Please complete your $taskName";
 
     final encodedText = Uri.encodeComponent(text);
 
@@ -464,7 +533,6 @@ class VoiceReminderService {
 
       try {
         if (voiceType == 'FLUTTER_TTS') {
-          // FlutterTTS is allowed ONLY for verification questions.
           debugPrint("🔊 PLAYING FLUTTERTTS VERIFICATION QUESTION: $taskName");
 
           try {
@@ -478,7 +546,6 @@ class VoiceReminderService {
 
           await Future.delayed(const Duration(seconds: 1));
         } else if (voiceType == 'OPENAI_REMINDER') {
-          // Reminders use OpenAI TTS only.
           debugPrint("🔊 PLAYING OPENAI REMINDER ONLY: $taskName");
 
           final audioUrl = item['audioUrl'] ?? '';
@@ -490,7 +557,6 @@ class VoiceReminderService {
               await _audioPlayer.stop();
               await _audioPlayer.setVolume(1.0);
 
-              // Increased timeout to 15 seconds for reliability
               await _audioPlayer
                   .play(UrlSource(audioUrl))
                   .timeout(const Duration(seconds: 15));
@@ -519,12 +585,9 @@ class VoiceReminderService {
           }
 
           if (!openAiSuccess) {
-            debugPrint("🔊 USING FLUTTERTTS FALLBACK for reminder: $taskName");
-            // Safety: Stop any other voice before starting fallback
-            await _voiceService.stop();
-            await _voiceService.speak(
-              text,
-              category: category,
+            debugPrint(
+              "🔊 FlutterTTS skipped for reminder: $taskName. "
+              "FlutterTTS is reserved only for verification questions.",
             );
           }
 
@@ -555,6 +618,7 @@ class VoiceReminderService {
     _cleanupTimer = null;
 
     _spokenReminderIds.clear();
+    _pendingTaskStateChangeIds.clear();
     _audioQueue.clear();
     _lastPlayedCounts.clear();
 
@@ -562,14 +626,50 @@ class VoiceReminderService {
     _audioPlayer.dispose();
   }
 
-  Future<void> resyncAfterTaskReschedule(String uid, String taskId) async {
+  /// Generalized resync to handle Later, Skip, and Completion.
+  /// Stops current voice reminders and clears local states immediately.
+  Future<void> resyncAfterTaskStateChange(
+    String uid,
+    String taskId, {
+    List<dynamic>? updatedTasks,
+    String? reason,
+  }) async {
+    debugPrint("🔊 VoiceReminderService: Resyncing $taskId. Reason: ${reason ?? 'Unknown'}");
+
+    // 1. Add to pending guard immediately
+    _pendingTaskStateChangeIds.add(taskId);
+
+    // 2. Clear immediate spoken state so we don't repeat the old reminder
     _spokenReminderIds.removeWhere((key) => key.startsWith(taskId));
     _lastPlayedCounts.remove(taskId);
 
+    // 3. Stop current audio playback if it relates to this task
+    try {
+      if (_audioQueue.any((item) => item['taskId'] == taskId)) {
+        _audioQueue.removeWhere((item) => item['taskId'] == taskId);
+        debugPrint("🔊 VoiceReminderService: Removed $taskId from audio queue.");
+      }
+      // Note: We don't stop the player immediately here as it might be playing something else,
+      // but the queue removal prevents NEXT items for this task.
+    } catch (e) {
+      debugPrint("VoiceReminderService: Error clearing audio for task: $e");
+    }
+
+    // 4. Cancel local notifications immediately
     for (int i = 0; i < 5; i++) {
       final notifId = NotificationService.makeId(uid, taskId, i);
       await _notificationService.cancel(notifId);
     }
+
+    // 5. If fresh data provided, update and potentially clear guard
+    if (updatedTasks != null) {
+      updateTasks(updatedTasks);
+    }
+  }
+
+  // Backward compatibility wrapper
+  Future<void> resyncAfterTaskReschedule(String uid, String taskId, {List<dynamic>? updatedTasks}) async {
+    return resyncAfterTaskStateChange(uid, taskId, updatedTasks: updatedTasks, reason: "reschedule");
   }
 
   Future<void> _scheduleNotificationsForTasks() async {
@@ -628,7 +728,7 @@ class VoiceReminderService {
         await _notificationService.scheduleNotification(
           id: notifId,
           title: "Reminder",
-          body: "Time for ${task['task_name']}",
+          body: "reminder, it is time for your ${task['task_name']}",
           scheduledTime: scheduledTime,
         );
       }

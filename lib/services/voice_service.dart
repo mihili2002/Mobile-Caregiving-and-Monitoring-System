@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
+import 'user_service.dart';
 
 class VoiceService {
   final FlutterTts _flutterTts = FlutterTts();
@@ -58,6 +59,12 @@ class VoiceService {
 
   void setCompletionHandler(Function handler) {
     _flutterTts.setCompletionHandler(() => handler());
+  }
+
+  Future<String?> getAudioUrl(String text, {String category = "common"}) async {
+    final baseUrl = UserService().baseUrl;
+    final encodedText = Uri.encodeComponent(text);
+    return "$baseUrl/api/audio/generate?text=$encodedText&category=$category";
   }
 
   Future<void> speak(String text, {String category = 'common'}) async {

@@ -74,6 +74,6 @@ class SmartReminderService {
 
   Future<void> _scheduleStandardAlarm(int id, String title, int hour, int minute) async {
     print("Using Standard Alarm (No AI)");
-    await _scheduleNotification(id, title, "Time for $title", hour, minute);
+    await _scheduleNotification(id, title, "It is Time for your $title", hour, minute);
   }
 }
