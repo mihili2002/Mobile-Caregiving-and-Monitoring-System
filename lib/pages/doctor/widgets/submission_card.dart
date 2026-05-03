@@ -230,9 +230,24 @@ class _SubmissionCardState extends State<SubmissionCard> {
             Row(
               children: [
                 Expanded(
-                  child: Text(
-                    plan.id,
-                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  child:
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.green.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Text(
+                        "Generated",
+                        style: TextStyle(
+                          color: Colors.green,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
                   ),
                 ),
                 TextButton.icon(

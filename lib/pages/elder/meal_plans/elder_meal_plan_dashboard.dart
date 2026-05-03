@@ -308,11 +308,11 @@ class _ElderMealPlanDashboardState extends State<ElderMealPlanDashboard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            "Plan ID: ${plan.id}",
-            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 6),
+          // Text(
+          //   "Plan ID: ${plan.id}",
+          //   style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
+          // ),
+          // const SizedBox(height: 6),
           Text(
             "Status: ${plan.status}",
             style: TextStyle(color: Colors.black.withOpacity(0.70)),

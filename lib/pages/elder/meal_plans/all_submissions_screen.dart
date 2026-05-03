@@ -139,33 +139,49 @@ class _AllSubmissionsScreenState extends State<AllSubmissionsScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  "Submission ID",
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey.shade600,
-                  ),
+                // LEFT SIDE → label + value in one row
+                Row(
+                  children: [
+                    Text(
+                      "Submitted at ",
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                    const SizedBox(width: 35),
+                    Text(
+                      _formatDate(submission.submittedAt),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
                 ),
+
+                // RIGHT SIDE → status
                 _statusChip(submission.status),
               ],
             ),
 
-            const SizedBox(height: 4),
+            // const SizedBox(height: 4),
 
-            Text(
-              submission.id,
-              style: const TextStyle(
-                fontWeight: FontWeight.w600,
-                fontSize: 13,
-              ),
-            ),
+            // Text(
+            //   submission.id,
+            //   style: const TextStyle(
+            //     fontWeight: FontWeight.w600,
+            //     fontSize: 13,
+            //   ),
+            // ),
+            //
+            // const SizedBox(height: 12),
 
-            const SizedBox(height: 12),
-
-            _infoRow(
-              label: "Submitted at",
-              value: _formatDate(submission.submittedAt),
-            ),
+            // _infoRow(
+            //   label: "Submitted at",
+            //   value: _formatDate(submission.submittedAt),
+            // ),
 
             if (submission.reviewedAt != null)
               _infoRow(

@@ -466,8 +466,19 @@ class _DoctorDashboardPageState extends State<DoctorDashboardPage> {
                       .toList();
 
                   // ✅ auto-sort: high risk first
-                  filtered.sort((a, b) =>
-                      _riskSortScore(a).compareTo(_riskSortScore(b)));
+                  filtered.sort((a, b) {
+                    // 1️⃣ First sort by risk (optional)
+                    final riskCompare =
+                    _riskSortScore(a).compareTo(_riskSortScore(b));
+
+                    if (riskCompare != 0) return riskCompare;
+
+                    // 2️⃣ Then sort by submittedAt (latest first)
+                    final aDate = a.submittedAt ?? DateTime(1970);
+                    final bDate = b.submittedAt ?? DateTime(1970);
+
+                    return bDate.compareTo(aDate); // DESCENDING
+                  });
 
                   return RefreshIndicator(
                     onRefresh: _refresh,
