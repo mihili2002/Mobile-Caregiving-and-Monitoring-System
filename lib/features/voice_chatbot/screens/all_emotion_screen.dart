@@ -29,8 +29,6 @@ class _AllEmotionsScreenState extends State<AllEmotionsScreen>
 
   bool _showPercentage = false;
 
-  Map<String, double> _percentages = {};
-
   static const _green900 = Color(0xFF00A693);
   static const _mint = Color(0xFFF2FBF7);
 
@@ -77,7 +75,6 @@ class _AllEmotionsScreenState extends State<AllEmotionsScreen>
 
       setState(() {
         _items = list;
-        _calculatePercentages();
         _loading = false;
       });
     } catch (e) {
@@ -127,21 +124,6 @@ class _AllEmotionsScreenState extends State<AllEmotionsScreen>
     return c;
   }
 
-  void _calculatePercentages() {
-    final Map<String, int> counts = _emotionCounts();
-
-    final total = counts.values.fold<int>(0, (a, b) => a + b);
-
-    if (total == 0) {
-      _percentages = {};
-      return;
-    }
-
-    _percentages = counts.map(
-      (k, v) => MapEntry(k, (v / total) * 100),
-    );
-  }
-
   List<String> _sortedEmotions(Set<String> emotions) {
     final list = emotions.toList()..sort();
     return list;
@@ -150,7 +132,6 @@ class _AllEmotionsScreenState extends State<AllEmotionsScreen>
   // =========================
   // GROUP BY DATE
   // =========================
-
   Map<String, List<Map<String, dynamic>>> _groupByDay() {
     final Map<String, List<Map<String, dynamic>>> result = {};
 
@@ -161,7 +142,6 @@ class _AllEmotionsScreenState extends State<AllEmotionsScreen>
           "${time.year}-${time.month.toString().padLeft(2, '0')}-${time.day.toString().padLeft(2, '0')}";
 
       result.putIfAbsent(day, () => []);
-
       result[day]!.add(item);
     }
 
@@ -171,7 +151,6 @@ class _AllEmotionsScreenState extends State<AllEmotionsScreen>
   // =========================
   // BAR CHART
   // =========================
-
   Widget _barChart() {
     final counts = _emotionCounts();
 
@@ -194,7 +173,6 @@ class _AllEmotionsScreenState extends State<AllEmotionsScreen>
           label: Text(_showPercentage ? "Show Count" : "Show %"),
         ),
         const SizedBox(height: 10),
-
         Expanded(
           child: BarChart(
             BarChartData(
@@ -225,9 +203,85 @@ class _AllEmotionsScreenState extends State<AllEmotionsScreen>
   }
 
   // =========================
+  // ✅ PERCENTAGE PER DAY
+  // =========================
+  Widget _percentagePerDayChart() {
+    final grouped = _groupByDay();
+
+    if (grouped.isEmpty) {
+      return const Center(child: Text("No emotion data"));
+    }
+
+    final days = grouped.keys.toList()..sort();
+
+    return ListView.builder(
+      itemCount: days.length,
+      itemBuilder: (_, i) {
+        final day = days[i];
+        final items = grouped[day]!;
+
+        final Map<String, int> counts = {};
+        for (final it in items) {
+          final e = _safe(it["emotion"]).toLowerCase();
+          if (e.isEmpty) continue;
+          counts[e] = (counts[e] ?? 0) + 1;
+        }
+
+        final total = counts.values.fold<int>(0, (a, b) => a + b);
+
+        final Map<String, double> percentages = {};
+        counts.forEach((k, v) {
+          percentages[k] = (v / total) * 100;
+        });
+
+        return Card(
+          margin: const EdgeInsets.all(10),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  day,
+                  style: const TextStyle(
+                      fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 10),
+                Column(
+                  children: percentages.entries.map((entry) {
+                    final emotion = entry.key;
+                    final percent = entry.value;
+
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 6),
+                      child: Row(
+                        children: [
+                          SizedBox(width: 80, child: Text(emotion)),
+                          Expanded(
+                            child: LinearProgressIndicator(
+                              value: percent / 100,
+                              color: _emotionColor(emotion),
+                              backgroundColor: Colors.grey.shade300,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Text("${percent.toStringAsFixed(1)}%"),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                )
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // =========================
   // PER DAY VIEW
   // =========================
-
   Widget _perDayChart() {
     final grouped = _groupByDay();
 
@@ -255,15 +309,12 @@ class _AllEmotionsScreenState extends State<AllEmotionsScreen>
                   style: const TextStyle(
                       fontSize: 18, fontWeight: FontWeight.bold),
                 ),
-
                 const SizedBox(height: 10),
-
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
                   children: items.map((it) {
                     final emotion = _safe(it["emotion"]);
-
                     return Chip(
                       label: Text(
                         emotion,
@@ -284,7 +335,6 @@ class _AllEmotionsScreenState extends State<AllEmotionsScreen>
   // =========================
   // LIST VIEW
   // =========================
-
   Widget _listView() {
     return ListView.builder(
       itemCount: _items.length,
@@ -325,7 +375,7 @@ class _AllEmotionsScreenState extends State<AllEmotionsScreen>
           controller: _tab,
           tabs: const [
             Tab(text: "Bar"),
-            Tab(text: "Trend"),
+            Tab(text: "Percentage"),
             Tab(text: "Per-day"),
             Tab(text: "List"),
           ],
@@ -339,7 +389,7 @@ class _AllEmotionsScreenState extends State<AllEmotionsScreen>
                   controller: _tab,
                   children: [
                     _barChart(),
-                    const Center(child: Text("Trend Chart Coming Soon")),
+                    _percentagePerDayChart(),
                     _perDayChart(),
                     _listView(),
                   ],
