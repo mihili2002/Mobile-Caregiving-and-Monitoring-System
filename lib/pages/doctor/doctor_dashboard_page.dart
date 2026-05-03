@@ -11,6 +11,8 @@ import 'widgets/meal_plan_modal.dart';
 // go back to your app auth flow
 import '../../widgets/session_wrapper.dart';
 import '../../widgets/auth_wrapper.dart';
+import '../../pages/shared/elders_selection_screen.dart';
+import '../../models/user_model.dart';
 
 class DoctorDashboardPage extends StatefulWidget {
   const DoctorDashboardPage({super.key});
@@ -55,6 +57,8 @@ class _DoctorDashboardPageState extends State<DoctorDashboardPage> {
     super.initState();
     _loadDashboard();
   }
+
+  
 
   @override
   void dispose() {
@@ -166,6 +170,10 @@ class _DoctorDashboardPageState extends State<DoctorDashboardPage> {
             },
             onReject: () async {
               await _mealPlanService.reject(plan.id);
+              if (mounted) Navigator.pop(context);
+              await _refresh();
+            },
+            onEdit: (updated) async {
               if (mounted) Navigator.pop(context);
               await _refresh();
             },
@@ -472,7 +480,69 @@ class _DoctorDashboardPageState extends State<DoctorDashboardPage> {
                         ),
                         const SizedBox(height: 12),
 
-                        // ✅ Search + Filter Row
+                        // ✅ Health Details Card for Doctor
+                        Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.shade50,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.blue.shade200),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.medical_information_outlined,
+                                color: Colors.blue.shade700,
+                                size: 28,
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      "Record Medical Details",
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      "Add medical data for an elder",
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.black.withOpacity(0.6),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.blue.shade700,
+                                  foregroundColor: Colors.white,
+                                ),
+                                onPressed: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => EldersSelectionScreen(
+                                        title: "Select Elder - Medical Details",
+                                        description:
+                                            "Record medical conditions and vitals for the selected elder.",
+                                        userRole: UserRole.doctor,
+                                      ),
+                                    ),
+                                  );
+                                },
+                                child: const Text("Select"),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        const SizedBox(height: 16),
                         Row(
                           children: [
                             Expanded(

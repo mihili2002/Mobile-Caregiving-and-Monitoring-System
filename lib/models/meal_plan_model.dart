@@ -110,6 +110,21 @@ class MealPlanModel {
 
     return DateTime.now();
   }
+
+  /// Serialize to JSON for API calls
+  Map<String, dynamic> toJson() {
+    return {
+      "id": id,
+      "elder_id": elderId,
+      "plan_id": planId,
+      "status": status,
+      "start_date": startDate.toIso8601String(),
+      "end_date": endDate.toIso8601String(),
+      "warnings": warnings,
+      "nutrient_targets": nutrientTargets,
+      "days": days.map((d) => d.toJson()).toList(),
+    };
+  }
 }
 
 //Day Model
@@ -127,6 +142,13 @@ class MealPlanDay {
       day: json["day"] ?? 0,
       meals: MealDayMeals.fromJson(Map<String, dynamic>.from(json["meals"] ?? {})),
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      "day": day,
+      "meals": meals.toJson(),
+    };
   }
 }
 
@@ -160,6 +182,15 @@ class MealDayMeals {
           .toList(),
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      "breakfast": breakfast.map((m) => m.toJson()).toList(),
+      "lunch": lunch.map((m) => m.toJson()).toList(),
+      "dinner": dinner.map((m) => m.toJson()).toList(),
+      "snacks": snacks.map((m) => m.toJson()).toList(),
+    };
+  }
 }
 
 //Single Meal Item
@@ -180,5 +211,13 @@ class MealItem {
       foodName: (json["food_name"] ?? json["foodName"] ?? "").toString(),
       notes: (json["notes"] ?? "").toString(),
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      "portion": portion,
+      "food_name": foodName,
+      "notes": notes,
+    };
   }
 }

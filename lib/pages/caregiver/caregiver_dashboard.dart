@@ -9,6 +9,9 @@ import '../../auth/login_page.dart';
 import 'manage_elders_page.dart';
 import '../../features/voice_chatbot/screens/elders_emotions_page.dart';
 import '../../features/voice_chatbot/screens/all_emotion_screen.dart';
+import '../../pages/shared/elders_selection_screen.dart';
+import 'manage_elder_profiles_page.dart';
+
 class CaregiverDashboard extends StatefulWidget {
   final AppUser user;
 
@@ -100,7 +103,7 @@ class _CaregiverDashboardState extends State<CaregiverDashboard> {
                   icon: Icons.shield_outlined,
                   title: "Emergency readiness",
                   body:
-                      "Keep emergency contacts updated and ensure the elder’s key medical info is available.",
+                      "Keep emergency contacts updated and ensure the elder's key medical info is available.",
                 ),
               ],
             ),
@@ -482,7 +485,7 @@ class _CaregiverDashboardState extends State<CaregiverDashboard> {
     );
   }
 
-  // ✅ UPDATED: Added "Emotions" card
+  // Updated Quick Actions Grid with single Manage Profiles button
   Widget _buildQuickActionsGrid() {
     return GridView.count(
       crossAxisCount: 2,
@@ -507,21 +510,34 @@ class _CaregiverDashboardState extends State<CaregiverDashboard> {
           },
         ),
         _buildFeatureCard(
+          title: "Manage Profiles",
+          icon: Icons.account_circle_outlined,
+          color: const Color(0xFF8B5CF6),
+          description: "View and edit elder profiles",
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => ManageElderProfilesPage(caregiver: widget.user),
+              ),
+            );
+          },
+        ),
+        _buildFeatureCard(
           title: "Emotions",
           icon: Icons.mood_outlined,
           color: const Color(0xFF0EA5E9),
           description: "View emotion insights",
-         onTap: () {
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (_) => EldersEmotionsPage(
-        baseUrl: "http://127.0.0.1:8000", // change to your real API url
-      ),
-    ),
-  );
-},
-
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => EldersEmotionsPage(
+                  baseUrl: "http://127.0.0.1:8000",
+                ),
+              ),
+            );
+          },
         ),
         _buildFeatureCard(
           title: "Daily Routines",
@@ -547,6 +563,24 @@ class _CaregiverDashboardState extends State<CaregiverDashboard> {
               context,
               MaterialPageRoute(
                 builder: (context) => ManageEldersPage(caregiver: widget.user),
+              ),
+            );
+          },
+        ),
+        _buildFeatureCard(
+          title: "Health Details",
+          icon: Icons.medical_information_outlined,
+          color: const Color(0xFF06B6D4),
+          description: "Record health data for elders",
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => EldersSelectionScreen(
+                  title: "Select Elder - Lifestyle & Nutrition",
+                  description: "Record lifestyle, nutrition intakes, and dietary information for the selected elder.",
+                  userRole: UserRole.caregiver,
+                ),
               ),
             );
           },
