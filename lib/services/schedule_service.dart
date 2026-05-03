@@ -267,6 +267,7 @@ class ScheduleService {
     required String date,
     required String taskId,
     String? sessionId,
+    String? reason,
   }) async {
     try {
       final response = await http.post(
@@ -277,6 +278,7 @@ class ScheduleService {
           "date": date,
           "task_id": taskId,
           "session_id": sessionId,
+          "reason": reason,
         }),
       );
 
