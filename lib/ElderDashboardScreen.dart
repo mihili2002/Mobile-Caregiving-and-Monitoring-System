@@ -27,7 +27,7 @@ class _ElderDashboardState extends State<ElderDashboard> with SingleTickerProvid
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1000),
+      duration: const Duration(milliseconds: 800),
     );
     _controller.forward();
   }
@@ -46,136 +46,207 @@ class _ElderDashboardState extends State<ElderDashboard> with SingleTickerProvid
     final secondary = scheme.secondary;
 
     return Scaffold(
-      body: Stack(
-        children: [
-          // Background
-          Positioned.fill(
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    theme.scaffoldBackgroundColor,
-                    scheme.background,
-                  ],
-                ),
-              ),
-            ),
-          ),
+      backgroundColor: theme.scaffoldBackgroundColor,
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final width = constraints.maxWidth;
+          final isMobile = width < 600;
+          final isTablet = width >= 600 && width < 1024;
+          final isDesktop = width >= 1024;
 
-          // Abstract background shape
-          Positioned(
-            top: -100,
-            right: -80,
-            child: Container(
-              width: 300,
-              height: 300,
-              decoration: BoxDecoration(
-                color: primary.withOpacity(0.08),
-                shape: BoxShape.circle,
-              ),
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 50, sigmaY: 50),
-                child: Container(color: Colors.transparent),
-              ),
-            ),
-          ),
+          // Responsive grid configuration
+          // Responsive grid configuration
+          int crossAxisCount = 2;
+          double spacing = 16.0;
+          double horizontalPadding = 20.0;
+          double maxContentWidth = 1400.0; // Increased for better web utilization
+          double aspectRatio = 0.85;
 
-          SafeArea(
-            child: CustomScrollView(
-              physics: const BouncingScrollPhysics(),
-              slivers: [
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-                  sliver: SliverToBoxAdapter(
-                    child: _buildHeader(context, theme, primary),
-                  ),
-                ),
-                SliverPadding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  sliver: SliverToBoxAdapter(
-                    child: _buildWelcomeCard(theme, primary),
-                  ),
-                ),
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(20, 28, 20, 20),
-                  sliver: SliverGrid(
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      crossAxisSpacing: 16,
-                      mainAxisSpacing: 16,
-                      childAspectRatio: 0.88,
+          if (isDesktop) {
+            crossAxisCount = 5;
+            spacing = 28.0; // More generous spacing for desktop
+            horizontalPadding = 48.0;
+            aspectRatio = 1.05; // Balanced square-ish cards for desktop
+          } else if (isTablet) {
+            crossAxisCount = 3;
+            spacing = 24.0;
+            horizontalPadding = 32.0;
+            aspectRatio = 0.95; // Slightly taller for tablet
+          } else {
+            // Mobile defaults
+            aspectRatio = 0.88; 
+          }
+
+          return Stack(
+            children: [
+              // Subtle background gradient
+              Positioned.fill(
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        theme.scaffoldBackgroundColor,
+                        primary.withOpacity(0.02),
+                        secondary.withOpacity(0.02),
+                      ],
                     ),
-                    delegate: SliverChildListDelegate([
-                      _buildAnimatedFeatureCard(
-                        0,
-                        title: 'Voice Chatbot',
-                        subtitle: 'Always here to help',
-                        icon: Icons.mic_rounded,
-                        gradient: [primary, primary.withOpacity(0.8)],
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => ChatScreen(elderUid: widget.user.uid)),
+                  ),
+                ),
+              ),
+
+              // Decorative background shape
+              Positioned(
+                top: -80,
+                right: -80,
+                child: Container(
+                  width: isDesktop ? 500 : 300,
+                  height: isDesktop ? 500 : 300,
+                  decoration: BoxDecoration(
+                    color: primary.withOpacity(0.04),
+                    shape: BoxShape.circle,
+                  ),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 60, sigmaY: 60),
+                    child: Container(color: Colors.transparent),
+                  ),
+                ),
+              ),
+
+              SafeArea(
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(maxWidth: maxContentWidth),
+                    child: CustomScrollView(
+                      physics: const BouncingScrollPhysics(),
+                      slivers: [
+                        // Header section
+                        SliverPadding(
+                          padding: EdgeInsets.fromLTRB(horizontalPadding, 24, horizontalPadding, 20),
+                          sliver: SliverToBoxAdapter(
+                            child: _buildHeader(context, theme, primary),
+                          ),
                         ),
-                      ),
-                      _buildAnimatedFeatureCard(
-                        1,
-                        title: 'Journal',
-                        subtitle: 'Capture your thoughts',
-                        icon: Icons.auto_stories_rounded,
-                        gradient: [const Color(0xFF00BBA7), const Color(0xFF009688)],
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => JournalRecordPage(elderId: widget.user.uid)),
+
+                        // Welcome card section
+                        SliverPadding(
+                          padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+                          sliver: SliverToBoxAdapter(
+                            child: _buildWelcomeCard(theme, primary, isDesktop),
+                          ),
                         ),
-                      ),
-                      _buildAnimatedFeatureCard(
-                        2,
-                        title: 'Daily Routine',
-                        subtitle: 'Track your habits',
-                        icon: Icons.task_alt_rounded,
-                        gradient: [const Color(0xFF4DB6AC), const Color(0xFF009688)],
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => DailyRoutinePage(
-                              elderId: widget.user.uid,
-                              elderName: widget.user.name,
+
+                        // Section Title
+                        SliverPadding(
+                          padding: EdgeInsets.fromLTRB(horizontalPadding, 40, horizontalPadding, 20),
+                          sliver: SliverToBoxAdapter(
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 4,
+                                  height: 24,
+                                  decoration: BoxDecoration(
+                                    color: primary,
+                                    borderRadius: BorderRadius.circular(2),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Text(
+                                  'Quick Actions',
+                                  style: theme.textTheme.titleLarge?.copyWith(
+                                    fontWeight: FontWeight.w800,
+                                    color: Colors.black.withOpacity(0.7),
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ),
-                      ),
-                      _buildAnimatedFeatureCard(
-                        3,
-                        title: 'Meal Planner',
-                        subtitle: 'Healthy nutrition',
-                        icon: Icons.restaurant_rounded,
-                        gradient: [const Color(0xFF26A69A), const Color(0xFF00897B)],
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const ElderMealPlanDashboard()),
+
+                        // Grid section
+                        SliverPadding(
+                          padding: EdgeInsets.fromLTRB(horizontalPadding, 0, horizontalPadding, 60),
+                          sliver: SliverGrid(
+                            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: crossAxisCount,
+                              crossAxisSpacing: spacing,
+                              mainAxisSpacing: spacing,
+                              childAspectRatio: aspectRatio,
+                            ),
+                            delegate: SliverChildListDelegate([
+                              _buildAnimatedFeatureCard(
+                                0,
+                                title: 'Voice Chatbot',
+                                subtitle: 'Always here to help',
+                                icon: Icons.mic_rounded,
+                                color: primary,
+                                onTap: () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(builder: (_) => ChatScreen(elderUid: widget.user.uid)),
+                                ),
+                              ),
+                              _buildAnimatedFeatureCard(
+                                1,
+                                title: 'Journal',
+                                subtitle: 'Capture thoughts',
+                                icon: Icons.auto_stories_rounded,
+                                color: const Color(0xFF009688),
+                                onTap: () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(builder: (_) => JournalRecordPage(elderId: widget.user.uid)),
+                                ),
+                              ),
+                              _buildAnimatedFeatureCard(
+                                2,
+                                title: 'Daily Routine',
+                                subtitle: 'Track your habits',
+                                icon: Icons.task_alt_rounded,
+                                color: const Color(0xFF4DB6AC),
+                                onTap: () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => DailyRoutinePage(
+                                      elderId: widget.user.uid,
+                                      elderName: widget.user.name,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              _buildAnimatedFeatureCard(
+                                3,
+                                title: 'Meal Planner',
+                                subtitle: 'Healthy nutrition',
+                                icon: Icons.restaurant_rounded,
+                                color: const Color(0xFF26A69A),
+                                onTap: () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(builder: (_) => const ElderMealPlanDashboard()),
+                                ),
+                              ),
+                              _buildAnimatedFeatureCard(
+                                4,
+                                title: 'Therapist',
+                                subtitle: 'Guidance & support',
+                                icon: Icons.favorite_rounded,
+                                color: secondary,
+                                onTap: () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(builder: (_) => ElderTherapistSupportPage(user: widget.user)),
+                                ),
+                              ),
+                            ]),
+                          ),
                         ),
-                      ),
-                      _buildAnimatedFeatureCard(
-                        4,
-                        title: 'Therapist',
-                        subtitle: 'Guidance & support',
-                        icon: Icons.favorite_rounded,
-                        gradient: [primary.withOpacity(0.9), secondary],
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => ElderTherapistSupportPage(user: widget.user)),
-                        ),
-                      ),
-                    ]),
+                      ],
+                    ),
                   ),
                 ),
-                const SliverToBoxAdapter(child: SizedBox(height: 40)),
-              ],
-            ),
-          ),
-        ],
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -184,38 +255,37 @@ class _ElderDashboardState extends State<ElderDashboard> with SingleTickerProvid
     return Row(
       children: [
         Container(
-          width: 50,
-          height: 50,
+          padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(14),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.05),
-                blurRadius: 15,
-                offset: const Offset(0, 8),
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
               ),
             ],
           ),
-          child: Icon(Icons.favorite_rounded, color: primary, size: 28),
+          child: Icon(Icons.favorite_rounded, color: primary, size: 24),
         ),
-        const SizedBox(width: 14),
+        const SizedBox(width: 12),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'eldease',
+                'ELDEASE',
                 style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w800,
-                  color: primary.withOpacity(0.8),
-                  letterSpacing: 0.5,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w900,
+                  color: primary.withOpacity(0.6),
+                  letterSpacing: 1.2,
                 ),
               ),
               Text(
                 'Dashboard',
-                style: theme.textTheme.titleLarge?.copyWith(
+                style: theme.textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.w800,
                   color: Colors.black87,
                 ),
@@ -223,80 +293,77 @@ class _ElderDashboardState extends State<ElderDashboard> with SingleTickerProvid
             ],
           ),
         ),
-        Material(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          elevation: 2,
-          shadowColor: Colors.black12,
-          child: InkWell(
-            borderRadius: BorderRadius.circular(14),
-            onTap: () async {
-              await AuthService().signOut();
-              if (context.mounted) {
-                Navigator.pushAndRemoveUntil(
-                  context,
-                  MaterialPageRoute(builder: (_) => const LoginPage()),
-                  (route) => false,
-                );
-              }
-            },
-            child: const Padding(
-              padding: EdgeInsets.all(10),
-              child: Icon(Icons.logout_rounded, color: Colors.black54),
-            ),
-          ),
+        _buildHeaderAction(
+          icon: Icons.logout_rounded,
+          onTap: () async {
+            await AuthService().signOut();
+            if (context.mounted) {
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (_) => const LoginPage()),
+                (route) => false,
+              );
+            }
+          },
         ),
-        const SizedBox(width: 8),
-        Material(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          elevation: 2,
-          shadowColor: Colors.black12,
-          child: InkWell(
-            borderRadius: BorderRadius.circular(14),
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const ElderProfilePage()),
-            ),
-            child: const Padding(
-              padding: EdgeInsets.all(10),
-              child: Icon(Icons.person_rounded, color: Colors.black54),
-            ),
+        const SizedBox(width: 12),
+        _buildHeaderAction(
+          icon: Icons.person_rounded,
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const ElderProfilePage()),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildWelcomeCard(ThemeData theme, Color primary) {
+  Widget _buildHeaderAction({required IconData icon, required VoidCallback onTap}) {
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(12),
+      elevation: 0,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.black.withOpacity(0.05)),
+          ),
+          child: Icon(icon, color: Colors.black54, size: 20),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWelcomeCard(ThemeData theme, Color primary, bool isDesktop) {
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: EdgeInsets.all(isDesktop ? 32 : 24),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.7),
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: Colors.white, width: 2),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 24,
-            offset: const Offset(0, 12),
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
           ),
         ],
+        border: Border.all(color: Colors.black.withOpacity(0.02)),
       ),
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: primary.withOpacity(0.12),
+              color: primary.withOpacity(0.08),
               shape: BoxShape.circle,
             ),
-            child: Text(
-              '👋',
-              style: const TextStyle(fontSize: 28),
-            ),
+            child: const Text('👋', style: TextStyle(fontSize: 32)),
           ),
-          const SizedBox(width: 18),
+          const SizedBox(width: 20),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -311,7 +378,9 @@ class _ElderDashboardState extends State<ElderDashboard> with SingleTickerProvid
                 const SizedBox(height: 4),
                 Text(
                   'How are you feeling today?',
-                  style: theme.textTheme.bodyMedium,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: Colors.black54,
+                  ),
                 ),
               ],
             ),
@@ -326,27 +395,30 @@ class _ElderDashboardState extends State<ElderDashboard> with SingleTickerProvid
     required String title,
     required String subtitle,
     required IconData icon,
-    required List<Color> gradient,
+    required Color color,
     required VoidCallback onTap,
   }) {
     final animation = CurvedAnimation(
       parent: _controller,
       curve: Interval(
-        (0.1 * index).clamp(0, 1),
-        (0.1 * index + 0.5).clamp(0, 1),
-        curve: Curves.easeOutQuart,
+        (0.05 * index).clamp(0, 1),
+        (0.05 * index + 0.6).clamp(0, 1),
+        curve: Curves.easeOutCubic,
       ),
     );
 
-    return ScaleTransition(
-      scale: animation,
-      child: FadeTransition(
-        opacity: animation,
+    return FadeTransition(
+      opacity: animation,
+      child: SlideTransition(
+        position: Tween<Offset>(
+          begin: const Offset(0, 0.1),
+          end: Offset.zero,
+        ).animate(animation),
         child: _FeatureCard(
           title: title,
           subtitle: subtitle,
           icon: icon,
-          gradient: gradient,
+          color: color,
           onTap: onTap,
         ),
       ),
@@ -354,106 +426,98 @@ class _ElderDashboardState extends State<ElderDashboard> with SingleTickerProvid
   }
 }
 
-class _FeatureCard extends StatelessWidget {
+class _FeatureCard extends StatefulWidget {
   final String title;
   final String subtitle;
   final IconData icon;
-  final List<Color> gradient;
+  final Color color;
   final VoidCallback onTap;
 
   const _FeatureCard({
     required this.title,
     required this.subtitle,
     required this.icon,
-    required this.gradient,
+    required this.color,
     required this.onTap,
   });
 
   @override
+  State<_FeatureCard> createState() => _FeatureCardState();
+}
+
+class _FeatureCardState extends State<_FeatureCard> {
+  bool _isHovered = false;
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final width = MediaQuery.of(context).size.width;
+    final isDesktop = width >= 1024;
+    final cardPadding = isDesktop ? 24.0 : 20.0;
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(28),
-        child: Ink(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(28),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.04),
-                blurRadius: 20,
-                offset: const Offset(0, 10),
+    return MouseRegion(
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: AnimatedScale(
+        scale: _isHovered ? 1.02 : 1.0,
+        duration: const Duration(milliseconds: 200),
+        child: Material(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(24),
+          elevation: _isHovered ? 12 : 2,
+          shadowColor: widget.color.withOpacity(0.15),
+          child: InkWell(
+            onTap: widget.onTap,
+            borderRadius: BorderRadius.circular(24),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              padding: EdgeInsets.all(cardPadding),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(
+                  color: _isHovered ? widget.color.withOpacity(0.3) : Colors.black.withOpacity(0.04),
+                  width: _isHovered ? 2 : 1,
+                ),
               ),
-            ],
-          ),
-          child: Stack(
-            children: [
-              // Bottom right gradient circle
-              Positioned(
-                bottom: -20,
-                right: -20,
-                child: Container(
-                  width: 80,
-                  height: 80,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [gradient[0].withOpacity(0.1), gradient[1].withOpacity(0.01)],
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: widget.color.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(16),
                     ),
-                    shape: BoxShape.circle,
+                    child: Icon(
+                      widget.icon,
+                      color: widget.color,
+                      size: isDesktop ? 32 : 28,
+                    ),
                   ),
-                ),
+                  const Spacer(),
+                  Text(
+                    widget.title,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w900,
+                      color: Colors.black87,
+                      fontSize: isDesktop ? 18 : 16,
+                      height: 1.1,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    widget.subtitle,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: Colors.black54,
+                      fontSize: isDesktop ? 13 : 12,
+                      height: 1.3,
+                    ),
+                  ),
+                ],
               ),
-              Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: gradient,
-                        ),
-                        borderRadius: BorderRadius.circular(18),
-                        boxShadow: [
-                          BoxShadow(
-                            color: gradient[0].withOpacity(0.3),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: Icon(icon, color: Colors.white, size: 26),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      title,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        color: Colors.black87,
-                        fontSize: 16,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      subtitle,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        fontSize: 12,
-                        height: 1.2,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ),
