@@ -207,26 +207,14 @@ class _MealPlanDetailPageState extends State<MealPlanDetailPage> {
   }
 
   int _todayIndexFromPlan(MealPlanModel plan) {
-    DateTime? start;
-    try {
-      if (plan.startDate is DateTime) {
-        start = plan.startDate as DateTime;
-      } else {
-        start = DateTime.tryParse(plan.startDate.toString());
+    for (int i = 0; i < plan.days.length; i++) {
+      if (!_isDayFullyDone(plan.days[i])) {
+        return i; // first incomplete day
       }
-    } catch (_) {
-      start = null;
     }
 
-    if (start == null) return 0;
-
-    final now = DateTime.now();
-    final startOnly = DateTime(start.year, start.month, start.day);
-    final todayOnly = DateTime(now.year, now.month, now.day);
-
-    final diff = todayOnly.difference(startOnly).inDays;
-    final maxIndex = max(0, plan.days.length - 1);
-    return diff.clamp(0, maxIndex);
+    // if all days completed → stay at last day
+    return plan.days.isEmpty ? 0 : plan.days.length - 1;
   }
 
   void _goToDay(int index) {
@@ -287,23 +275,15 @@ class _MealPlanDetailPageState extends State<MealPlanDetailPage> {
 
   // -------------------- ✅ choose which day to auto-open --------------------
   Future<int> _chooseAutoOpenDayIndex(MealPlanModel plan) async {
-    final planId = plan.id;
-
-    final lastOpen = await _getLastOpenDay(planId: planId);
-    if (lastOpen != null && lastOpen >= 0 && lastOpen < plan.days.length) {
-      if (!_isDayFullyDone(plan.days[lastOpen])) {
-        return lastOpen;
+    // 1. find first incomplete day
+    for (int i = 0; i < plan.days.length; i++) {
+      if (!_isDayFullyDone(plan.days[i])) {
+        return i;
       }
     }
 
-    for (int i = 0; i < plan.days.length; i++) {
-      if (!_isDayFullyDone(plan.days[i])) return i;
-    }
-
-    final allDone = plan.days.isNotEmpty && plan.days.every(_isDayFullyDone);
-    if (allDone) return max(0, plan.days.length - 1);
-
-    return _todayIndexFromPlan(plan);
+    // 2. if all completed → last day
+    return plan.days.isEmpty ? 0 : plan.days.length - 1;
   }
 
   bool _isDayFullyDone(MealPlanDay dayObj) {
@@ -648,15 +628,15 @@ class _MealPlanDetailPageState extends State<MealPlanDetailPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    "Plan ID: ${plan.id}",
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
+                  // Text(
+                  //   "Plan ID: ${plan.id}",
+                  //   style: const TextStyle(
+                  //     color: Colors.white,
+                  //     fontSize: 18,
+                  //     fontWeight: FontWeight.w900,
+                  //   ),
+                  // ),
+                  // const SizedBox(height: 6),
                   Text(
                     "Status: ${plan.status}",
                     style: const TextStyle(color: Colors.white, fontSize: 15),
@@ -923,6 +903,30 @@ class _MealPlanDetailPageState extends State<MealPlanDetailPage> {
                     });
 
                     await _saveCompletedMeals(planId: _plan!.id);
+
+                    // ✅ ADD THIS PART HERE
+                    final currentDayObj = _plan!.days.firstWhere(
+                          (d) => d.day == dayNumber,
+                      orElse: () => _plan!.days[0],
+                    );
+
+                    if (_isDayFullyDone(currentDayObj)) {
+                      final currentIndex = _plan!.days.indexOf(currentDayObj);
+                      final nextIndex = currentIndex + 1;
+
+                      if (nextIndex < _expandedDays.length) {
+                        setState(() {
+                          _expandedDays[currentIndex] = false;
+                          _expandedDays[nextIndex] = true;
+                        });
+
+                        await _saveLastOpenDay(planId: _plan!.id, index: nextIndex);
+
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          _goToDay(nextIndex);
+                        });
+                      }
+                    }
                   },
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),

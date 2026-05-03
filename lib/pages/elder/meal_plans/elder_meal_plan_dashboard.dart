@@ -112,24 +112,24 @@ class _ElderMealPlanDashboardState extends State<ElderMealPlanDashboard> {
                   },
                 ),
  
-                const SizedBox(height: 12),
+                // const SizedBox(height: 12),
  
                 // ✅ FULL-WIDTH CARD 2 (Upload Health Details)
-                _actionCard(
-                  icon: Icons.description_outlined,
-                  iconBg: const Color(0xFFF2E9FF),
-                  iconColor: const Color(0xFF11BFA8),
-                  title: "Upload Health Details",
-                  subtitle: "Submit your latest health data",
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const PatientHealthDetailsScreen(),
-                      ),
-                    );
-                  },
-                ),
+                // _actionCard(
+                //   icon: Icons.description_outlined,
+                //   iconBg: const Color(0xFFF2E9FF),
+                //   iconColor: const Color(0xFF11BFA8),
+                //   title: "Upload Health Details",
+                //   subtitle: "Submit your latest health data",
+                //   onTap: () {
+                //     Navigator.push(
+                //       context,
+                //       MaterialPageRoute(
+                //         builder: (_) => const PatientHealthDetailsScreen(),
+                //       ),
+                //     );
+                //   },
+                // ),
  
                 const SizedBox(height: 18),
  
