@@ -53,12 +53,15 @@ class _ElderProfilePageState extends State<ElderProfilePage> {
       final List items = (data["items"] ?? []) as List;
 
       final Map<String, int> counts = {
-        "happy": 0,
-        "sad": 0,
-        "angry": 0,
-        "fear": 0,
-        "neutral": 0,
-      };
+         "happy": 0,
+         "sad": 0,
+         "angry": 0,
+         "fear": 0,
+         "calm": 0,
+         "surprise": 0,
+         "disgust": 0,
+         "neutral": 0,
+};
 
       for (final it in items) {
         final raw = (it["emotion"] ?? "").toString().toLowerCase();
@@ -82,14 +85,29 @@ class _ElderProfilePageState extends State<ElderProfilePage> {
   /// =========================
   /// NORMALIZE EMOTIONS (IMPORTANT FIX)
   /// =========================
-  String _normalize(String e) {
-    if (e.contains("happy") || e.contains("joy")) return "happy";
-    if (e.contains("sad")) return "sad";
-    if (e.contains("angry") || e.contains("anger")) return "angry";
-    if (e.contains("fear") || e.contains("anxiety")) return "fear";
-    if (e.contains("neutral")) return "neutral";
-    return "";
-  }
+  String _normalize(String emotion) {
+  if (emotion.isEmpty) return 'neutral';
+
+  final key = emotion.trim().toUpperCase();
+
+  // 🔥 SAME Q1–Q4 LOGIC
+  if (key == 'Q1') return 'happy';
+  if (key == 'Q2') return 'angry';
+  if (key == 'Q3') return 'sad';
+  if (key == 'Q4') return 'calm';
+
+  final lower = key.toLowerCase();
+
+  if (lower.contains('happy') || lower.contains('joy')) return 'happy';
+  if (lower.contains('angry') || lower.contains('anger')) return 'angry';
+  if (lower.contains('fear') || lower.contains('anxiety')) return 'fear';
+  if (lower.contains('sad')) return 'sad';
+  if (lower.contains('calm') || lower.contains('neutral')) return 'calm';
+  if (lower.contains('surprise')) return 'surprise';
+  if (lower.contains('disgust')) return 'disgust';
+
+  return 'neutral';
+}
 
   @override
   Widget build(BuildContext context) {
