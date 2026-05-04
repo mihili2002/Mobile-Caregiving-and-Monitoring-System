@@ -68,6 +68,12 @@ class _DoctorDashboardPageState extends State<DoctorDashboardPage> {
 
   void _loadDashboard() {
     _dashboardFuture = _dashboardService.getDashboard();
+
+    _dashboardFuture.then((data) {
+      print(data);
+    }).catchError((e) {
+      print("Error: $e");
+    });
   }
 
   Future<void> _refresh() async {
@@ -335,12 +341,14 @@ class _DoctorDashboardPageState extends State<DoctorDashboardPage> {
 
     // optional (safe)
     final name = item.latestSubmission['name']?.toString().toLowerCase() ?? "";
+    final elderName = (item.elderName ?? "").toString().toLowerCase();
     final phone =
         item.latestSubmission['phone']?.toString().toLowerCase() ?? "";
 
     return elderId.contains(query) ||
         submissionId.contains(query) ||
-        name.contains(query) ||
+      elderName.contains(query) ||
+      name.contains(query) ||
         phone.contains(query);
   }
 
@@ -625,6 +633,7 @@ class _DoctorDashboardPageState extends State<DoctorDashboardPage> {
 
                                 SubmissionCard(
                                   elderId: item.elderId,
+                                  elderName: item.elderName,
                                   latestSubmission: item.latestSubmission,
                                   latestMealPlan: plan,
                                   canApproveRejectEdit: canApproveRejectEdit,
