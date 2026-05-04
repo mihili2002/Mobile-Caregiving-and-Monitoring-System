@@ -17,6 +17,7 @@ import '../../services/voice_service.dart';
 import 'schedule_history_page.dart';
 import 'voice_chatbot_page.dart';
 import 'widgets/task_skip_review_widget.dart';
+import '../../widgets/digital_clock.dart';
 
 const skipReasonOptions = [
   'not_feeling_well',
@@ -2117,6 +2118,10 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
             ),
           ),
           const Divider(height: 1),
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 8),
+            child: DigitalClock(),
+          ),
           if (_insights.isNotEmpty)
             Container(
               width: double.infinity,

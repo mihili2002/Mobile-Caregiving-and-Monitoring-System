@@ -9,6 +9,7 @@ import 'package:uuid/uuid.dart';
 import '../../models/user_model.dart';
 import '../../services/voice_service.dart';
 import '../../services/user_service.dart'; 
+import '../../widgets/digital_clock.dart';
 
 class VoiceChatbotPage extends StatefulWidget {
   final AppUser user;
@@ -363,8 +364,10 @@ class _VoiceChatbotPageState extends State<VoiceChatbotPage> {
         backgroundColor: Colors.teal,
         foregroundColor: Colors.white,
       ),
-      body: Column(
+      body: Stack(
         children: [
+          Column(
+            children: [
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(16),
@@ -584,9 +587,20 @@ class _VoiceChatbotPageState extends State<VoiceChatbotPage> {
                 ],
               ),
             ),
-          )
+          ),
         ],
       ),
-    );
+      Positioned(
+        top: 10,
+        right: 10,
+        child: const DigitalClock(
+          isCentered: false, 
+          fontSize: 16, 
+          iconSize: 18
+        ),
+      ),
+    ],
+  ),
+);
   }
 }
