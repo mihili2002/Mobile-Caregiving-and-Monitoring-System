@@ -18,312 +18,124 @@ class _ElderProfilePageState extends State<ElderProfilePage> {
   final UserService _userService = UserService();
 
   late Future<Map<String, dynamic>?> _elderDataFuture;
-  late Future<Map<String, double>> _emotionFuture;
+  late Future<Map<String, Map<String, double>>> _emotionFuture;
 
-  //static const String baseUrl = "http://10.0.2.2:8000";
   static const String baseUrl = "http://127.0.0.1:8000";
 
   @override
   void initState() {
     super.initState();
+
     _elderDataFuture = _userService.getElderProfile(widget.user.uid);
-    _emotionFuture = _fetchEmotionPercentages(widget.user.uid);
+    _emotionFuture = _fetchWeeklyEmotionPercentages(widget.user.uid);
   }
 
-  /// =========================
-  /// FETCH EMOTION PERCENTAGES (FIXED)
-  /// =========================
-  Future<Map<String, double>> _fetchEmotionPercentages(String uid) async {
+  // =========================
+  // (LOGIC UNCHANGED)
+  // =========================
+  Future<Map<String, Map<String, double>>> _fetchWeeklyEmotionPercentages(
+      String uid) async {
     try {
-      final uri = Uri.parse(
-        "$baseUrl/chatbot/emotions?elder_uid=$uid&days=7&limit=500",
+      final chatUri = Uri.parse(
+        "$baseUrl/chatbot/emotions?elder_uid=$uid&days=30&limit=1000",
       );
 
-      final res = await http.get(
-           uri,
-          headers: await _userService.getAuthHeaders(),
+      final journalUri = Uri.parse(
+        "$baseUrl/chatbot/journals/emotion-trend?elder_uid=$uid&days=30",
       );
 
-      if (res.statusCode != 200) {
-        throw Exception("Server error: ${res.statusCode}");
+      final headers = await _userService.getAuthHeaders();
+
+      final responses = await Future.wait([
+        http.get(chatUri, headers: headers),
+        http.get(journalUri, headers: headers),
+      ]);
+
+      if (responses[0].statusCode != 200 ||
+          responses[1].statusCode != 200) {
+        throw Exception("Server error");
       }
 
-      final data = jsonDecode(res.body);
+      final chatItems =
+          (jsonDecode(responses[0].body)["items"] ?? []) as List;
+      final journalItems =
+          (jsonDecode(responses[1].body)["items"] ?? []) as List;
 
-      final List items = (data["items"] ?? []) as List;
+      final allItems = [...chatItems, ...journalItems];
 
-      final Map<String, int> counts = {
-         "happy": 0,
-         "sad": 0,
-         "angry": 0,
-         "fear": 0,
-         "calm": 0,
-         "surprise": 0,
-         "disgust": 0,
-         "neutral": 0,
-};
+      Map<String, Map<String, int>> weeklyCounts = {};
 
-      for (final it in items) {
-        final raw = (it["emotion"] ?? "").toString().toLowerCase();
+      for (final it in allItems) {
+        final emotionRaw = (it["emotion"] ?? "").toString();
+        final emotion = _normalize(emotionRaw);
 
-        final emotion = _normalize(raw);
-        if (emotion.isEmpty) continue;
+        DateTime time;
+        try {
+          time = DateTime.parse(
+            it["createdAt"] ??
+                it["created_at"] ??
+                it["timestamp"] ??
+                DateTime.now().toIso8601String(),
+          );
+        } catch (_) {
+          continue;
+        }
 
-        counts[emotion] = (counts[emotion] ?? 0) + 1;
+        final weekKey = _getWeekKey(time);
+
+        weeklyCounts.putIfAbsent(weekKey, () => {});
+        weeklyCounts[weekKey]![emotion] =
+            (weeklyCounts[weekKey]![emotion] ?? 0) + 1;
       }
 
-      final total = counts.values.fold<int>(0, (a, b) => a + b);
-      if (total == 0) return {};
+      Map<String, Map<String, double>> result = {};
 
-      return counts.map((k, v) => MapEntry(k, (v / total) * 100));
+      weeklyCounts.forEach((week, emotions) {
+        final total = emotions.values.fold<int>(0, (a, b) => a + b);
+
+        result[week] = emotions.map((k, v) {
+          return MapEntry(k, (v / total) * 100);
+        });
+      });
+
+      return result;
     } catch (e) {
-      debugPrint("Emotion fetch error: $e");
+      debugPrint("Weekly emotion error: $e");
       return {};
     }
   }
 
-  /// =========================
-  /// NORMALIZE EMOTIONS (IMPORTANT FIX)
-  /// =========================
+  String _getWeekKey(DateTime date) {
+    final monday =
+        date.subtract(Duration(days: date.weekday - 1));
+    final sunday = monday.add(const Duration(days: 6));
+
+    return "${monday.day}/${monday.month} - ${sunday.day}/${sunday.month}";
+  }
+
   String _normalize(String emotion) {
-  if (emotion.isEmpty) return 'neutral';
+    if (emotion.isEmpty) return 'neutral';
 
-  final key = emotion.trim().toUpperCase();
+    final key = emotion.trim().toUpperCase();
 
-  // 🔥 SAME Q1–Q4 LOGIC
-  if (key == 'Q1') return 'happy';
-  if (key == 'Q2') return 'angry';
-  if (key == 'Q3') return 'sad';
-  if (key == 'Q4') return 'calm';
+    if (key == 'Q1') return 'happy';
+    if (key == 'Q2') return 'angry';
+    if (key == 'Q3') return 'sad';
+    if (key == 'Q4') return 'calm';
 
-  final lower = key.toLowerCase();
+    final lower = key.toLowerCase();
 
-  if (lower.contains('happy') || lower.contains('joy')) return 'happy';
-  if (lower.contains('angry') || lower.contains('anger')) return 'angry';
-  if (lower.contains('fear') || lower.contains('anxiety')) return 'fear';
-  if (lower.contains('sad')) return 'sad';
-  if (lower.contains('calm') || lower.contains('neutral')) return 'calm';
-  if (lower.contains('surprise')) return 'surprise';
-  if (lower.contains('disgust')) return 'disgust';
+    if (lower.contains('happy') || lower.contains('joy')) return 'happy';
+    if (lower.contains('angry')) return 'angry';
+    if (lower.contains('fear')) return 'fear';
+    if (lower.contains('sad')) return 'sad';
+    if (lower.contains('calm') || lower.contains('neutral')) return 'calm';
+    if (lower.contains('surprise')) return 'surprise';
+    if (lower.contains('disgust')) return 'disgust';
 
-  return 'neutral';
-}
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey[100],
-      appBar: AppBar(
-        title: const Text("Elder Profile"),
-        backgroundColor: Colors.green,
-        foregroundColor: Colors.white,
-        centerTitle: true,
-      ),
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            _buildHeader(),
-            Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                children: [
-                  /// =========================
-                  /// BASIC INFO
-                  /// =========================
-                  FutureBuilder<Map<String, dynamic>?>(
-                    future: _elderDataFuture,
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState ==
-                          ConnectionState.waiting) {
-                        return const CircularProgressIndicator();
-                      }
-
-                      final elderData = snapshot.data;
-                      final age = elderData?['age']?.toString() ?? "Not set";
-
-                      return Column(
-                        children: [
-                          _buildInfoCard(
-                            "Full Name",
-                            widget.user.name ?? "N/A",
-                            Icons.person,
-                          ),
-                          const SizedBox(height: 12),
-                          _buildInfoCard(
-                            "Age",
-                            "$age Years",
-                            Icons.cake,
-                          ),
-                        ],
-                      );
-                    },
-                  ),
-
-                  const SizedBox(height: 25),
-
-                  /// =========================
-                  /// EMOTION REPORT (FIXED UI)
-                  /// =========================
-                  FutureBuilder<Map<String, double>>(
-                    future: _emotionFuture,
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState ==
-                          ConnectionState.waiting) {
-                        return const CircularProgressIndicator();
-                      }
-
-                      final data = snapshot.data ?? {};
-
-                      if (data.isEmpty) {
-                        return const Text(
-                          "No emotion data available",
-                          style: TextStyle(color: Colors.grey),
-                        );
-                      }
-
-                      return Card(
-                        elevation: 3,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(15),
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                "Emotion Report (Last 7 Days)",
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-
-                              ...data.entries.map((e) {
-                                return Padding(
-                                  padding:
-                                      const EdgeInsets.symmetric(vertical: 8),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        "${_label(e.key)} "
-                                        "(${e.value.toStringAsFixed(1)}%)",
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 6),
-                                      LinearProgressIndicator(
-                                        value: e.value / 100,
-                                        backgroundColor: Colors.grey[300],
-                                        color: Colors.green,
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              }).toList(),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+    return 'neutral';
   }
 
-  /// =========================
-  /// HEADER
-  /// =========================
-  Widget _buildHeader() {
-    return Container(
-      width: double.infinity,
-      decoration: const BoxDecoration(
-        color: Colors.green,
-        borderRadius: BorderRadius.only(
-          bottomLeft: Radius.circular(30),
-          bottomRight: Radius.circular(30),
-        ),
-      ),
-      padding: const EdgeInsets.only(bottom: 40, top: 20),
-      child: Column(
-        children: [
-          const CircleAvatar(
-            radius: 50,
-            backgroundColor: Colors.white,
-            child: Icon(Icons.person, size: 50, color: Colors.green),
-          ),
-          const SizedBox(height: 15),
-          Text(
-            widget.user.name ?? "Elder User",
-            style: const TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// =========================
-  /// INFO CARD
-  /// =========================
-  Widget _buildInfoCard(String label, String value, IconData icon) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(15),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 5),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: Colors.green.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(icon, color: Colors.green),
-          ),
-          const SizedBox(width: 20),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(label, style: TextStyle(color: Colors.grey[600])),
-              Text(
-                value,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// =========================
-  /// LABELS
-  /// =========================
   String _label(String key) {
     switch (key) {
       case "happy":
@@ -334,10 +146,217 @@ class _ElderProfilePageState extends State<ElderProfilePage> {
         return "Angry";
       case "fear":
         return "Fear";
-      case "neutral":
-        return "Neutral";
+      case "calm":
+        return "Calm";
+      case "surprise":
+        return "Surprise";
+      case "disgust":
+        return "Disgust";
       default:
-        return key;
+        return "Neutral";
     }
+  }
+
+  // =========================
+  // UI
+  // =========================
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF4F6F9),
+      appBar: AppBar(
+        title: const Text("Elder Profile"),
+        backgroundColor: Colors.green,
+        foregroundColor: Colors.white,
+        elevation: 0,
+      ),
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            const SizedBox(height: 16),
+
+            // =========================
+            // HEADER CARD (IMPROVED)
+            // =========================
+            FutureBuilder<Map<String, dynamic>?>(
+              future: _elderDataFuture,
+              builder: (context, snapshot) {
+                final elderData = snapshot.data;
+
+                final name = widget.user.name ?? "N/A";
+                final age = elderData?['age']?.toString() ?? "Not set";
+
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Colors.green, Colors.teal],
+                      ),
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 10,
+                          offset: const Offset(0, 5),
+                        )
+                      ],
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(18),
+                      child: Row(
+                        children: [
+                          const CircleAvatar(
+                            radius: 32,
+                            backgroundColor: Colors.white,
+                            child: Icon(Icons.person,
+                                color: Colors.green, size: 32),
+                          ),
+                          const SizedBox(width: 15),
+                          Column(
+                            crossAxisAlignment:
+                                CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                name,
+                                style: const TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              const SizedBox(height: 5),
+                              Text(
+                                "Age: $age years",
+                                style: const TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ],
+                          )
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+
+            const SizedBox(height: 20),
+
+            // =========================
+            // WEEKLY EMOTION REPORT (IMPROVED UI)
+            // =========================
+            FutureBuilder<Map<String, Map<String, double>>>(
+              future: _emotionFuture,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState ==
+                    ConnectionState.waiting) {
+                  return const Padding(
+                    padding: EdgeInsets.all(20),
+                    child: CircularProgressIndicator(),
+                  );
+                }
+
+                final data = snapshot.data ?? {};
+
+                if (data.isEmpty) {
+                  return const Text("No emotion data available");
+                }
+
+                return Column(
+                  children: data.entries.map((week) {
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
+                      child: Card(
+                        elevation: 4,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(14),
+                          child: Column(
+                            crossAxisAlignment:
+                                CrossAxisAlignment.start,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: Colors.green.withOpacity(0.1),
+                                  borderRadius:
+                                      BorderRadius.circular(10),
+                                ),
+                                child: Text(
+                                  "📅 Week: ${week.key}",
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 15,
+                                    color: Colors.green,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+
+                              ...week.value.entries.map((e) {
+                                return Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                      vertical: 6),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment
+                                                .spaceBetween,
+                                        children: [
+                                          Text(
+                                            _label(e.key),
+                                            style: const TextStyle(
+                                              fontWeight:
+                                                  FontWeight.w600,
+                                            ),
+                                          ),
+                                          Text(
+                                            "${e.value.toStringAsFixed(1)}%",
+                                            style: const TextStyle(
+                                              fontWeight:
+                                                  FontWeight.bold,
+                                              color: Colors.green,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 6),
+                                      ClipRRect(
+                                        borderRadius:
+                                            BorderRadius.circular(10),
+                                        child: LinearProgressIndicator(
+                                          minHeight: 8,
+                                          value: e.value / 100,
+                                          backgroundColor:
+                                              Colors.grey[300],
+                                          color: Colors.green,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              }).toList(),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
