@@ -341,12 +341,14 @@ class _DoctorDashboardPageState extends State<DoctorDashboardPage> {
 
     // optional (safe)
     final name = item.latestSubmission['name']?.toString().toLowerCase() ?? "";
+    final elderName = (item.elderName ?? "").toString().toLowerCase();
     final phone =
         item.latestSubmission['phone']?.toString().toLowerCase() ?? "";
 
     return elderId.contains(query) ||
         submissionId.contains(query) ||
-        name.contains(query) ||
+      elderName.contains(query) ||
+      name.contains(query) ||
         phone.contains(query);
   }
 
