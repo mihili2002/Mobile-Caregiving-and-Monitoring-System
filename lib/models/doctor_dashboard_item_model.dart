@@ -2,11 +2,13 @@ import 'meal_plan_model.dart';
 
 class DoctorDashboardItem {
   final String elderId;
+  final String elderName;
   final Map<String, dynamic> latestSubmission;
   final MealPlanModel? latestMealPlan;
 
   DoctorDashboardItem({
     required this.elderId,
+    required this.elderName,
     required this.latestSubmission,
     this.latestMealPlan,
   });
@@ -14,6 +16,7 @@ class DoctorDashboardItem {
   factory DoctorDashboardItem.fromJson(Map<String, dynamic> json) {
     return DoctorDashboardItem(
       elderId: (json['elder_id'] ?? json['elderId'] ?? '').toString(),
+      elderName: (json['elder_name'] ?? 'Unknown').toString(),
       latestSubmission: Map<String, dynamic>.from(
         json['latest_submission'] ??
             json['latestSubmission'] ??
@@ -56,6 +59,21 @@ class DoctorDashboardItem {
       return null;
     }
   }
+
+  @override
+  String toString() {
+    return '''
+DoctorDashboardItem(
+  elderId: $elderId,
+  elderName: $elderName,
+  submissionId: $latestSubmissionId,
+  approved: $isApproved,
+  submittedAt: $submittedAt,
+  hasMealPlan: $hasMealPlan
+)
+''';
+  }
+
 
   /// 🍽 Whether meal plan exists for this submission
   bool get hasMealPlan => latestMealPlan != null;

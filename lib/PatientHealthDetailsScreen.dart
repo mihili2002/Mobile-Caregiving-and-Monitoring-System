@@ -303,6 +303,9 @@ class _PatientHealthDetailsScreenState
         }
       }
 
+      // Cross-field and range validations
+      _validateRangesBeforeSubmit();
+
       // Build payload
 // 1. Initialize the map with the mandatory ID
       final Map<String, dynamic> payload = {
@@ -504,6 +507,9 @@ class _PatientHealthDetailsScreenState
       String label, {
         bool number = true,
         bool required = true,
+        double? min,
+        double? max,
+        bool integerOnly = false,
       }) =>
       TextFormField(
         controller: c,
@@ -511,45 +517,68 @@ class _PatientHealthDetailsScreenState
         keyboardType:
             number ? TextInputType.number : TextInputType.text,
         decoration: _dec(label),
-        validator: required
-            ? (value) {
-                if (value == null || value.trim().isEmpty) {
-                  return "$label is required";
-                }
-                if (number) {
-                  final parsed = number
-                      ? (double.tryParse(value.trim()) ??
-                          int.tryParse(value.trim()))
-                      : null;
-                  if (parsed == null) {
-                    return "Please enter a valid number";
-                  }
-                }
-                return null;
-              }
-            : (value) {
-                if (number && value != null && value.trim().isNotEmpty) {
-                  final parsed = double.tryParse(value.trim()) ??
-                      int.tryParse(value.trim());
-                  if (parsed == null) {
-                    return "Please enter a valid number";
-                  }
-                }
-                return null;
-              },
+        validator: (value) {
+          if (required) {
+            if (value == null || value.trim().isEmpty) {
+              return "$label is required";
+            }
+          }
+
+          if (number && value != null && value.trim().isNotEmpty) {
+            final trimmed = value.trim();
+            final parsedDouble = double.tryParse(trimmed);
+            final parsedInt = int.tryParse(trimmed);
+            if (integerOnly) {
+              if (parsedInt == null) return "Please enter a valid integer";
+              final v = parsedInt.toDouble();
+              if (min != null && v < min) return "$label must be >= ${min.toStringAsFixed(0)}";
+              if (max != null && v > max) return "$label must be <= ${max.toStringAsFixed(0)}";
+            } else {
+              final v = parsedDouble ?? parsedInt?.toDouble();
+              if (v == null) return "Please enter a valid number";
+              if (min != null && v < min) return "$label must be >= $min";
+              if (max != null && v > max) return "$label must be <= $max";
+            }
+          }
+
+          return null;
+        },
       );
+
+  // Validate cross-field logical constraints before submit
+  void _validateRangesBeforeSubmit() {
+    // Blood pressure logical check
+    final systolic = _parseIntOrNull(_systolicController.text);
+    final diastolic = _parseIntOrNull(_diastolicController.text);
+    if (systolic != null && diastolic != null) {
+      if (systolic < diastolic) {
+        throw Exception("Systolic must be greater than or equal to Diastolic");
+      }
+    }
+
+    // Role-based extra checks
+    if ((_isCaregiverRole || _isElderRole) && (_dietaryHabit == null || _dietaryHabit!.isEmpty)) {
+      throw Exception("Please select a dietary habit");
+    }
+
+    // Age check for Doctor/Elder roles
+    final age = _parseIntOrNull(_ageController.text);
+    if ((_isDoctorRole || _isElderRole) && age != null) {
+      if (age <= 0 || age > 120) throw Exception("Please enter a realistic age (1-120)");
+    }
+  }
 
   // ------------ SECTIONS --------
   Widget _basicInfoCard() => _sectionCard(
     title: "Basic Information",
     children: [
-      _field(_ageController, "Age"),
+      _field(_ageController, "Age", integerOnly: true, min: 1, max: 120),
       _genderRow(),
       Row(
         children: [
-          Expanded(child: _field(_heightController, "Height (cm)")),
+          Expanded(child: _field(_heightController, "Height (cm)", integerOnly: true, min: 30, max: 250)),
           const SizedBox(width: 10),
-          Expanded(child: _field(_weightController, "Weight (kg)")),
+          Expanded(child: _field(_weightController, "Weight (kg)", min: 2, max: 200)),
         ],
       ),
     ],
@@ -570,13 +599,13 @@ class _PatientHealthDetailsScreenState
       ),
       Row(
         children: [
-          Expanded(child: _field(_systolicController, "Systolic")),
+          Expanded(child: _field(_systolicController, "Systolic", integerOnly: true, min: 50, max: 300)),
           const SizedBox(width: 10),
-          Expanded(child: _field(_diastolicController, "Diastolic")),
+          Expanded(child: _field(_diastolicController, "Diastolic", integerOnly: true, min: 30, max: 200)),
         ],
       ),
-      _field(_bloodSugarController, "Blood Sugar (mg/dL)"),
-      _field(_cholesterolController, "Cholesterol (mg/dL)"),
+      _field(_bloodSugarController, "Blood Sugar (mg/dL)", min: 20, max: 1000),
+      _field(_cholesterolController, "Cholesterol (mg/dL)", min: 50, max: 1000),
       SwitchListTile(
         title: const Text("Genetic Risk"),
         value: _geneticRisk,
@@ -590,7 +619,7 @@ class _PatientHealthDetailsScreenState
   Widget _lifestyleCard() => _sectionCard(
     title: "Lifestyle Information",
     children: [
-      _field(_dailyStepsController, "Daily Steps"),
+      _field(_dailyStepsController, "Daily Steps", integerOnly: true, min: 0, max: 10000),
       DropdownButtonFormField<String>(
         value: _exerciseFrequency,
         decoration:
@@ -610,7 +639,7 @@ class _PatientHealthDetailsScreenState
         onChanged:
             _enabled() ? (v) => setState(() => _exerciseFrequency = v) : null,
       ),
-      _field(_sleepHoursController, "Sleep Hours"),
+      _field(_sleepHoursController, "Sleep Hours", min: 0, max: 24),
       SwitchListTile(
         title: const Text("Smoking"),
         value: _smoking,
@@ -629,10 +658,10 @@ class _PatientHealthDetailsScreenState
   Widget _nutritionIntakesCard() => _sectionCard(
     title: "Daily Nutrition Intakes",
     children: [
-      _field(_calorieController, "Caloric Intake (kcal)", required: false),
-      _field(_proteinController, "Protein (g/day)", required: false),
-      _field(_carbController, "Carbohydrates (g/day)", required: false),
-      _field(_fatController, "Fat (g/day)", required: false),
+      _field(_calorieController, "Caloric Intake (kcal)", required: false, min: 0, max: 10000),
+      _field(_proteinController, "Protein (g/day)", required: false, min: 0, max: 5000),
+      _field(_carbController, "Carbohydrates (g/day)", required: false, min: 0, max: 5000),
+      _field(_fatController, "Fat (g/day)", required: false, min: 0, max: 5000),
     ],
   );
 
