@@ -21,18 +21,54 @@ class EmotionGraphPage extends StatefulWidget {
 class _EmotionGraphPageState extends State<EmotionGraphPage> {
   bool _loading = true;
   String? _error;
+
   List<_EmotionPoint> _points = [];
   int _days = 7;
   bool _showPercentages = false;
-  Map<String, double> _emotionPercentages = {};
-  
-  // Debug info
+
+  Map<String, Map<String, double>> _dailyEmotionPercentages = {};
+
   List<Map<String, dynamic>> _rawItems = [];
 
   @override
   void initState() {
     super.initState();
     _load();
+  }
+
+  // =========================
+  // COLOR SYSTEM FOR EMOTIONS
+  // =========================
+  Color _emotionColor(String emotion) {
+    switch (emotion.toLowerCase()) {
+      case "joy":
+      case "happy":
+        return Colors.green;
+
+      case "sad":
+      case "sadness":
+        return Colors.blue;
+
+      case "anger":
+      case "angry":
+        return Colors.red;
+
+      case "fear":
+        return Colors.purple;
+
+      case "surprise":
+        return Colors.orange;
+
+      case "calm":
+      case "neutral":
+        return Colors.teal;
+
+      case "disgust":
+        return Colors.brown;
+
+      default:
+        return Colors.grey;
+    }
   }
 
   Future<void> _load() async {
@@ -67,44 +103,31 @@ class _EmotionGraphPageState extends State<EmotionGraphPage> {
 
       final data = jsonDecode(res.body) as Map<String, dynamic>;
       final items = (data['items'] as List<dynamic>? ?? []);
-      
-      // Store raw items for debugging
+
       _rawItems = items.map((e) => e as Map<String, dynamic>).toList();
 
       final parsed = <_EmotionPoint>[];
-      
+
       for (var item in items) {
         final m = item as Map<String, dynamic>;
-        
-        // Get raw emotion value from API
+
         final rawEmotion = m['emotion']?.toString() ?? 'null';
         final journalId = m['journal_id']?.toString() ?? 'unknown';
-        final createdAt = m['created_at']?.toString() ?? 'unknown';
-        
-        print('📊 Journal: $journalId');
-        print('   Created: $createdAt');
-        print('   Raw emotion from API: "$rawEmotion"');
-        
-        // Parse date
-        DateTime? ts;
+
+        DateTime ts;
         try {
           ts = DateTime.parse(m['created_at']).toLocal();
-        } catch (e) {
-          print('   ⚠️ Failed to parse date: ${m['created_at']}');
+        } catch (_) {
           continue;
         }
-        
-        // Normalize emotion
-        final normalizedEmotion = _normalizeEmotionKey(rawEmotion);
-        print('   Normalized emotion: "$normalizedEmotion"');
-        print('   Score: ${_emotionScore(normalizedEmotion)}');
-        print('---');
-        
+
+        final normalized = _normalizeEmotionKey(rawEmotion);
+
         parsed.add(_EmotionPoint(
           createdAt: ts,
-          emotionKey: normalizedEmotion,
-          emotionLabel: _emotionLabel(normalizedEmotion),
-          score: _emotionScore(normalizedEmotion),
+          emotionKey: normalized,
+          emotionLabel: _getEmotionLabel(normalized),
+          score: _emotionScore(normalized),
           rawEmotion: rawEmotion,
           journalId: journalId,
         ));
@@ -112,28 +135,16 @@ class _EmotionGraphPageState extends State<EmotionGraphPage> {
 
       parsed.sort((a, b) => a.createdAt.compareTo(b.createdAt));
 
-      // Count emotions for debugging
-      final emotionCounts = <String, int>{};
+      print('📊 Loaded ${parsed.length} emotion points');
       for (var p in parsed) {
-        emotionCounts[p.emotionKey] = (emotionCounts[p.emotionKey] ?? 0) + 1;
+        print('   ${p.createdAt}: ${p.emotionKey} (score: ${p.score})');
       }
-      print('📊 Emotion counts: $emotionCounts');
-      print('📊 Total points: ${parsed.length}');
 
       setState(() {
         _points = parsed;
-        _calculateEmotionPercentages();
+        _calculateDailyPercentages();
         _loading = false;
       });
-      
-      // Show snackbar with summary
-      if (mounted && parsed.isNotEmpty) {
-        final summary = emotionCounts.entries.map((e) => '${e.key}: ${e.value}').join(', ');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Loaded ${parsed.length} entries: $summary')),
-        );
-      }
-      
     } catch (e) {
       print('❌ Error: $e');
       setState(() {
@@ -143,70 +154,109 @@ class _EmotionGraphPageState extends State<EmotionGraphPage> {
     }
   }
 
- String _normalizeEmotionKey(String emotion) {
-  if (emotion.isEmpty || emotion == 'null') return 'neutral';
+  void _calculateDailyPercentages() {
+    final Map<String, Map<String, int>> dailyCounts = {};
 
-  // 🔥 IMPORTANT: handle Q1–Q4 FIRST
-  final key = emotion.trim().toUpperCase();
+    for (final p in _points) {
+      final dateKey =
+          "${p.createdAt.year}-${p.createdAt.month.toString().padLeft(2, '0')}-${p.createdAt.day.toString().padLeft(2, '0')}";
 
-  if (key == 'Q1') return 'happy';   
-  if (key == 'Q2') return 'angry';   
-  if (key == 'Q3') return 'sad';   
-  if (key == 'Q4') return 'calm';    
+      dailyCounts.putIfAbsent(dateKey, () => {});
+      dailyCounts[dateKey]![p.emotionKey] =
+          (dailyCounts[dateKey]![p.emotionKey] ?? 0) + 1;
+    }
 
-  // 🔁 fallback for text-based emotions
-  final lower = key.toLowerCase();
+    final Map<String, Map<String, double>> result = {};
 
-  if (lower.contains('happy') || lower.contains('joy')) return 'happy';
-  if (lower.contains('angry') || lower.contains('anger')) return 'angry';
-  if (lower.contains('fear')) return 'fear';
-  if (lower.contains('sad')) return 'sad';
-  if (lower.contains('calm') || lower.contains('neutral')) return 'calm';
-  if (lower.contains('surprise')) return 'surprise';
-  if (lower.contains('disgust')) return 'disgust';
+    dailyCounts.forEach((date, emotions) {
+      final total = emotions.values.fold(0, (a, b) => a + b);
 
-  print('⚠️ Unknown emotion: "$emotion" -> defaulting to neutral');
-  return 'neutral';
-}
+      result[date] = emotions.map((emotion, count) {
+        return MapEntry(emotion, (count / total) * 100);
+      });
+    });
+
+    _dailyEmotionPercentages = result;
+  }
+
+  String _normalizeEmotionKey(String emotion) {
+    final key = emotion.trim().toLowerCase();
+
+    if (key.contains('happy') || key == 'q1') return 'happy';
+    if (key.contains('angry') || key == 'q2') return 'angry';
+    if (key.contains('sad') || key == 'q3') return 'sad';
+    if (key.contains('calm') || key == 'q4') return 'calm';
+    if (key.contains('fear')) return 'fear';
+    if (key.contains('surprise')) return 'surprise';
+    if (key.contains('disgust')) return 'disgust';
+
+    return 'neutral';
+  }
 
   double _emotionScore(String key) {
     switch (key) {
-      case 'sad': return 0.0;
-      case 'angry': return 1.0;
-      case 'fear': return 1.5;
-      case 'neutral': return 2.0;
-      case 'calm': return 2.5;
-      case 'surprise': return 3.0;
-      case 'disgust': return 1.2;
-      case 'happy': return 4.0;
-      default: return 2.0;
+      case 'sad':
+        return 0;
+      case 'angry':
+        return 1;
+      case 'fear':
+        return 1.5;
+      case 'neutral':
+        return 2;
+      case 'calm':
+        return 2.5;
+      case 'surprise':
+        return 3;
+      case 'happy':
+        return 4;
+      default:
+        return 2;
     }
   }
 
-  String _emotionLabel(String key) {
+  String _getEmotionLabel(String key) {
     switch (key) {
-      case 'sad': return 'Sad 😔';
-      case 'angry': return 'Angry 😠';
-      case 'fear': return 'Fear 😨';
-      case 'neutral': return 'Neutral 😐';
-      case 'calm': return 'Calm 😌';
-      case 'surprise': return 'Surprise 😲';
-      case 'disgust': return 'Disgust 🤢';
-      case 'happy': return 'Happy 😊';
-      default: return key;
+      case 'sad':
+        return 'Sad 😔';
+      case 'angry':
+        return 'Angry 😠';
+      case 'fear':
+        return 'Fear 😨';
+      case 'neutral':
+        return 'Neutral 😐';
+      case 'calm':
+        return 'Calm 😌';
+      case 'surprise':
+        return 'Surprise 😲';
+      case 'disgust':
+        return 'Disgust 🤢';
+      case 'happy':
+        return 'Happy 😊';
+      default:
+        return key;
     }
   }
 
-  void _calculateEmotionPercentages() {
-    final counts = <String, int>{};
-    for (final p in _points) {
-      counts[p.emotionKey] = (counts[p.emotionKey] ?? 0) + 1;
-    }
-    final total = _points.length;
-    if (total > 0) {
-      _emotionPercentages = counts.map((k, v) => MapEntry(k, (v / total) * 100));
-    } else {
-      _emotionPercentages = {};
+  String _getEmotionEmoji(String key) {
+    switch (key) {
+      case 'sad':
+        return '😔';
+      case 'angry':
+        return '😠';
+      case 'fear':
+        return '😨';
+      case 'neutral':
+        return '😐';
+      case 'calm':
+        return '😌';
+      case 'surprise':
+        return '😲';
+      case 'disgust':
+        return '🤢';
+      case 'happy':
+        return '😊';
+      default:
+        return '😐';
     }
   }
 
@@ -218,10 +268,9 @@ class _EmotionGraphPageState extends State<EmotionGraphPage> {
       appBar: AppBar(
         title: const Text('Emotion Fluctuations'),
         actions: [
-          // Debug button
           IconButton(
-            icon: const Icon(Icons.bug_report),
-            onPressed: _showDebugDialog,
+            icon: const Icon(Icons.refresh),
+            onPressed: _load,
           ),
         ],
       ),
@@ -253,232 +302,121 @@ class _EmotionGraphPageState extends State<EmotionGraphPage> {
                       _showPercentages = !_showPercentages;
                     });
                   },
-                  child: Text(
-                    _showPercentages ? "Show Graph" : "Percentages",
-                  ),
+                  child: Text(_showPercentages ? "Show Graph" : "Percentages"),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.refresh),
-                  onPressed: _load,
-                )
               ],
             ),
             const SizedBox(height: 16),
+
             Expanded(
               child: _loading
                   ? const Center(child: CircularProgressIndicator())
                   : _error != null
                       ? Center(child: Text(_error!))
                       : _points.isEmpty
-                          ? const Center(child: Text("No data found.\nTry recording voice journals with emotions."))
+                          ? const Center(
+                              child: Text(
+                                "No data found for the selected date range.\nTry recording voice journals with emotions.",
+                                textAlign: TextAlign.center,
+                              ),
+                            )
                           : _showPercentages
-                              ? _EmotionPercentageView(percentages: _emotionPercentages)
-                              : _EmotionLineChart(points: _points, primary: primary),
+                              ? _DailyEmotionView(
+                                  data: _dailyEmotionPercentages,
+                                  colorFn: _emotionColor,
+                                )
+                              : _EmotionLineChart(
+                                  points: _points,
+                                  primary: primary,
+                                  colorFn: _emotionColor,
+                                  emojiFn: _getEmotionEmoji,
+                                  labelFn: _getEmotionLabel,
+                                ),
             ),
           ],
         ),
       ),
     );
   }
-  
-  void _showDebugDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Debug Info'),
-        content: Container(
-          width: double.maxFinite,
-          height: 400,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Total entries: ${_rawItems.length}'),
-              const SizedBox(height: 8),
-              const Text('Raw API response:'),
-              Expanded(
-                child: SingleChildScrollView(
-                  child: Text(
-                    JsonEncoder.withIndent('  ').convert(_rawItems),
-                    style: const TextStyle(fontSize: 10),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
-class _EmotionLineChart extends StatelessWidget {
-  final List<_EmotionPoint> points;
-  final Color primary;
+// =========================
+// 📊 DAILY PERCENTAGE VIEW
+// =========================
+class _DailyEmotionView extends StatelessWidget {
+  final Map<String, Map<String, double>> data;
+  final Color Function(String) colorFn;
 
-  const _EmotionLineChart({
-    required this.points,
-    required this.primary,
+  const _DailyEmotionView({
+    required this.data,
+    required this.colorFn,
   });
 
   @override
   Widget build(BuildContext context) {
-    if (points.isEmpty) {
-      return const Center(child: Text('No data to display'));
+    final dates = data.keys.toList()..sort();
+
+    if (dates.isEmpty) {
+      return const Center(child: Text('No data available'));
     }
-    
-    final spots = List.generate(points.length, (i) => FlSpot(i.toDouble(), points[i].score));
-    
-    // Create custom dot colors based on emotion
-    final List<FlDotData> dotDataList = [];
-    
-    return LineChart(
-      LineChartData(
-        minY: -0.5,
-        maxY: 4.5,
-        gridData: const FlGridData(show: true),
-        titlesData: FlTitlesData(
-          leftTitles: AxisTitles(
-            sideTitles: SideTitles(
-              showTitles: true,
-              reservedSize: 60,
-              getTitlesWidget: (value, meta) {
-                if (value == 0) return const Text('Sad', style: TextStyle(fontSize: 11));
-                if (value == 1) return const Text('Angry', style: TextStyle(fontSize: 11));
-                if (value == 1.5) return const Text('Fear', style: TextStyle(fontSize: 11));
-                if (value == 2) return const Text('Neutral', style: TextStyle(fontSize: 11));
-                if (value == 2.5) return const Text('Calm', style: TextStyle(fontSize: 11));
-                if (value == 3) return const Text('Surprise', style: TextStyle(fontSize: 11));
-                if (value == 4) return const Text('Happy', style: TextStyle(fontSize: 11));
-                return const Text('');
-              },
-            ),
-          ),
-          bottomTitles: AxisTitles(
-            sideTitles: SideTitles(
-              showTitles: true,
-              reservedSize: 40,
-              interval: 1,
-              getTitlesWidget: (value, meta) {
-                final index = value.toInt();
-                if (index < 0 || index >= points.length) return const Text('');
-                final date = points[index].createdAt;
-                return Transform.rotate(
-                  angle: -0.5,
-                  child: Text(
-                    '${date.day}/${date.month}',
-                    style: const TextStyle(fontSize: 9),
-                  ),
-                );
-              },
-            ),
-          ),
-          rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-        ),
-        lineBarsData: [
-          LineChartBarData(
-            spots: spots,
-            color: primary,
-            isCurved: true,
-            barWidth: 2,
-            dotData: FlDotData(show: true),
-            belowBarData: BarAreaData(show: false),
-          ),
-        ],
-      ),
-    );
-  }
-}
 
-class _EmotionPercentageView extends StatelessWidget {
-  final Map<String, double> percentages;
-
-  const _EmotionPercentageView({required this.percentages});
-
-  @override
-  Widget build(BuildContext context) {
-    final items = percentages.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
-    
-    if (items.isEmpty) {
-      return const Center(child: Text('No percentage data available'));
-    }
-    
     return ListView.builder(
-      itemCount: items.length,
-      itemBuilder: (context, i) {
-        final key = items[i].key;
-        final value = items[i].value;
+      itemCount: dates.length,
+      itemBuilder: (context, index) {
+        final date = dates[index];
+        final emotions = data[date]!;
         
-        Color getColor(String emotion) {
-          switch (emotion) {
-            case 'happy': return Colors.green;
-            case 'sad': return Colors.blue;
-            case 'angry': return Colors.red;
-            case 'fear': return Colors.deepPurple;
-            case 'calm': return Colors.teal;
-            case 'surprise': return Colors.orange;
-            case 'disgust': return Colors.brown;
-            default: return Colors.grey;
-          }
-        }
-        
-        String getEmoji(String emotion) {
-          switch (emotion) {
-            case 'happy': return '😊';
-            case 'sad': return '😔';
-            case 'angry': return '😠';
-            case 'fear': return '😨';
-            case 'calm': return '😌';
-            case 'surprise': return '😲';
-            case 'disgust': return '🤢';
-            default: return '😐';
-          }
-        }
+        // Sort emotions by percentage (highest first)
+        final sortedEmotions = emotions.entries.toList()
+          ..sort((a, b) => b.value.compareTo(a.value));
 
         return Card(
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+          margin: const EdgeInsets.only(bottom: 12),
+          child: ExpansionTile(
+            title: Text(
+              "📅 $date",
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            subtitle: Text("${emotions.length} emotion${emotions.length > 1 ? 's' : ''}"),
+            children: sortedEmotions.map((e) {
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Row(
                   children: [
                     Container(
-                      width: 16,
-                      height: 16,
+                      width: 12,
+                      height: 12,
                       decoration: BoxDecoration(
-                        color: getColor(key),
+                        color: colorFn(e.key),
                         shape: BoxShape.circle,
                       ),
                     ),
-                    const SizedBox(width: 10),
-                    Text(
-                      '${getEmoji(key)} ${key.toUpperCase()}',
-                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        e.key.toUpperCase(),
+                        style: const TextStyle(fontSize: 14),
+                      ),
                     ),
-                    const Spacer(),
-                    Text(
-                      '${value.toStringAsFixed(1)}%',
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: colorFn(e.key).withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        "${e.value.toStringAsFixed(1)}%",
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: colorFn(e.key),
+                        ),
+                      ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
-                LinearProgressIndicator(
-                  value: value / 100,
-                  backgroundColor: Colors.grey.shade200,
-                  color: getColor(key),
-                  minHeight: 10,
-                  borderRadius: BorderRadius.circular(5),
-                ),
-              ],
-            ),
+              );
+            }).toList(),
           ),
         );
       },
@@ -486,6 +424,229 @@ class _EmotionPercentageView extends StatelessWidget {
   }
 }
 
+// =========================
+// 📈 LINE CHART WITH DATE AXIS (FIXED)
+// =========================
+class _EmotionLineChart extends StatelessWidget {
+  final List<_EmotionPoint> points;
+  final Color primary;
+  final Color Function(String) colorFn;
+  final String Function(String) emojiFn;
+  final String Function(String) labelFn;
+
+  const _EmotionLineChart({
+    required this.points,
+    required this.primary,
+    required this.colorFn,
+    required this.emojiFn,
+    required this.labelFn,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (points.isEmpty) {
+      return const Center(child: Text('No data to display'));
+    }
+
+    final spots = List.generate(
+      points.length,
+      (i) => FlSpot(i.toDouble(), points[i].score),
+    );
+
+    // Calculate optimal interval for X-axis labels based on data points count
+    int getXAxisInterval(int totalPoints) {
+      if (totalPoints <= 7) return 1;
+      if (totalPoints <= 14) return 2;
+      if (totalPoints <= 21) return 3;
+      if (totalPoints <= 30) return 4;
+      return 5;
+    }
+
+    final xInterval = getXAxisInterval(points.length);
+
+    return LineChart(
+      LineChartData(
+        minY: -0.5,
+        maxY: 4.5,
+        gridData: FlGridData(
+          show: true,
+          drawHorizontalLine: true,
+          drawVerticalLine: true,
+          horizontalInterval: 0.5,
+          verticalInterval: points.length > 10 ? (points.length / 10) : 1,
+          getDrawingHorizontalLine: (value) {
+            return FlLine(
+              color: Colors.grey.withOpacity(0.3),
+              strokeWidth: 1,
+            );
+          },
+          getDrawingVerticalLine: (value) {
+            return FlLine(
+              color: Colors.grey.withOpacity(0.3),
+              strokeWidth: 1,
+            );
+          },
+        ),
+        titlesData: FlTitlesData(
+          // LEFT TITLES (Emotion labels on Y-axis)
+          leftTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 70,
+              interval: 0.5,
+              getTitlesWidget: (value, meta) {
+                String getEmotionText(double score) {
+                  if (score == 0) return 'Sad';
+                  if (score == 1) return 'Angry';
+                  if (score == 1.5) return 'Fear';
+                  if (score == 2) return 'Neutral';
+                  if (score == 2.5) return 'Calm';
+                  if (score == 3) return 'Surprise';
+                  if (score == 4) return 'Happy';
+                  return '';
+                }
+                
+                String getEmotionEmoji(double score) {
+                  if (score == 0) return '😔';
+                  if (score == 1) return '😠';
+                  if (score == 1.5) return '😨';
+                  if (score == 2) return '😐';
+                  if (score == 2.5) return '😌';
+                  if (score == 3) return '😲';
+                  if (score == 4) return '😊';
+                  return '😐';
+                }
+
+                final text = getEmotionText(value);
+                if (text.isEmpty) return const Text('');
+                
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: Text(
+                    '$text ${getEmotionEmoji(value)}',
+                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500),
+                  ),
+                );
+              },
+            ),
+          ),
+          // BOTTOM TITLES (Dates on X-axis)
+          bottomTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 60,
+              interval: xInterval.toDouble(),
+              getTitlesWidget: (value, meta) {
+                final index = value.toInt();
+                if (index < 0 || index >= points.length) return const Text('');
+                
+                // Only show labels at the specified interval
+                if (index % xInterval != 0 && index != points.length - 1) {
+                  return const Text('');
+                }
+                
+                final date = points[index].createdAt;
+                final day = date.day.toString().padLeft(2, '0');
+                final month = date.month.toString().padLeft(2, '0');
+                final hour = date.hour.toString().padLeft(2, '0');
+                final minute = date.minute.toString().padLeft(2, '0');
+                
+                // If it's the same day as previous, show only time
+                String displayText;
+                if (index > 0 && points[index - 1].createdAt.day == date.day) {
+                  displayText = '$hour:$minute';
+                } else {
+                  displayText = '$day/$month\n$hour:$minute';
+                }
+                
+                return Transform.rotate(
+                  angle: -0.3,
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(
+                      displayText,
+                      style: const TextStyle(fontSize: 9),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          rightTitles: const AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
+          topTitles: const AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
+        ),
+        lineBarsData: [
+          LineChartBarData(
+            spots: spots,
+            color: primary,
+            isCurved: true,
+            curveSmoothness: 0.3,
+            barWidth: 3,
+            dotData: FlDotData(
+              show: true,
+              getDotPainter: (spot, percent, barData, index) {
+                final emotion = points[index.toInt()].emotionKey;
+                return FlDotCirclePainter(
+                  radius: 6,
+                  color: colorFn(emotion),
+                  strokeWidth: 2,
+                  strokeColor: Colors.white,
+                );
+              },
+            ),
+            belowBarData: BarAreaData(
+              show: true,
+              color: primary.withOpacity(0.1),
+            ),
+            aboveBarData: BarAreaData(show: false),
+          ),
+        ],
+        // Touch tooltips for better interaction (FIXED)
+        lineTouchData: LineTouchData(
+          enabled: true,
+          touchTooltipData: LineTouchTooltipData(
+            getTooltipItems: (touchedSpots) {
+              return touchedSpots.map((touchedSpot) {
+                final index = touchedSpot.x.toInt();
+                if (index >= points.length) return null;
+                
+                final point = points[index];
+                final date = point.createdAt;
+                final formattedDate = '${date.day}/${date.month} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+                
+                return LineTooltipItem(
+                  '${point.emotionLabel}\n$formattedDate\nScore: ${point.score.toStringAsFixed(1)}',
+                  const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                );
+              }).toList();
+            },
+            tooltipRoundedRadius: 8,
+            tooltipMargin: 8,
+          ),
+          handleBuiltInTouches: true,
+        ),
+        borderData: FlBorderData(
+          show: true,
+          border: Border.all(color: Colors.grey.withOpacity(0.3), width: 1),
+        ),
+        clipData: const FlClipData.all(),
+      ),
+    );
+  }
+}
+
+// =========================
+// MODEL CLASS
+// =========================
 class _EmotionPoint {
   final DateTime createdAt;
   final String emotionKey;

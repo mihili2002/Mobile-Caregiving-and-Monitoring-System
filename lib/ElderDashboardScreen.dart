@@ -400,7 +400,7 @@ class _ElderDashboardState extends State<ElderDashboard> with SingleTickerProvid
                 ),
               ),
               Text(
-                'Caregiving Dashboard',
+                'Elder Dashboard',
                 style: theme.textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.w800,
                   color: Colors.black87,

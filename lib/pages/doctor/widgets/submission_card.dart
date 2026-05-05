@@ -5,6 +5,7 @@ import 'status_badge.dart';
 
 class SubmissionCard extends StatefulWidget {
   final String elderId;
+  final String elderName;
   final Map<String, dynamic> latestSubmission;
   final MealPlanModel? latestMealPlan;
 
@@ -19,6 +20,7 @@ class SubmissionCard extends StatefulWidget {
   const SubmissionCard({
     super.key,
     required this.elderId,
+    required this.elderName,
     required this.latestSubmission,
     required this.latestMealPlan,
     required this.onShowMore,
@@ -99,6 +101,7 @@ class _SubmissionCardState extends State<SubmissionCard> {
     final plan = widget.latestMealPlan;
 
     // ---------- SAFE EXTRACTION ----------
+    final elderName = widget.elderName;
     final age = _toInt(s['age']);
     final gender = s['gender'];
     final height = _toDouble(s['height_cm'] ?? s['height']);
@@ -183,6 +186,7 @@ class _SubmissionCardState extends State<SubmissionCard> {
 
           const SizedBox(height: 10),
 
+          _kv("Elder Name", widget.elderName),
           _kv("Age / Gender", "$age • $gender"),
           _kv("BMI", bmi == null ? "-" : bmi.toStringAsFixed(1)),
           _kv("Conditions",
@@ -230,9 +234,24 @@ class _SubmissionCardState extends State<SubmissionCard> {
             Row(
               children: [
                 Expanded(
-                  child: Text(
-                    plan.id,
-                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  child:
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.green.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Text(
+                        "Generated",
+                        style: TextStyle(
+                          color: Colors.green,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
                   ),
                 ),
                 TextButton.icon(
