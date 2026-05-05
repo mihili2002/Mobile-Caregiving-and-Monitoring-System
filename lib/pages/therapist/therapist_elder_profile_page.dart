@@ -47,13 +47,78 @@ class _TherapistElderProfilePageState
     }
   }
 
-  Widget buildPredictionCard(String title, double value) {
+  final Map<String, String> featureQuestions = {
+    "Gender": "Gender",
+    "Education_Level": "Education Level",
+    "Medication_Use": "Medication Use",
+    "Substance_Use": "Substance Use",
+    "Age": "Age",
+    "Sleep_Hours": "Sleep Hours",
+    "Physical_Activity_Hrs": "Physical Activity (Hrs)",
+    "Social_Support_Score": "Social Support Score",
+    "Anxiety_Score": "Anxiety Score",
+    "Depression_Score": "Depression Score",
+    "Stress_Level": "Stress Level",
+    "Family_History_Mental_Illness": "Family History of Mental Illness",
+    "Chronic_Illnesses": "Chronic Illnesses",
+    "Therapy": "Therapy",
+    "Meditation": "Meditation",
+    "Financial_Stress": "Financial Stress",
+    "Work_Stress": "Work Stress",
+    "Self_Esteem_Score": "Self Esteem Score",
+    "Life_Satisfaction_Score": "Life Satisfaction Score",
+    "Loneliness_Score": "Loneliness Score",
+  };
+
+  Widget buildPredictionCard(String title, String riskKey) {
+    final pred = latestRisk?["predictions"]?[riskKey];
+    final double prob = (pred?["probability"] ?? 0.0).toDouble();
+    final String level = (pred?["level"] ?? "N/A").toString();
+
+    Color levelColor = Colors.grey;
+    if (level == "Low") {
+      levelColor = Colors.green;
+    } else if (level == "Medium") {
+      levelColor = Colors.orange;
+    } else if (level == "High") {
+      levelColor = Colors.red;
+    }
+
     return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       child: ListTile(
-        title: Text(title),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+        subtitle: Padding(
+          padding: const EdgeInsets.only(top: 8.0),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: levelColor.withOpacity(0.2),
+                  border: Border.all(color: levelColor),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  level,
+                  style: TextStyle(
+                    color: levelColor,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
         trailing: Text(
-          "${(value * 100).toStringAsFixed(1)}%",
-          style: const TextStyle(fontWeight: FontWeight.bold),
+          "${(prob * 100).toStringAsFixed(1)}%",
+          style: TextStyle(
+            fontWeight: FontWeight.w900,
+            fontSize: 18,
+            color: levelColor,
+          ),
         ),
       ),
     );
@@ -95,21 +160,66 @@ class _TherapistElderProfilePageState
 
                     const SizedBox(height: 10),
 
-                    buildPredictionCard(
-                        "Depression Risk",
-                        (latestRisk?["depProb"] ?? 0.0).toDouble()),
+                    buildPredictionCard("Depression Risk", "Depression_Risk"),
+                    buildPredictionCard("Anxiety Risk", "Anxiety_Risk"),
+                    buildPredictionCard("Insomnia Risk", "Insomnia_Risk"),
+                    buildPredictionCard("Emotional Well-being Risk", "Emotional_WellBeing_Risk"),
 
-                    buildPredictionCard(
-                        "Anxiety Risk",
-                        (latestRisk?["anxProb"] ?? 0.0).toDouble()),
+                    const SizedBox(height: 30),
 
-                    buildPredictionCard(
-                        "Insomnia Risk",
-                        (latestRisk?["insProb"] ?? 0.0).toDouble()),
+                    const Text(
+                      "Submitted Questions & Answers",
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
 
-                    buildPredictionCard(
-                        "Emotional Well-being Risk",
-                        (latestRisk?["emoProb"] ?? 0.0).toDouble()),
+                    const SizedBox(height: 10),
+
+                    Card(
+                      elevation: 1,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(8.0),
+                        child: Column(
+                          children: [
+                            if (latestRisk?["features"] != null)
+                              ...(latestRisk!["features"] as Map<String, dynamic>)
+                                  .entries
+                                  .map((entry) {
+                                final label = featureQuestions[entry.key] ?? entry.key;
+                                return Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 4),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Flexible(
+                                        child: Text(
+                                          label,
+                                          style: const TextStyle(
+                                            color: Colors.black87,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Text(
+                                        entry.value.toString(),
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              }).toList(),
+                          ],
+                        ),
+                      ),
+                    ),
 
                     const SizedBox(height: 20),
 
