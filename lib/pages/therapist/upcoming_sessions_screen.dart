@@ -15,6 +15,7 @@ class UpcomingSessionsScreen extends StatelessWidget {
         _TherapySession(
           elderName: "Elder - Nimal",
           residentId: "resident_001",
+          elderEmail: "nimal@gmail.com",
           dateText: "15th January",
           timeText: "4:00 PM",
           mode: "Online",
@@ -22,6 +23,7 @@ class UpcomingSessionsScreen extends StatelessWidget {
         _TherapySession(
           elderName: "Elder - Kumari",
           residentId: "resident_002",
+          elderEmail: "kumari@gmail.com",
           dateText: "18th January",
           timeText: "11:30 AM",
           mode: "Clinic",
@@ -29,6 +31,7 @@ class UpcomingSessionsScreen extends StatelessWidget {
         _TherapySession(
           elderName: "Elder - Silva",
           residentId: "resident_003",
+          elderEmail: "silva@gmail.com",
           dateText: "22nd January",
           timeText: "2:15 PM",
           mode: "Online",
@@ -132,6 +135,7 @@ class UpcomingSessionsScreen extends StatelessWidget {
 class _TherapySession {
   final String elderName;
   final String residentId;
+  final String elderEmail; // ⭐ NEW
   final String dateText;
   final String timeText;
   final String mode;
@@ -139,6 +143,7 @@ class _TherapySession {
   const _TherapySession({
     required this.elderName,
     required this.residentId,
+    required this.elderEmail, // ⭐ NEW
     required this.dateText,
     required this.timeText,
     required this.mode,
@@ -238,6 +243,7 @@ class _SessionCard extends StatelessWidget {
                       MaterialPageRoute(
                         builder: (_) => RiskHistoryChartScreen(
                           residentId: session.residentId,
+                          elderEmail: session.elderEmail,
                           days: 30,
                         ),
                       ),
@@ -256,8 +262,7 @@ class _SessionCard extends StatelessWidget {
                       MaterialPageRoute(
                         builder: (_) => PersonalizedPlanScreen(
                           residentId: session.residentId,
-                          elderEmail:
-                              "${session.residentId}@gmail.com",
+                          elderEmail: session.elderEmail,
                           mode: PlanMode.viewOnly,
                         ),
                       ),

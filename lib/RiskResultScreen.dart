@@ -5,8 +5,13 @@ import 'package:mobile_caregiving_and_monitoring_system/pages/therapist/risk_his
 
 class RiskResultScreen extends StatelessWidget {
   final Map<String, dynamic> result;
+  final String? elderEmail; // ⭐ NEW
 
-  const RiskResultScreen({super.key, required this.result});
+  const RiskResultScreen({
+    super.key,
+    required this.result,
+    this.elderEmail,
+  });
 
   static const String baseUrl = "http://127.0.0.1:8000";
 
@@ -191,6 +196,7 @@ class RiskResultScreen extends StatelessWidget {
                           MaterialPageRoute(
                             builder: (_) => RiskHistoryChartScreen(
                               residentId: residentId,
+                              elderEmail: elderEmail ?? "",
                               days: 30,
                             ),
                           ),

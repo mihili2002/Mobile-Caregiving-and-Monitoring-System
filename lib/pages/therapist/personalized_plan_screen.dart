@@ -45,22 +45,35 @@ class _PersonalizedPlanScreenState extends State<PersonalizedPlanScreen> {
 
   Future<void> _loadPlan() async {
     try {
+      Map<String, dynamic> result;
 
-      // ⭐ SEND ELDER EMAIL TO BACKEND
-      final result = await TherapyPlanService.generatePlan(
-        widget.residentId,
-        elderEmail: widget.elderEmail,
-      );
+      if (widget.mode == PlanMode.viewOnly) {
+        // ⭐ FETCH EXISTING ACTIVE PLAN
+        result = await TherapyPlanService.getActivePlan(widget.residentId);
 
-      final plan = result["plan"];
+        if (result.containsKey("message")) {
+          setState(() {
+            _loading = false;
+            _status = result["message"];
+          });
+          return;
+        }
+      } else {
+        // ⭐ GENERATE NEW AI PLAN
+        result = await TherapyPlanService.generatePlan(
+          widget.residentId,
+          elderEmail: widget.elderEmail,
+        );
+      }
+
+      final plan = result.containsKey("plan") ? result["plan"] : result;
 
       setState(() {
-        _domains = plan["domains"];
+        _domains = plan["domains"] ?? [];
         _currentPlanId = plan["id"];
-        _status = plan["status"];
+        _status = plan["status"] ?? "Active";
         _isApproved = _status == "Active";
-        _editing =
-            widget.mode == PlanMode.generateEditable && !_isApproved;
+        _editing = widget.mode == PlanMode.generateEditable && !_isApproved;
         _loading = false;
       });
 
@@ -242,11 +255,11 @@ class _PersonalizedPlanScreenState extends State<PersonalizedPlanScreen> {
                       padding: const EdgeInsets.all(16),
                       child: ListView(
                   children: [
-                    Text(
-                      "Resident: ${widget.residentId}",
-                      style: const TextStyle(
-                          fontWeight: FontWeight.w800),
-                    ),
+                    // Text(
+                    //   // "Resident: ${widget.residentId}",
+                    //   style: const TextStyle(
+                    //       fontWeight: FontWeight.w800),
+                    // ),
                     const SizedBox(height: 6),
                     Text(
                       "Status: $_status",

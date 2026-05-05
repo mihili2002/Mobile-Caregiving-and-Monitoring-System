@@ -11,11 +11,13 @@ import 'personalized_plan_screen.dart';
 
 class RiskHistoryChartScreen extends StatefulWidget {
   final String residentId;
+  final String elderEmail; // ⭐ NEW
   final int days;
 
   const RiskHistoryChartScreen({
     super.key,
     required this.residentId,
+    required this.elderEmail, // ⭐ NEW
     this.days = 30,
   });
 
@@ -284,8 +286,7 @@ class _RiskHistoryChartScreenState extends State<RiskHistoryChartScreen> {
                                                 builder: (_) =>
                                                     PersonalizedPlanScreen(
                                                   residentId: widget.residentId,
-                                                  elderEmail:
-                                                      "${widget.residentId}@gmail.com",
+                                                  elderEmail: widget.elderEmail,
                                                   mode: PlanMode.viewOnly,
                                                 ),
                                               ),
@@ -306,8 +307,7 @@ class _RiskHistoryChartScreenState extends State<RiskHistoryChartScreen> {
                                                 builder: (_) =>
                                                     PersonalizedPlanScreen(
                                                   residentId: widget.residentId,
-                                                  elderEmail:
-                                                      "${widget.residentId}@gmail.com",
+                                                  elderEmail: widget.elderEmail,
                                                   mode: PlanMode.generateEditable,
                                                 ),
                                               ),
