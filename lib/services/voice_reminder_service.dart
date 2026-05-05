@@ -191,7 +191,7 @@ class VoiceReminderService {
         "🔊 [Checking Task: $name] status=$status, effectiveTime=$effectiveReminderTime, diff=$diff",
       );
 
-      if (diff < 0) continue;
+      if (now.isBefore(effectiveReminderTime)) continue;
 
       final minuteKey = "${taskId}_${now.hour}_${now.minute}";
 
