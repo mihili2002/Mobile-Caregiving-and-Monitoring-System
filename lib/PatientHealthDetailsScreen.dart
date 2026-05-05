@@ -428,7 +428,8 @@ class _PatientHealthDetailsScreenState
                     _basicInfoCard(),
                     _healthConditionsCard(),
                   ] else if (_isCaregiverRole) ...[
-                    // Caregiver: Lifestyle fields
+                    // Caregiver: allow filling chronic conditions + lifestyle
+                    _chronicConditionsOnlyCard(),
                     _lifestyleCard(),
                     _nutritionIntakesCard(),
                     _dietaryCard(),
@@ -612,6 +613,26 @@ class _PatientHealthDetailsScreenState
         onChanged: _enabled()
             ? (v) => setState(() => _geneticRisk = v)
             : null,
+      ),
+    ],
+  );
+
+  // A slimmer card exposing only chronic condition chips (for caregiver use)
+  Widget _chronicConditionsOnlyCard() => _sectionCard(
+    title: "Health Conditions",
+    children: [
+      SizedBox(
+        width: double.infinity,
+        child: Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          children: [
+            _condChip("Diabetes"),
+            _condChip("Hypertension"),
+            _condChip("Heart Disease"),
+            _condChip("None"),
+          ],
+        ),
       ),
     ],
   );
