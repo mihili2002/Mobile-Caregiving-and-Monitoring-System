@@ -587,16 +587,16 @@ class _PatientHealthDetailsScreenState
   Widget _healthConditionsCard() => _sectionCard(
     title: "Health Conditions",
     children: [
-      Wrap(
-        spacing: 12,
-        runSpacing: 12,
-        children: [
-          _condChip("Diabetes"),
-          _condChip("Hypertension"),
-          _condChip("Heart Disease"),
-          _condChip("None"),
-        ],
-      ),
+      // Wrap(
+      //   spacing: 12,
+      //   runSpacing: 12,
+      //   children: [
+      //     _condChip("Diabetes"),
+      //     _condChip("Hypertension"),
+      //     _condChip("Heart Disease"),
+      //     _condChip("None"),
+      //   ],
+      // ),
       Row(
         children: [
           Expanded(child: _field(_systolicController, "Systolic", integerOnly: true, min: 50, max: 300)),
