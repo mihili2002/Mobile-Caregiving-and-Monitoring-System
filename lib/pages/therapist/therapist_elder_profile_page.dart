@@ -230,7 +230,9 @@ class _TherapistElderProfilePageState
                           context,
                           MaterialPageRoute(
                             builder: (_) =>
-                                RiskResultScreen(result: latestRisk!),
+                                RiskResultScreen(
+                                    result: latestRisk!,
+                                    elderEmail: elder.email),
                           ),
                         );
                       },
@@ -247,6 +249,7 @@ class _TherapistElderProfilePageState
                         MaterialPageRoute(
                           builder: (_) => RiskHistoryChartScreen(
                             residentId: elder.uid,
+                            elderEmail: elder.email,
                             days: 30,
                           ),
                         ),
@@ -266,6 +269,24 @@ class _TherapistElderProfilePageState
                             residentId: elder.uid,
                             elderEmail: elder.email,
                             mode: PlanMode.generateEditable,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+
+                  const SizedBox(height: 10),
+
+                  OutlinedButton(
+                    child: const Text("View Current Personalized Plan"),
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => PersonalizedPlanScreen(
+                            residentId: elder.uid,
+                            elderEmail: elder.email,
+                            mode: PlanMode.viewOnly,
                           ),
                         ),
                       );
