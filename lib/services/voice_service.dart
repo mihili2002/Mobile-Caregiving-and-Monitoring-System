@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
+import 'user_service.dart';
 
 class VoiceService {
   final FlutterTts _flutterTts = FlutterTts();
@@ -60,26 +61,72 @@ class VoiceService {
     _flutterTts.setCompletionHandler(() => handler());
   }
 
-  Future<void> speak(String text) async {
+  Future<String?> getAudioUrl(String text, {String category = "common"}) async {
+    final baseUrl = UserService().baseUrl;
+    final encodedText = Uri.encodeComponent(text);
+    return "$baseUrl/api/audio/generate?text=$encodedText&category=$category";
+  }
+
+  Future<void> speak(String text, {String category = 'common'}) async {
     if (!_isTtsInit) await initTts();
 
     try {
       await stopListening();
       await _flutterTts.stop();
+
+      // Apply different voice patterns according to task category
+      double targetPitch = 0.9;
+      double targetRate = 0.4;
+      
+      switch (category.toLowerCase()) {
+        case 'health':
+        case 'medication':
+          targetPitch = 1.1; 
+          targetRate = 0.42;
+          break;
+        case 'meal':
+        case 'meals':
+          targetPitch = 0.9; 
+          targetRate = 0.4;
+          break;
+        case 'social':
+          targetPitch = 1.2; 
+          targetRate = 0.48;
+          break;
+        case 'leisure':
+        case 'therapy':
+          targetPitch = 0.85; 
+          targetRate = 0.35;
+          break;
+        case 'urgent':
+          targetPitch = 0.95; 
+          targetRate = 0.55; 
+          break;
+        case 'common':
+        default:
+          targetPitch = 0.9; 
+          targetRate = 0.4;
+          break;
+      }
+
+      await _flutterTts.setPitch(targetPitch);
+      await _flutterTts.setSpeechRate(targetRate);
+      
+      debugPrint("🔊 FlutterTTS: Speaking as '$category' [Pitch: $targetPitch, Rate: $targetRate]");
       await _flutterTts.speak(text);
     } catch (e) {
       debugPrint("TTS Error: $e");
     }
   }
 
-  Future<void> speakReminder(String taskName, {String? elderName}) async {
+  Future<void> speakReminder(String taskName, {String? elderName, String category = 'common'}) async {
     String preamble = "Excuse me";
     if (elderName != null && elderName.isNotEmpty) {
       preamble += " $elderName";
     }
 
     final message = "$preamble, it is time for your $taskName.";
-    await speak(message);
+    await speak(message, category: category);
   }
 
   /// Listen once and return the recognized text.

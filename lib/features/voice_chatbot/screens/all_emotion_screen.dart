@@ -29,15 +29,13 @@ class _AllEmotionsScreenState extends State<AllEmotionsScreen>
 
   bool _showPercentage = false;
 
-  Map<String, double> _percentages = {};
-
   static const _green900 = Color(0xFF00A693);
   static const _mint = Color(0xFFF2FBF7);
 
   @override
   void initState() {
     super.initState();
-    _tab = TabController(length: 4, vsync: this);
+    _tab = TabController(length: 3, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadOnce());
   }
 
@@ -77,7 +75,6 @@ class _AllEmotionsScreenState extends State<AllEmotionsScreen>
 
       setState(() {
         _items = list;
-        _calculatePercentages();
         _loading = false;
       });
     } catch (e) {
@@ -99,6 +96,9 @@ class _AllEmotionsScreenState extends State<AllEmotionsScreen>
     return DateTime.fromMillisecondsSinceEpoch(0);
   }
 
+  // =========================
+  // ✅ ONLY CHANGE IS HERE
+  // =========================
   Color _emotionColor(String emotion) {
     switch (emotion.toLowerCase()) {
       case "joy":
@@ -112,6 +112,11 @@ class _AllEmotionsScreenState extends State<AllEmotionsScreen>
         return Colors.red;
       case "fear":
         return Colors.purple;
+
+      // ✅ NEW ADDED COLOR
+      case "surprise":
+        return Colors.orange;
+
       default:
         return Colors.grey;
     }
@@ -127,29 +132,10 @@ class _AllEmotionsScreenState extends State<AllEmotionsScreen>
     return c;
   }
 
-  void _calculatePercentages() {
-    final Map<String, int> counts = _emotionCounts();
-
-    final total = counts.values.fold<int>(0, (a, b) => a + b);
-
-    if (total == 0) {
-      _percentages = {};
-      return;
-    }
-
-    _percentages = counts.map(
-      (k, v) => MapEntry(k, (v / total) * 100),
-    );
-  }
-
   List<String> _sortedEmotions(Set<String> emotions) {
     final list = emotions.toList()..sort();
     return list;
   }
-
-  // =========================
-  // GROUP BY DATE
-  // =========================
 
   Map<String, List<Map<String, dynamic>>> _groupByDay() {
     final Map<String, List<Map<String, dynamic>>> result = {};
@@ -161,16 +147,11 @@ class _AllEmotionsScreenState extends State<AllEmotionsScreen>
           "${time.year}-${time.month.toString().padLeft(2, '0')}-${time.day.toString().padLeft(2, '0')}";
 
       result.putIfAbsent(day, () => []);
-
       result[day]!.add(item);
     }
 
     return result;
   }
-
-  // =========================
-  // BAR CHART
-  // =========================
 
   Widget _barChart() {
     final counts = _emotionCounts();
@@ -194,11 +175,37 @@ class _AllEmotionsScreenState extends State<AllEmotionsScreen>
           label: Text(_showPercentage ? "Show Count" : "Show %"),
         ),
         const SizedBox(height: 10),
-
         Expanded(
           child: BarChart(
             BarChartData(
               maxY: _showPercentage ? 100 : null,
+              titlesData: FlTitlesData(
+                leftTitles: AxisTitles(
+                  axisNameWidget: const Text(
+                    "Count / %",
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  sideTitles: SideTitles(showTitles: true),
+                ),
+                bottomTitles: AxisTitles(
+                  axisNameWidget: const Text(
+                    "Emotions",
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    getTitlesWidget: (value, meta) {
+                      if (value.toInt() >= emotions.length) {
+                        return const SizedBox();
+                      }
+                      return Text(
+                        emotions[value.toInt()],
+                        style: const TextStyle(fontSize: 10),
+                      );
+                    },
+                  ),
+                ),
+              ),
               barGroups: List.generate(emotions.length, (i) {
                 final e = emotions[i];
                 final count = counts[e] ?? 0;
@@ -224,11 +231,7 @@ class _AllEmotionsScreenState extends State<AllEmotionsScreen>
     );
   }
 
-  // =========================
-  // PER DAY VIEW
-  // =========================
-
-  Widget _perDayChart() {
+  Widget _percentagePerDayChart() {
     final grouped = _groupByDay();
 
     if (grouped.isEmpty) {
@@ -243,6 +246,20 @@ class _AllEmotionsScreenState extends State<AllEmotionsScreen>
         final day = days[i];
         final items = grouped[day]!;
 
+        final Map<String, int> counts = {};
+        for (final it in items) {
+          final e = _safe(it["emotion"]).toLowerCase();
+          if (e.isEmpty) continue;
+          counts[e] = (counts[e] ?? 0) + 1;
+        }
+
+        final total = counts.values.fold<int>(0, (a, b) => a + b);
+
+        final Map<String, double> percentages = {};
+        counts.forEach((k, v) {
+          percentages[k] = (v / total) * 100;
+        });
+
         return Card(
           margin: const EdgeInsets.all(10),
           child: Padding(
@@ -250,26 +267,31 @@ class _AllEmotionsScreenState extends State<AllEmotionsScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  day,
-                  style: const TextStyle(
-                      fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-
+                Text(day,
+                    style: const TextStyle(
+                        fontSize: 18, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 10),
+                Column(
+                  children: percentages.entries.map((entry) {
+                    final emotion = entry.key;
+                    final percent = entry.value;
 
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: items.map((it) {
-                    final emotion = _safe(it["emotion"]);
-
-                    return Chip(
-                      label: Text(
-                        emotion,
-                        style: const TextStyle(color: Colors.white),
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 6),
+                      child: Row(
+                        children: [
+                          SizedBox(width: 80, child: Text(emotion)),
+                          Expanded(
+                            child: LinearProgressIndicator(
+                              value: percent / 100,
+                              color: _emotionColor(emotion),
+                              backgroundColor: Colors.grey.shade300,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Text("${percent.toStringAsFixed(1)}%"),
+                        ],
                       ),
-                      backgroundColor: _emotionColor(emotion),
                     );
                   }).toList(),
                 )
@@ -281,25 +303,68 @@ class _AllEmotionsScreenState extends State<AllEmotionsScreen>
     );
   }
 
-  // =========================
-  // LIST VIEW
-  // =========================
-
   Widget _listView() {
+    if (_items.isEmpty) {
+      return const Center(child: Text("No emotion data"));
+    }
+
     return ListView.builder(
       itemCount: _items.length,
       itemBuilder: (_, i) {
         final it = _items[i];
+        final emotion = _safe(it["emotion"]);
+        final text = _safe(it["text"]);
         final time = _parseTime(it);
 
-        return ListTile(
-          leading: CircleAvatar(
-            backgroundColor: _emotionColor(_safe(it["emotion"])),
+        final formattedDate =
+            "${time.year}-${time.month.toString().padLeft(2, '0')}-${time.day.toString().padLeft(2, '0')} "
+            "${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}";
+
+        return Container(
+          margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: _emotionColor(emotion), width: 1.5),
           ),
-          title: Text(_safe(it["emotion"])),
-          subtitle: Text(_safe(it["text"])),
-          trailing: Text(
-              "${time.year}-${time.month}-${time.day} ${time.hour}:${time.minute}"),
+          child: Row(
+            children: [
+              Container(
+                width: 12,
+                height: 60,
+                decoration: BoxDecoration(
+                  color: _emotionColor(emotion),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      emotion.toUpperCase(),
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: _emotionColor(emotion),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    if (text.isNotEmpty) Text(text),
+                    const SizedBox(height: 6),
+                    Text(
+                      formattedDate,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         );
       },
     );
@@ -323,10 +388,14 @@ class _AllEmotionsScreenState extends State<AllEmotionsScreen>
         ],
         bottom: TabBar(
           controller: _tab,
+          labelColor: Colors.white,
+          unselectedLabelColor: Colors.white70,
+          indicatorColor: Colors.white,
+          indicatorWeight: 3,
+          labelStyle: const TextStyle(fontWeight: FontWeight.bold),
           tabs: const [
             Tab(text: "Bar"),
-            Tab(text: "Trend"),
-            Tab(text: "Per-day"),
+            Tab(text: "Percentage"),
             Tab(text: "List"),
           ],
         ),
@@ -339,8 +408,7 @@ class _AllEmotionsScreenState extends State<AllEmotionsScreen>
                   controller: _tab,
                   children: [
                     _barChart(),
-                    const Center(child: Text("Trend Chart Coming Soon")),
-                    _perDayChart(),
+                    _percentagePerDayChart(),
                     _listView(),
                   ],
                 ),

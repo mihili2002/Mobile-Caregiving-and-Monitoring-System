@@ -9,42 +9,57 @@ enum UserRole {
 
 class AppUser {
   final String uid;
-  final String elderId; // ✅ NEW FIELD
+  final String elderId;
   final String email;
   final UserRole role;
   final String? name;
 
+  // ✅ ALL REQUIRED FIELDS
+  final int? age;
+  final String? gender;
+  final String? education; // 🔥 ADD THIS
+
   AppUser({
     required this.uid,
-    required this.elderId, // ✅ REQUIRED
+    required this.elderId,
     required this.email,
     required this.role,
     this.name,
+    this.age,
+    this.gender,
+    this.education, // 🔥 ADD THIS
   });
 
-  /// Convert to Firestore map
+  String get id => uid;
+
+  /// Convert to Firestore
   Map<String, dynamic> toMap() {
     return {
       'uid': uid,
-      'elderId': elderId, // ✅ stored
+      'elderId': elderId,
       'email': email,
       'role': role.toString().split('.').last,
       'name': name,
+      'age': age,
+      'gender': gender,
+      'education': education, // 🔥 ADD THIS
     };
   }
 
-  /// Create from Firestore map
+  /// From Firestore
   factory AppUser.fromMap(Map<String, dynamic> data, String uid) {
     return AppUser(
       uid: uid,
-      elderId: data['elderId'] ?? uid, // ✅ fallback for old users
+      elderId: data['elderId'] ?? uid,
       email: data['email'] ?? '',
       role: _parseRole(data['role']),
       name: data['name'],
+      age: data['age'] != null ? int.tryParse(data['age'].toString()) : null,
+      gender: data['gender'],
+      education: data['education'], // 🔥 ADD THIS
     );
   }
 
-  /// Parse role safely
   static UserRole _parseRole(String? role) {
     switch (role?.toLowerCase()) {
       case 'elder':
@@ -61,7 +76,7 @@ class AppUser {
       case 'familymember':
         return UserRole.familyMember;
       default:
-        return UserRole.elder; // Default fallback
+        return UserRole.elder;
     }
   }
 }

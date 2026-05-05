@@ -67,11 +67,11 @@ class RoutineUnderstandingService {
   /// Formulate a verification question based on task
   String getVerificationQuestion(String taskName) {
     if (taskName.toLowerCase().contains('med') || taskName.toLowerCase().contains('pill')) {
-      return "Did you take your $taskName?";
+      return "Did you take your $taskName? If yes please mark it as done";
     }
     if (taskName.toLowerCase().contains('breakfast') || taskName.toLowerCase().contains('lunch') || taskName.toLowerCase().contains('dinner')) {
-      return "Did you have your $taskName?";
+      return "Did you have your $taskName? If yes please mark it as done";
     }
-    return "Have you finished $taskName yet?";
+    return "Have you finished $taskName yet? If yes please mark it as done";
   }
 }

@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:audioplayers/audioplayers.dart';
 
 import '../../services/behavior_service.dart';
 import '../../services/notification_service.dart';
@@ -16,6 +17,7 @@ import '../../services/voice_service.dart';
 import 'schedule_history_page.dart';
 import 'voice_chatbot_page.dart';
 import 'widgets/task_skip_review_widget.dart';
+import '../../widgets/digital_clock.dart';
 
 const skipReasonOptions = [
   'not_feeling_well',
@@ -50,6 +52,7 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
   final VoiceService _voiceService = VoiceService();
   final NotificationService _notificationService = NotificationService();
   final BehaviorService _behaviorService = BehaviorService();
+  final AudioPlayer _audioPlayer = AudioPlayer();
 
   late final String effectiveUid;
   Timer? _timer;
@@ -106,6 +109,7 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
   void dispose() {
     _timer?.cancel();
     _voiceService.stop();
+    _audioPlayer.dispose();
     super.dispose();
   }
 
@@ -161,7 +165,27 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
         _selectedDate.day == now.day;
   }
 
-  Future<void> _fetchSchedule() async {
+  /// Speaks a confirmation message using OpenAI TTS first,
+  /// falling back to local FlutterTTS only if OpenAI fails.
+  Future<void> _speakWithOpenAIFallback(String text) async {
+    try {
+      // 1. Try OpenAI TTS first
+      final audioUrl = await _voiceService.getAudioUrl(text);
+      if (audioUrl != null && audioUrl.isNotEmpty) {
+        await _audioPlayer.stop();
+        await _audioPlayer.play(UrlSource(audioUrl));
+        return;
+      }
+    } catch (e) {
+      debugPrint("OpenAI confirmation failed: $e");
+    }
+
+    // 2. Fallback to local FlutterTTS
+    await _voiceService.stop();
+    await _voiceService.speak(text);
+  }
+
+  Future<List<dynamic>> _fetchSchedule() async {
     setState(() {
       _isLoading = true;
       _hasError = false;
@@ -185,7 +209,7 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
         _isLoading = false;
         _hasError = true;
       });
-      return;
+      return [];
     }
 
     final tasks = List<dynamic>.from(data['tasks'] ?? []);
@@ -210,6 +234,8 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
       _scheduleTieredReminders();
       _checkInsights();
     }
+    
+    return tasks;
   }
 
   Future<void> _checkInsights() async {
@@ -450,15 +476,16 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
 
     for (final t in _dailyTasks) {
       final bool isCompleted = t['completed'] == true;
-      final String rawStatus = (t['status'] ?? '').toString().trim();
-      final String normalizedStatus = _normalizeStatus(rawStatus, isCompleted);
+      final String normalizedStatus = _normalizeStatus(t);
 
       if (isCompleted) continue;
       if (_isTerminalStatus(normalizedStatus)) continue;
 
       DateTime? scheduledTime;
       try {
-        if (t['scheduledAt'] != null) {
+        if (t['status'] == 'snoozed' && t['snoozedUntil'] != null) {
+          scheduledTime = DateTime.parse(t['snoozedUntil']);
+        } else if (t['scheduledAt'] != null) {
           scheduledTime = DateTime.parse(t['scheduledAt']);
         } else if (t['time'] != null && t['time'].toString().contains(":")) {
           final now = DateTime.now();
@@ -485,10 +512,10 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
           final id = NotificationService.makeId(effectiveUid, t['id'], i);
 
           String title = "Reminder";
-          String body = "Time for ${t['task_name']}";
+          String body = "reminder, It is Time for your ${t['task_name']}";
           if (offset > 0) {
             title = "Follow-up Reminder";
-            body = "You haven't finished ${t['task_name']} yet.";
+            body = "You haven't finished your ${t['task_name']} yet.";
           }
 
           _notificationService.scheduleNotification(
@@ -517,6 +544,7 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
       'skipped',
       'missed_likely',
       'missed_confirmed',
+      'missed',
       'needs_caregiver_review',
       'escalated',
       'snoozed',
@@ -524,20 +552,50 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
     }.contains(status);
   }
 
-  String _normalizeStatus(String? rawStatus, bool isCompleted) {
-    final status = (rawStatus ?? '').trim();
+  String _normalizeStatus(Map<String, dynamic> task) {
+    final bool isCompleted = task['completed'] == true;
+    final String rawStatus = (task['status'] ?? '').toString().trim();
+    String status = rawStatus;
 
-    if (status.isEmpty) {
-      return isCompleted ? 'completed_confirmed' : 'scheduled';
+    if (status.isEmpty || status == 'pending') {
+      status = isCompleted ? 'completed_confirmed' : 'scheduled';
+    } else if (isCompleted) {
+      status = 'completed_confirmed';
+    }
+
+    if (!isCompleted) {
+      DateTime? taskTime;
+      if (task['snoozedUntil'] != null) {
+        taskTime = DateTime.tryParse(task['snoozedUntil']);
+      } else if (task['scheduledAt'] != null) {
+        taskTime = DateTime.tryParse(task['scheduledAt']);
+      } else if (task['time'] != null && task['time'].toString().contains(":")) {
+        final now = DateTime.now();
+        final parts = task['time'].split(":");
+        if (parts.length >= 2) {
+          taskTime = DateTime(
+            now.year,
+            now.month,
+            now.day,
+            int.tryParse(parts[0]) ?? 0,
+            int.tryParse(parts[1]) ?? 0,
+          );
+        }
+      }
+
+      if (taskTime != null) {
+        final now = DateTime.now();
+        if (now.isAfter(taskTime.add(const Duration(hours: 1)))) {
+          status = 'missed';
+        }
+      }
     }
 
     switch (status) {
-      case 'pending':
-        return isCompleted ? 'completed_confirmed' : 'scheduled';
       case 'acknowledged':
         return 'reminder_triggered';
       case 'reminder_sent':
-        return 'reminder_triggered';
+        return 'reminder_sent';
       default:
         return status;
     }
@@ -550,10 +608,14 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
       'scheduled',
       'upcoming',
       'reminder_triggered',
+      'reminder_sent',
       'snoozed',
       'in_progress',
       'needs_caregiver_review',
       'escalated',
+      'missed',
+      'missed_likely',
+      'missed_confirmed',
     }.contains(status);
   }
 
@@ -564,9 +626,8 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
       'scheduled',
       'upcoming',
       'reminder_triggered',
+      'reminder_sent',
       'snoozed',
-      'missed_likely',
-      'missed_confirmed',
       'needs_caregiver_review',
     }.contains(status);
   }
@@ -578,6 +639,7 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
       'scheduled',
       'upcoming',
       'reminder_triggered',
+      'reminder_sent',
       'snoozed',
       'needs_caregiver_review',
     }.contains(status);
@@ -590,7 +652,9 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
       'scheduled',
       'upcoming',
       'reminder_triggered',
+      'reminder_sent',
       'snoozed',
+      'missed',
       'missed_likely',
       'missed_confirmed',
       'needs_caregiver_review',
@@ -749,11 +813,22 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
 
                   if (intent == "task_rescheduled") {
                     await _voiceService.speak(reply);
-                    await VoiceReminderService().resyncAfterTaskReschedule(
+                    
+                    // Give the backend a moment to commit the Firestore changes
+                    await Future.delayed(const Duration(seconds: 1));
+                    
+                    // [GENERALIZED] Call resync which adds to guard and cancels old timers
+                    await VoiceReminderService().resyncAfterTaskStateChange(
                       effectiveUid,
                       taskId,
+                      reason: "reschedule",
                     );
-                    await _fetchSchedule();
+
+                    // Fetch fresh tasks
+                    final freshTasks = await _fetchSchedule();
+                    // Update service with fresh tasks to potentially clear guard
+                    VoiceReminderService().updateTasks(freshTasks);
+
                     await Future.delayed(const Duration(seconds: 2));
                     if (ctx.mounted) Navigator.pop(ctx);
                     return;
@@ -880,6 +955,14 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
 
   Future<void> _handleCompleteTask(String taskId) async {
     final dateStr = _selectedDate.toIso8601String().split('T')[0];
+
+    // [NEW] Immediate local invalidation
+    await VoiceReminderService().resyncAfterTaskStateChange(
+      effectiveUid,
+      taskId,
+      reason: "completed",
+    );
+
     await _scheduleService.completeTask(
       uid: effectiveUid,
       date: dateStr,
@@ -889,7 +972,7 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
     _fetchSchedule();
   }
 
-  Future<void> _handleLaterTask(String taskId) async {
+  Future<void> _handleLaterTask(String taskId, {String? reason}) async {
     final dateStr = _selectedDate.toIso8601String().split('T')[0];
 
     final result = await _scheduleService.requestTaskLater(
@@ -897,12 +980,14 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
       date: dateStr,
       taskId: taskId,
       sessionId: _voiceSessionId,
+      reason: reason,
     );
 
     if (result == null) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Couldn't start the reschedule conversation.")),
+        const SnackBar(
+            content: Text("Couldn't start the reschedule conversation.")),
       );
       return;
     }
@@ -927,146 +1012,69 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
     String taskId, {
     required Map<String, dynamic> task,
   }) async {
-    final skipData = await _showSkipDialog(context);
-    if (skipData == null) return;
+    final skipResult = await _showSkipDialog(context);
+    if (skipResult == null) return;
 
+    final action = skipResult['action'];
+    final reason = skipResult['reason'];
     final dateStr = _selectedDate.toIso8601String().split('T')[0];
-    final reasons = skipData['reasons'] as List<String>;
-    final decisionBy = skipData['decisionBy'] as String;
-    final caregiverNote = skipData['caregiverNote'] as String?;
 
     try {
-      final result = await _scheduleService.skipTask(
-        uid: effectiveUid,
-        date: dateStr,
-        taskId: taskId,
-        reasons: reasons,
-        decisionBy: decisionBy,
-        caregiverNote: caregiverNote,
-      );
-
-      final resultStatus = result['status'];
-
-      if (resultStatus == 'confirmation_required') {
-        if (!mounted) return;
-
-        final taskName = task['task_name'] ?? 'this task';
-        final bool willNotifyCaregiver = task['escalateOnSkip'] == true ||
-            task['notifyCaregiverOnSkip'] == true ||
-            task['type'] == 'medication';
-
-        final confirmed = await showDialog<bool>(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            title: Row(
-              children: const [
-                Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 28),
-                SizedBox(width: 10),
-                Text('Skip Task?'),
-              ],
-            ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  result['message'] ??
-                      'Are you sure you want to skip "$taskName"?',
-                  style: const TextStyle(fontSize: 15),
-                ),
-                if (willNotifyCaregiver) ...[
-                  const SizedBox(height: 12),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: Colors.orange.shade50,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: Colors.orange.shade200),
-                    ),
-                    child: Row(
-                      children: const [
-                        Icon(Icons.info_outline, color: Colors.orange, size: 18),
-                        SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'Your caregiver may be informed about this skip.',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: Colors.deepOrange,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('Cancel'),
-              ),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-                onPressed: () => Navigator.pop(ctx, true),
-                child: const Text('Yes, Skip'),
-              ),
-            ],
-          ),
-        );
-
-        if (confirmed == true) {
-          await _scheduleService.skipTask(
-            uid: effectiveUid,
-            date: dateStr,
-            taskId: taskId,
-            reasons: reasons,
-            decisionBy: decisionBy,
-            caregiverNote: caregiverNote,
-            confirmed: true,
-          );
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Task skipped.')),
-            );
-          }
-        } else {
-          return;
-        }
-      } else if (resultStatus == 'blocked') {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(result['message'] ??
-                  'This task cannot be skipped right now.'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
+      if (action == 'later') {
+        // 🔥 Reusing existing voice rescheduling flow
+        await _handleLaterTask(taskId, reason: reason);
         return;
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Task skipped successfully.')),
-          );
-        }
       }
 
-      _cancelTaskNotifications(taskId);
-      _fetchSchedule();
+      if (action == 'caregiver') {
+        // [NEW] Immediate local invalidation
+        await VoiceReminderService().resyncAfterTaskStateChange(
+          effectiveUid,
+          taskId,
+          reason: "caregiver_review",
+        );
+
+        // Escalate to caregiver status
+        await _scheduleService.updateFirestoreTaskStatus(
+          effectiveUid,
+          _selectedDate,
+          taskId,
+          false,
+          status: 'needs_caregiver_review',
+        );
+        // Premium OpenAI confirmation
+        await _speakWithOpenAIFallback("Okay, I will inform your caregiver.");
+        _fetchSchedule();
+        return;
+      }
+
+      if (action == 'skipped') {
+        // [NEW] Immediate local invalidation
+        await VoiceReminderService().resyncAfterTaskStateChange(
+          effectiveUid,
+          taskId,
+          reason: "skipped",
+        );
+
+        // Standard skip
+        await _scheduleService.skipTask(
+          uid: effectiveUid,
+          date: dateStr,
+          taskId: taskId,
+          reasons: [reason],
+          decisionBy: 'elder',
+          confirmed: true,
+        );
+        // Premium OpenAI confirmation
+        await _speakWithOpenAIFallback("Okay, I will skip this for today.");
+        _fetchSchedule();
+        return;
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error skipping task: $e'),
+            content: Text('Error: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -1093,11 +1101,15 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
         return "Skipped";
       case 'missed_likely':
       case 'missed_confirmed':
+      case 'missed':
         return "Missed";
       case 'needs_caregiver_review':
         return "Needs review";
       case 'escalated':
         return "Caregiver informed";
+      case 'reminder_sent':
+      case 'reminder_triggered':
+        return "Reminder Sent";
       default:
         return isCompleted ? "Completed" : "Scheduled";
     }
@@ -1107,8 +1119,10 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
     switch (status) {
       case 'scheduled':
       case 'upcoming':
-      case 'reminder_triggered':
         return Colors.teal;
+      case 'reminder_triggered':
+      case 'reminder_sent':
+        return Colors.blue;
       case 'snoozed':
         return Colors.orange;
       case 'in_progress':
@@ -1121,6 +1135,7 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
         return Colors.red;
       case 'missed_likely':
       case 'missed_confirmed':
+      case 'missed':
       case 'escalated':
         return Colors.red;
       case 'needs_caregiver_review':
@@ -1137,6 +1152,7 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
       case 'upcoming':
         return Icons.upcoming;
       case 'reminder_triggered':
+      case 'reminder_sent':
         return Icons.notifications_active;
       case 'snoozed':
         return Icons.snooze;
@@ -1150,6 +1166,7 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
         return Icons.skip_next;
       case 'missed_likely':
       case 'missed_confirmed':
+      case 'missed':
         return Icons.cancel;
       case 'needs_caregiver_review':
         return Icons.notification_important;
@@ -1174,6 +1191,13 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
     final caregiverNote = skipData['caregiverNote'] as String?;
 
     try {
+      // [NEW] Immediate local invalidation
+      await VoiceReminderService().resyncAfterTaskStateChange(
+        effectiveUid,
+        taskId,
+        reason: "caregiver_skipped",
+      );
+
       await _scheduleService.skipTask(
         uid: effectiveUid,
         date: dateStr,
@@ -1200,88 +1224,122 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
     BuildContext context, {
     String initialDecisionBy = 'elder',
   }) async {
-    final selectedReasons = <String>{};
-    String decisionBy = initialDecisionBy;
-    final caregiverNoteController = TextEditingController();
+    String? selectedReason;
+    int step = 1; // 1: Reason, 2: Action
+
+    final reasonsMap = {
+      'not_feeling_well': {'label': "I don't feel well", 'icon': Icons.sick},
+      'not_available': {'label': "I am busy now", 'icon': Icons.timer},
+      'already_done_uncertain': {
+        'label': "I already did it",
+        'icon': Icons.check_circle_outline
+      },
+      'out_of_medicine': {
+        'label': "I don't have what I need",
+        'icon': Icons.shopping_basket
+      },
+      'other': {'label': "Other", 'icon': Icons.more_horiz},
+    };
 
     return showDialog<Map<String, dynamic>>(
       context: context,
       builder: (context) {
         return StatefulBuilder(
-          builder: (context, setState) {
+          builder: (context, setDialogState) {
             return AlertDialog(
-              title: const Text('Skip task'),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('Why is this task being skipped?'),
-                    const SizedBox(height: 8),
-                    ...skipReasonOptions.map((reason) {
-                      return CheckboxListTile(
-                        value: selectedReasons.contains(reason),
-                        title: Text(reason.replaceAll('_', ' ')),
-                        controlAffinity: ListTileControlAffinity.leading,
-                        onChanged: (checked) {
-                          setState(() {
-                            if (checked == true) {
-                              selectedReasons.add(reason);
-                            } else {
-                              selectedReasons.remove(reason);
-                            }
-                          });
-                        },
-                      );
-                    }),
-                    const SizedBox(height: 12),
-                    const Text('Decision by'),
-                    RadioListTile<String>(
-                      value: 'elder',
-                      groupValue: decisionBy,
-                      title: const Text('Elder'),
-                      onChanged: (value) => setState(() => decisionBy = value!),
-                    ),
-                    RadioListTile<String>(
-                      value: 'caregiver',
-                      groupValue: decisionBy,
-                      title: const Text('Caregiver'),
-                      onChanged: (value) => setState(() => decisionBy = value!),
-                    ),
-                    if (decisionBy == 'caregiver') ...[
-                      const SizedBox(height: 8),
-                      TextField(
-                        controller: caregiverNoteController,
-                        maxLines: 3,
-                        decoration: const InputDecoration(
-                          labelText: 'Caregiver note',
-                          hintText:
-                              'Explain why the caregiver decided to skip this task',
-                          border: OutlineInputBorder(),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20)),
+              title: Text(
+                step == 1 ? 'Why skip this task?' : 'What should I do?',
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontWeight: FontWeight.bold),
               ),
+              content: SizedBox(
+  width: double.maxFinite,
+  child: step == 1
+      ? SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: reasonsMap.entries.map((entry) {
+              return Card(
+                elevation: 0,
+                margin: const EdgeInsets.only(bottom: 10),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(15),
+                  side: BorderSide(color: Colors.grey.shade200),
+                ),
+                child: ListTile(
+                  leading: Icon(
+                    entry.value['icon'] as IconData,
+                    color: Colors.teal,
+                  ),
+                  title: Text(
+                    entry.value['label'] as String,
+                    style: const TextStyle(fontWeight: FontWeight.w500),
+                  ),
+                  trailing: const Icon(
+                    Icons.chevron_right,
+                    size: 18,
+                    color: Colors.grey,
+                  ),
+                  onTap: () {
+                    setDialogState(() {
+                      selectedReason = entry.key;
+                      step = 2;
+                    });
+                  },
+                ),
+              );
+            }).toList(),
+          ),
+        )
+      : Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              "Select an action below.",
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.grey),
+            ),
+            const SizedBox(height: 20),
+
+            // ✅ Remind me later
+            _buildActionButton(
+              label: "Remind me later",
+              icon: Icons.notifications_active,
+              color: Colors.teal,
+              isHighlighted: selectedReason == 'not_available',
+              onTap: () => Navigator.pop(context, {
+                'action': 'later',
+                'reason': selectedReason,
+              }),
+            ),
+
+            const SizedBox(height: 12),
+
+            // ✅ Skip today
+            _buildActionButton(
+              label: "Skip for today",
+              icon: Icons.block,
+              color: Colors.orange,
+              onTap: () => Navigator.pop(context, {
+                'action': 'skipped',
+                'reason': selectedReason,
+              }),
+            ),
+          ],
+        ),
+),
               actions: [
+                if (step == 2)
+                  TextButton(
+                    onPressed: () => setDialogState(() => step = 1),
+                    child: const Text('Back'),
+                  ),
                 TextButton(
                   onPressed: () => Navigator.pop(context),
-                  child: const Text('Cancel'),
-                ),
-                ElevatedButton(
-                  onPressed: selectedReasons.isEmpty ||
-                          (decisionBy == 'caregiver' &&
-                              caregiverNoteController.text.trim().isEmpty)
-                      ? null
-                      : () {
-                          Navigator.pop(context, {
-                            'reasons': selectedReasons.toList(),
-                            'decisionBy': decisionBy,
-                            'caregiverNote': caregiverNoteController.text.trim(),
-                          });
-                        },
-                  child: const Text('Save'),
+                  child:
+                      const Text('Cancel', style: TextStyle(color: Colors.grey)),
                 ),
               ],
             );
@@ -1291,10 +1349,51 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
     );
   }
 
+  Widget _buildActionButton({
+    required String label,
+    required IconData icon,
+    required Color color,
+    required VoidCallback onTap,
+    bool isHighlighted = false,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(15),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+        decoration: BoxDecoration(
+          color: isHighlighted ? color.withOpacity(0.1) : Colors.white,
+          borderRadius: BorderRadius.circular(15),
+          border: Border.all(
+            color: isHighlighted ? color : Colors.grey.shade200,
+            width: isHighlighted ? 2 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: color),
+            const SizedBox(width: 15),
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: isHighlighted ? color : Colors.black87,
+                  fontSize: 16,
+                ),
+              ),
+            ),
+            if (isHighlighted)
+              Icon(Icons.star, color: color, size: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildTaskTile(Map<String, dynamic> task) {
     final bool isCompleted = task['completed'] == true;
-    final String rawStatus = (task['status'] ?? '').toString().trim();
-    final String status = _normalizeStatus(rawStatus, isCompleted);
+    final String status = _normalizeStatus(task);
     final String time = task['time'] ?? "--:--";
     final String subtitle = task['subtitle'] ?? "";
 
@@ -1713,7 +1812,7 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
     }
 
     final common = _dailyTasks
-        .where((t) => t['type'] == 'common' || t['type'] == 'custom')
+        .where((t) => t['type'] != 'medication' && t['type'] != 'therapy' && t['type'] != 'therapist')
         .toList();
     final meds = _dailyTasks.where((t) => t['type'] == 'medication').toList();
     final therapy = _dailyTasks
@@ -1824,6 +1923,13 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
     );
 
     if (!currentStatus) {
+      // [NEW] Immediate local invalidation when marking DONE
+      await VoiceReminderService().resyncAfterTaskStateChange(
+        effectiveUid,
+        taskId,
+        reason: "toggled_complete",
+      );
+
       await _scheduleService.completeTask(
         uid: effectiveUid,
         date: _selectedDate.toIso8601String().split('T')[0],
@@ -1882,10 +1988,35 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
   }
 
   String _getScheduleDocId() {
-  final d =
-      "${_selectedDate.day.toString().padLeft(2, '0')}.${_selectedDate.month.toString().padLeft(2, '0')}.${_selectedDate.year}";
-  return "${effectiveUid}_$d";
-}
+    final d =
+        "${_selectedDate.day.toString().padLeft(2, '0')}.${_selectedDate.month.toString().padLeft(2, '0')}.${_selectedDate.year}";
+    return "${effectiveUid}_$d";
+  }
+
+  String _determineCategory(String taskName) {
+    final lower = taskName.toLowerCase();
+    
+    // Medication / Health
+    if (lower.contains('pill') || lower.contains('vitamin') || lower.contains('medication') || lower.contains('medicine') || lower.contains('tablet') || lower.contains('syrup')) return 'medication';
+    if (lower.contains('water') || lower.contains('drink') || lower.contains('hydrate') || lower.contains('health')) return 'health';
+    
+    // Meals
+    if (lower.contains('eat') || lower.contains('breakfast') || lower.contains('lunch') || lower.contains('dinner') || lower.contains('meal') || lower.contains('snack')) return 'meals';
+    
+    // Social
+    if (lower.contains('call') || lower.contains('visit') || lower.contains('talk') || lower.contains('friend') || lower.contains('daughter') || lower.contains('son') || lower.contains('family')) return 'social';
+    
+    // Leisure
+    if (lower.contains('read') || lower.contains('tv') || lower.contains('relax') || lower.contains('walk') || lower.contains('garden') || lower.contains('music')) return 'leisure';
+    
+    // Therapy
+    if (lower.contains('therapy') || lower.contains('stretch') || lower.contains('exercise') || lower.contains('massage') || lower.contains('physio')) return 'therapy';
+    
+    // Urgent
+    if (lower.contains('doctor') || lower.contains('clinic') || lower.contains('hospital') || lower.contains('appointment') || lower.contains('emergency')) return 'urgent';
+    
+    return 'common';
+  }
 
   void _showManualAddDialog() {
     final nameController = TextEditingController();
@@ -1927,18 +2058,21 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
           ElevatedButton(
             child: const Text("Add"),
             onPressed: () async {
-              if (nameController.text.trim().isEmpty) return;
+              final taskName = nameController.text.trim();
+              if (taskName.isEmpty) return;
 
               final hhmm =
                   "${selectedTime.hour.toString().padLeft(2, '0')}:${selectedTime.minute.toString().padLeft(2, '0')}";
+              
+              final category = _determineCategory(taskName);
 
               final success = await _scheduleService.addTask(
                 effectiveUid,
                 _selectedDate,
                 {
-                  "task_name": nameController.text.trim(),
+                  "task_name": taskName,
                   "time": hhmm,
-                  "type": "common",
+                  "type": category,
                   "completed": false,
                   "id":
                       "${effectiveUid}_manual_${DateTime.now().millisecondsSinceEpoch}",
@@ -2028,6 +2162,10 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
             ),
           ),
           const Divider(height: 1),
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 8),
+            child: DigitalClock(),
+          ),
           if (_insights.isNotEmpty)
             Container(
               width: double.infinity,
