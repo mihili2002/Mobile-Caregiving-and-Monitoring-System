@@ -476,8 +476,7 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
 
     for (final t in _dailyTasks) {
       final bool isCompleted = t['completed'] == true;
-      final String rawStatus = (t['status'] ?? '').toString().trim();
-      final String normalizedStatus = _normalizeStatus(rawStatus, isCompleted);
+      final String normalizedStatus = _normalizeStatus(t);
 
       if (isCompleted) continue;
       if (_isTerminalStatus(normalizedStatus)) continue;
@@ -545,6 +544,7 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
       'skipped',
       'missed_likely',
       'missed_confirmed',
+      'missed',
       'needs_caregiver_review',
       'escalated',
       'snoozed',
@@ -552,20 +552,50 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
     }.contains(status);
   }
 
-  String _normalizeStatus(String? rawStatus, bool isCompleted) {
-    final status = (rawStatus ?? '').trim();
+  String _normalizeStatus(Map<String, dynamic> task) {
+    final bool isCompleted = task['completed'] == true;
+    final String rawStatus = (task['status'] ?? '').toString().trim();
+    String status = rawStatus;
 
-    if (status.isEmpty) {
-      return isCompleted ? 'completed_confirmed' : 'scheduled';
+    if (status.isEmpty || status == 'pending') {
+      status = isCompleted ? 'completed_confirmed' : 'scheduled';
+    } else if (isCompleted) {
+      status = 'completed_confirmed';
+    }
+
+    if (!isCompleted) {
+      DateTime? taskTime;
+      if (task['snoozedUntil'] != null) {
+        taskTime = DateTime.tryParse(task['snoozedUntil']);
+      } else if (task['scheduledAt'] != null) {
+        taskTime = DateTime.tryParse(task['scheduledAt']);
+      } else if (task['time'] != null && task['time'].toString().contains(":")) {
+        final now = DateTime.now();
+        final parts = task['time'].split(":");
+        if (parts.length >= 2) {
+          taskTime = DateTime(
+            now.year,
+            now.month,
+            now.day,
+            int.tryParse(parts[0]) ?? 0,
+            int.tryParse(parts[1]) ?? 0,
+          );
+        }
+      }
+
+      if (taskTime != null) {
+        final now = DateTime.now();
+        if (now.isAfter(taskTime.add(const Duration(hours: 1)))) {
+          status = 'missed';
+        }
+      }
     }
 
     switch (status) {
-      case 'pending':
-        return isCompleted ? 'completed_confirmed' : 'scheduled';
       case 'acknowledged':
         return 'reminder_triggered';
       case 'reminder_sent':
-        return 'reminder_triggered';
+        return 'reminder_sent';
       default:
         return status;
     }
@@ -578,10 +608,14 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
       'scheduled',
       'upcoming',
       'reminder_triggered',
+      'reminder_sent',
       'snoozed',
       'in_progress',
       'needs_caregiver_review',
       'escalated',
+      'missed',
+      'missed_likely',
+      'missed_confirmed',
     }.contains(status);
   }
 
@@ -592,9 +626,8 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
       'scheduled',
       'upcoming',
       'reminder_triggered',
+      'reminder_sent',
       'snoozed',
-      'missed_likely',
-      'missed_confirmed',
       'needs_caregiver_review',
     }.contains(status);
   }
@@ -606,6 +639,7 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
       'scheduled',
       'upcoming',
       'reminder_triggered',
+      'reminder_sent',
       'snoozed',
       'needs_caregiver_review',
     }.contains(status);
@@ -618,7 +652,9 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
       'scheduled',
       'upcoming',
       'reminder_triggered',
+      'reminder_sent',
       'snoozed',
+      'missed',
       'missed_likely',
       'missed_confirmed',
       'needs_caregiver_review',
@@ -1065,11 +1101,15 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
         return "Skipped";
       case 'missed_likely':
       case 'missed_confirmed':
+      case 'missed':
         return "Missed";
       case 'needs_caregiver_review':
         return "Needs review";
       case 'escalated':
         return "Caregiver informed";
+      case 'reminder_sent':
+      case 'reminder_triggered':
+        return "Reminder Sent";
       default:
         return isCompleted ? "Completed" : "Scheduled";
     }
@@ -1079,8 +1119,10 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
     switch (status) {
       case 'scheduled':
       case 'upcoming':
-      case 'reminder_triggered':
         return Colors.teal;
+      case 'reminder_triggered':
+      case 'reminder_sent':
+        return Colors.blue;
       case 'snoozed':
         return Colors.orange;
       case 'in_progress':
@@ -1093,6 +1135,7 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
         return Colors.red;
       case 'missed_likely':
       case 'missed_confirmed':
+      case 'missed':
       case 'escalated':
         return Colors.red;
       case 'needs_caregiver_review':
@@ -1109,6 +1152,7 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
       case 'upcoming':
         return Icons.upcoming;
       case 'reminder_triggered':
+      case 'reminder_sent':
         return Icons.notifications_active;
       case 'snoozed':
         return Icons.snooze;
@@ -1122,6 +1166,7 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
         return Icons.skip_next;
       case 'missed_likely':
       case 'missed_confirmed':
+      case 'missed':
         return Icons.cancel;
       case 'needs_caregiver_review':
         return Icons.notification_important;
@@ -1348,8 +1393,7 @@ class _DailyRoutinePageState extends State<DailyRoutinePage>
 
   Widget _buildTaskTile(Map<String, dynamic> task) {
     final bool isCompleted = task['completed'] == true;
-    final String rawStatus = (task['status'] ?? '').toString().trim();
-    final String status = _normalizeStatus(rawStatus, isCompleted);
+    final String status = _normalizeStatus(task);
     final String time = task['time'] ?? "--:--";
     final String subtitle = task['subtitle'] ?? "";
 

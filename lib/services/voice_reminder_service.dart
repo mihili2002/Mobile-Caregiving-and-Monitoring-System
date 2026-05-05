@@ -237,7 +237,7 @@ class VoiceReminderService {
         continue;
       }
 
-      if (diff == 10 || diff == 20) {
+      if (diff == 5 || diff == 10 || diff == 20) {
         if (!_spokenReminderIds.contains(minuteKey)) {
           _spokenReminderIds.add(minuteKey);
 
